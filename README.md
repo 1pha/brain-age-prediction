@@ -13,6 +13,5 @@
     + 128 - 64 - 1(regression work)
   + optimizer: Adam, lr=1e-3
   + loss: MSEloss
-<br>
-+ Result: not good
++ Result: not good <br></br>
 ![](./result/0923_lr1e-3_Train.png) ![](./result/0923_lr1e-3_Test.png)
