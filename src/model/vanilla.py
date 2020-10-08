@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 
@@ -44,6 +45,6 @@ class Vanilla3d(nn.Module):
         x = self.fc1(x)
         x = self.fc2(x)
         if self.task_type == 'binary':
-            x = nn.functional.sigmoid(x)
+            x = torch.sigmoid(x)
 
         return x

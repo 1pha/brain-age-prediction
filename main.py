@@ -24,7 +24,7 @@ parser.add_argument('--optimizer', '-o', type=str, default='adam',
                     help='Type of Optimizer, default=adam')
 parser.add_argument('--scheduler', '-sc', type=str, default=None,
                     help='Type of Scheduler, default=None')
-parser.add_argument('--loss_function', '-l', type=str, default='mse',
+parser.add_argument('--loss_function', '-l', type=str, default='bce',
                     help='Define Loss function, default=mse')
 parser.add_argument('--epochs', '-e', type=int, default=1,
                     help='Number of epochs, default=20')
@@ -42,7 +42,8 @@ optimizer_list = {
 }
 
 loss_list = {
-    'mse': nn.MSELoss
+    'mse': nn.MSELoss,
+    'bce': nn.BCELoss
 }
 
 if __name__ == "__main__":

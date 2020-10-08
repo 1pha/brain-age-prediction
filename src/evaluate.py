@@ -5,9 +5,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report
 
 import torch
+
 
 def eval(model, loader, device):
 
@@ -71,7 +72,9 @@ def result_plot(task_type, trues, preds, title='Train', fname=None):
 
         preds = (preds >= .5) * 1
 
-        confusion_matrix(trues, preds)
+        print(classification_report(trues, preds, target_names=['Old', 'Young']))
         sns_plot = sns.heatmap(confusion_matrix(trues, preds), annot=True)
         if fname:
-            sns_plot.savefig(f'./result/{fname}_{title}_binary.png')
+            figure = sns_plot.get_figure()
+            figure.savefig(f'./result/{fname}_{title}_bin.png', dpi=400)
+        plt.show()
