@@ -1,8 +1,11 @@
 from itertools import chain
 
 import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
+
+from sklearn.metrics import confusion_matrix
 
 import torch
 
@@ -66,4 +69,9 @@ def result_plot(task_type, trues, preds, title='Train', fname=None):
 
     elif task_type == 'binary':
 
-        pass
+        preds = (preds >= .5) * 1
+
+        confusion_matrix(trues, preds)
+        sns_plot = sns.heatmap(confusion_matrix(trues, preds), annot=True)
+        if fname:
+            sns_plot.savefig(f'./result/{fname}_{title}_binary.png')

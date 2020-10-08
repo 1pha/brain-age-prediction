@@ -76,11 +76,11 @@ if __name__ == "__main__":
 
     # 04. Evaluate
     # 04-1. Loss Plot
-    loss_plot(*losses, EPOCHS, args.loss_function)
+    #loss_plot(*losses, EPOCHS, args.loss_function)
 
     # 04-2. Result Plot
     train_true, train_pred = eval(model=model, loader=train_loader, device=device)
-    result_plot(trues=train_true, preds=train_pred, title='Train', fname=fname)
+    result_plot(task_type=args.task_type, trues=train_true, preds=train_pred, title='Train', fname=fname)
 
     test_true, test_pred = eval(model=model, loader=test_loader, device=device)
-    result_plot(trues=test_true, preds=test_pred, title='Test', fname=fname)
+    result_plot(task_type=args.task_type, trues=test_true, preds=test_pred, title='Test', fname=fname)
