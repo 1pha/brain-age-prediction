@@ -1,2 +1,4 @@
 *.ini
 .ipynb_checkpoints/
+*ipynb_checkpoints*
+*pycache*
