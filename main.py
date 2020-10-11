@@ -25,7 +25,7 @@ parser.add_argument('--optimizer', '-o', type=str, default='adam',
 parser.add_argument('--scheduler', '-sc', type=str, default=None,
                     help='Type of Scheduler, default=None')
 parser.add_argument('--loss_function', '-l', type=str, default='bce',
-                    help='Define Loss function, default=mse')
+                    help='Define Loss function, default=bce')
 parser.add_argument('--epochs', '-e', type=int, default=1,
                     help='Number of epochs, default=20')
 parser.add_argument('--batch_size', '-b', type=int, default=8,
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     # 02. Setups
     optimizer = optimizer_list[args.optimizer](model.parameters(),
                                                lr=args.learning_rate)
-    scheduler = scheduler_list[args.scheduler](optimizer) if args.scheduler else None
+    scheduler = scheduler_list[args.scheduler](optimizer, len(train_loader), eta_min=0) if args.scheduler else None
     loss_fn = loss_list[args.loss_function]()
     EPOCHS = range(args.epochs)
 
