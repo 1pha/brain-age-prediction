@@ -46,6 +46,10 @@ loss_list = {
     'bce': nn.BCELoss
 }
 
+scheduler_list = {
+    'cosine': optim.lr_scheduler.CosineAnnealingLR
+}
+
 if __name__ == "__main__":
 
     # 00. Load Data
@@ -63,6 +67,7 @@ if __name__ == "__main__":
     # 02. Setups
     optimizer = optimizer_list[args.optimizer](model.parameters(),
                                                lr=args.learning_rate)
+    scheduler = scheduler_list[args.scheduler](optimizer) if args.scheduler else None
     loss_fn = loss_list[args.loss_function]()
     EPOCHS = range(args.epochs)
 
