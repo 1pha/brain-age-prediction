@@ -75,7 +75,8 @@ if __name__ == "__main__":
     summary = SummaryWriter(f'./tensorboard/{datetime.now().strftime("%Y-%m-%d_%H%M")}') if args.save else None
     fname = f'{datetime.now().strftime("%Y-%m-%d_%H%M-")}' if args.save else None
     model, losses = run(model=model, epochs=EPOCHS, train_loader=train_loader, test_loader=test_loader,
-                        optimizer=optimizer, loss_fn=loss_fn, device=device, summary=summary, verbose=True)
+                        optimizer=optimizer, loss_fn=loss_fn, device=device,
+                        summary=summary, scheduler=scheduler, verbose=True)
 
     if args.save:
         torch.save(model, f"./models/{fname}_model.pth")
