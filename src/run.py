@@ -77,7 +77,7 @@ def run(model, epochs, train_loader, test_loader,
             summary.add_pr_curve('pr_curve/test', tst_trues, tst_preds, e)
 
             if scheduler:
-                summary.add_scalars('lr', scheduler.get_last_lr(), e)
+                summary.add_scalar('lr', scheduler.get_last_lr(), e)
 
         if verbose:
             print(f'EPOCHS {e} | TRAIN :: [LOSS] {trn_losses[-1]:.3f} | VALID :: [LOSS] {tst_losses[-1]:.3f}')

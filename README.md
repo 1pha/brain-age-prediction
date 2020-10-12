@@ -1,17 +1,15 @@
 # MRI Data 3D Brain Convolution
----
-## Logs
-### 09.23
-+ Successfully **passed** the 3d brains to model
-+ outputs came out but do poorly
-+ Current Model
-  + layer1
-    + Conv3d(1, 8, 5, 3) - BatchNorm3d(8) - ReLU - Dropout(.2) - Maxpool(3, 3)
-  + layer2
-    + Conv3d(8, 16, 5, 3) - BatchNorm3d(16) - ReLU - Dropout(.2) - Maxpool(3, 3)
-  + fc
-    + 128 - 64 - 1(regression work)
-  + optimizer: Adam, lr=1e-3
-  + loss: MSEloss
-+ Result: not good <br></br>
-![](./result/0923_lr1e-3_Train.png) ![](./result/0923_lr1e-3_Test.png)
+## 10.12
++ PR Curve is **not good**:rotating_light: 
+  + currently working predicting only one side
+  + even though it's nearly balanced...
++ **Task** Old/Young Binary Classification
++ [Current Model](./src/model/vanilla.py)
+  + `optimizer`: Adam, lr=1e-3
+  + `loss`: BCELoss
+  + `scheduler`: CosineAnnealing
++ :construction:Trying to implement **Inception** Module
+  + Reference
+    + [Brain MRI-based 3D Convolutional Neural Networks for Classification of Schizophrenia and Controls
+](https://arxiv.org/abs/2003.08818)
+    + [Implementing Inception(KR)](https://wingnim.tistory.com/36)
