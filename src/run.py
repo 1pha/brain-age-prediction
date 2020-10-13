@@ -3,6 +3,8 @@ from itertools import chain
 import numpy as np
 import seaborn as sns
 from sklearn.metrics import confusion_matrix as cf
+from sklearn.metrics import classification_report
+
 import torch
 
 def run(model, epochs, train_loader, test_loader,
@@ -81,5 +83,7 @@ def run(model, epochs, train_loader, test_loader,
 
         if verbose:
             print(f'EPOCHS {e} | TRAIN :: [LOSS] {trn_losses[-1]:.3f} | VALID :: [LOSS] {tst_losses[-1]:.3f}')
+            print(f'[TRAIN - REPORT]{classification_report(trn_trues, trn_preds)}')
+            print(f'[TEST  - REPORT]{classification_report(tst_trues, tst_preds)}')
 
     return model, (trn_losses, tst_losses)

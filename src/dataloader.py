@@ -35,7 +35,7 @@ class MyDataset(Dataset):
 
     def __getitem__(self, idx):
         # print(idx)
-        x = torch.tensor(nib.load(self.data_files[idx]).get_fdata())[None, :, :].float()# / 255
+        x = torch.tensor(nib.load(self.data_files[idx]).get_fdata())[None, :, :].float() / 255
         y = torch.tensor(self.label_file[idx]).float()
         return x, y
 

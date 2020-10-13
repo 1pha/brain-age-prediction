@@ -31,7 +31,7 @@ parser.add_argument('--epochs', '-e', type=int, default=1,
                     help='Number of epochs, default=20')
 parser.add_argument('--batch_size', '-b', type=int, default=8,
                     help='Size of the minibatch, default=8')
-parser.add_argument('--save', '-s', action='store_true', default=False)
+parser.add_argument('--save', '-s', action='store_true', default=True)
 args = parser.parse_args()
 
 model_list = {
