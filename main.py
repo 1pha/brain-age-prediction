@@ -31,7 +31,7 @@ parser.add_argument('--epochs', '-e', type=int, default=1,
                     help='Number of epochs, default=20')
 parser.add_argument('--batch_size', '-b', type=int, default=8,
                     help='Size of the minibatch, default=8')
-parser.add_argument('--save', '-s', action='store_true', default=True)
+parser.add_argument('--save', '-s', action='store_true', default=False)
 args = parser.parse_args()
 
 model_list = {
@@ -63,11 +63,13 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dset, batch_size=args.batch_size)
 
     # 01. Define Model
+    print("# 01. Define Model")
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f'Using {device}')
     model = model_list[args.model](args.task_type).to(device)
 
     # 02. Setups
+    print("# 02. Setups - Optim, Loss, Scheduler")
     optimizer = optimizer_list[args.optimizer](model.parameters(),
                                                lr=args.learning_rate)
     scheduler = scheduler_list[args.scheduler](optimizer, len(train_loader), eta_min=0) if args.scheduler else None
@@ -75,6 +77,7 @@ if __name__ == "__main__":
     EPOCHS = range(args.epochs)
 
     # 03. Run
+    print("# 03. Run Epochs")
     summary = SummaryWriter(f'./tensorboard/{datetime.now().strftime("%Y-%m-%d_%H%M")}') if args.save else None
     fname = f'{datetime.now().strftime("%Y-%m-%d_%H%M-")}' if args.save else None
     model, losses = run(model=model, epochs=EPOCHS, train_loader=train_loader, test_loader=test_loader,
@@ -85,6 +88,7 @@ if __name__ == "__main__":
         torch.save(model, f"./models/{fname}_model.pth")
 
     # 04. Evaluate
+    print("# 04. Loss Plot")
     # 04-1. Loss Plot
     #loss_plot(*losses, EPOCHS, args.loss_function)
 
