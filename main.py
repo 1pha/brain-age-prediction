@@ -10,6 +10,7 @@ from src.run import run
 from src.dataloader import MyDataset
 from src.evaluate import eval, loss_plot, result_plot
 from src.model.vanilla import Vanilla3d
+from src.model.paper_ieee.levakov import Levakov
 
 import argparse
 
@@ -34,7 +35,8 @@ parser.add_argument('--save', '-s', action='store_true', default=True)
 args = parser.parse_args()
 
 model_list = {
-    'vanilla': Vanilla3d
+    'vanilla': Vanilla3d,
+    'levakov': Levakov,
 }
 
 optimizer_list = {
@@ -53,6 +55,7 @@ scheduler_list = {
 if __name__ == "__main__":
 
     # 00. Load Data
+    print("# 00. Loading Data")
     train_dset = MyDataset(args.task_type)
     test_dset = MyDataset(args.task_type, test=True)
 
