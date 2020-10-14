@@ -83,7 +83,7 @@ def run(model, epochs, train_loader, test_loader,
 
         if verbose:
             print(f'EPOCHS {e} | TRAIN :: [LOSS] {trn_losses[-1]:.3f} | VALID :: [LOSS] {tst_losses[-1]:.3f}')
-            print(f'[TRAIN - REPORT]{classification_report(trn_trues, trn_preds)}')
-            print(f'[TEST  - REPORT]{classification_report(tst_trues, tst_preds)}')
+            print(f'[TRAIN - REPORT]\n{classification_report(trn_trues, trn_preds)}')
+            print(f'[TEST  - REPORT]\n{classification_report(tst_trues, tst_preds)}')
 
     return model, (trn_losses, tst_losses)
