@@ -33,7 +33,7 @@ parser.add_argument('--batch_size', '-b', type=int, default=8,
                     help='Size of the minibatch, default=8')
 parser.add_argument('--resize', '-r', type=int, default=64,
                     help='Size of resizing, default=64. Original raw data is 256-cube')
-parser.add_argument('--save', '-s', action='store_true', default=False)
+parser.add_argument('--save', '-s', action='store_true', default=True)
 args = parser.parse_args()
 
 model_list = {
