@@ -15,6 +15,9 @@
     + `Batch_size` 8
     + `Scheduler` Cosine Annealing, with initial lr=1e-4
   + not good... (18:50)
+  + yes good(21:28)
+    + found a **severe** error in my code...
+    + since this is originally from regression with LOGs, my prediction was collecting informations transforming back with exp! which is not needed for classification task...(last layer of sigmoid will do everything...) So stupid...
   + Reference
     + [Levakov et al.](https://onlinelibrary.wiley.com/doi/pdf/10.1002/hbm.25011)
 ### 10.12
