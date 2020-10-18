@@ -1,5 +1,23 @@
 # MRI Data 3D Brain Convolution
-## 10.12
+### 10.18(Sun)
++ Changes
+  + **MinMaxScaler**
+    + instead of dividing 255 to every subjects
+    + scaler fitted to each subjects respectively
+    + `sklearn.preprocessing.MinMaxScaler`
+  + **Interpolate**
+    + 256cube too big
+    + narrowed down to 64cube
++ Results
+  + currently running with
+    + `Model` Levakov
+    + `Epochs` 400
+    + `Batch_size` 8
+    + `Scheduler` Cosine Annealing, with initial lr=1e-4
+  + not good... (18:50)
+  + Reference
+    + [Levakov et al.](https://onlinelibrary.wiley.com/doi/pdf/10.1002/hbm.25011)
+### 10.12
 + PR Curve is **not good**:rotating_light: 
   + currently working predicting only one side
   + even though it's nearly balanced...
