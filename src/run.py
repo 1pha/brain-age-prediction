@@ -6,6 +6,7 @@ from sklearn.metrics import confusion_matrix as cf
 from sklearn.metrics import classification_report
 
 import torch
+import torch.nn.functional as F
 
 def run(model, epochs, train_loader, test_loader,
         optimizer, loss_fn, device,
@@ -36,7 +37,7 @@ def run(model, epochs, train_loader, test_loader,
             trn_trues.append(y.to('cpu'))
             trn_preds.append(y_pred.to('cpu'))
 
-            loss = loss_fn(y_pred, y)
+            loss = loss_fn(y_pred.squeeze(1), y)
             del x, y, y_pred
 
             loss.backward()
@@ -69,7 +70,7 @@ def run(model, epochs, train_loader, test_loader,
                 tst_trues.append(y.to('cpu'))
                 tst_preds.append(y_pred.to('cpu'))
 
-                loss = loss_fn(y_pred, y)
+                loss = loss_fn(y_pred.squeeze(1), y)
                 del x, y, y_pred
 
                 tst_bth_loss += loss.item()
