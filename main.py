@@ -27,10 +27,12 @@ parser.add_argument('--scheduler', '-sc', type=str, default=None,
                     help='Type of Scheduler, default=None')
 parser.add_argument('--loss_function', '-l', type=str, default='bce',
                     help='Define Loss function, default=bce')
-parser.add_argument('--epochs', '-e', type=int, default=1,
+parser.add_argument('--epochs', '-e', type=int, default=20,
                     help='Number of epochs, default=20')
 parser.add_argument('--batch_size', '-b', type=int, default=8,
                     help='Size of the minibatch, default=8')
+parser.add_argument('--resize', '-r', type=int, default=64,
+                    help='Size of resizing, default=64. Original raw data is 256-cube')
 parser.add_argument('--save', '-s', action='store_true', default=False)
 args = parser.parse_args()
 
@@ -82,7 +84,7 @@ if __name__ == "__main__":
     fname = f'{datetime.now().strftime("%Y-%m-%d_%H%M-")}' if args.save else None
     model, losses = run(model=model, epochs=EPOCHS, train_loader=train_loader, test_loader=test_loader,
                         optimizer=optimizer, loss_fn=loss_fn, device=device,
-                        summary=summary, scheduler=scheduler, verbose=True)
+                        resize=args.resize, summary=summary, scheduler=scheduler, verbose=True)
 
     if args.save:
         torch.save(model, f"./models/{fname}_model.pth")
