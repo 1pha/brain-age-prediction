@@ -22,7 +22,7 @@ class Levakov(nn.Module):
             nn.Conv3d(16, 16, 3), nn.ReLU(),
             nn.MaxPool3d(kernel_size=2, stride=2),
             nn.BatchNorm3d(16),
-            nn.Dropout(.3)
+            nn.Dropout(.5)
         )
 
         self.layer3 = nn.Sequential(
@@ -30,7 +30,7 @@ class Levakov(nn.Module):
             nn.Conv3d(32, 32, 3), nn.ReLU(),
             nn.MaxPool3d(kernel_size=2, stride=2),
             nn.BatchNorm3d(32),
-            nn.Dropout(.3)
+            nn.Dropout(.5)
         )
 
         self.fc1 = nn.Linear(2048, 1024)
@@ -51,10 +51,8 @@ class Levakov(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
-        x = self.fc4(x)
+        x = torch.sigmoid(self.fc4(x))
         
-        x = self.dropout(x)
-        if self.task_type == 'binary':
-            x = torch.sigmoid(x)
+        #x = self.dropout(x)
 
         return x

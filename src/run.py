@@ -50,7 +50,7 @@ def run(model, epochs, train_loader, test_loader,
 
         torch.cuda.empty_cache()
         trn_trues = np.array(list(chain(*trn_trues)))
-        trn_preds = (np.exp(list(chain(*trn_preds))) >= .5) * 1
+        trn_preds = (np.array(list(chain(*trn_preds))) >= .5) * 1
         trn_losses.append(trn_bth_loss / len(train_loader))
 
         # TEST
@@ -77,7 +77,7 @@ def run(model, epochs, train_loader, test_loader,
 
         tst_losses.append(tst_bth_loss / len(test_loader))
         tst_trues = np.array(list(chain(*tst_trues)))
-        tst_preds = (np.exp(list(chain(*tst_preds))) >= .5) * 1
+        tst_preds = (np.array(list(chain(*tst_preds))) >= .5) * 1
         torch.cuda.empty_cache()
 
         if summary:
