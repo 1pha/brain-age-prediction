@@ -8,7 +8,8 @@ from sklearn.metrics import classification_report
 import torch
 
 def run(model, epochs, train_loader, test_loader,
-        optimizer, loss_fn, device, summary=None, scheduler=None, verbose=True):
+        optimizer, loss_fn, device,
+        resize=64, summary=None, scheduler=None, verbose=True):
 
     trn_losses, tst_losses = [], []
 
@@ -22,7 +23,11 @@ def run(model, epochs, train_loader, test_loader,
         model.train()
         for i, (x, y) in enumerate(train_loader):
 
-            x, y = x.to(device), y.to(device)
+            if resize:
+                x, y = F.interpolate(x, size=(64, 64, 64)).to(device), y.to(device)
+            
+            else:
+                x, y = x.to(device), y.to(device)
 
             optimizer.zero_grad()
 
@@ -53,7 +58,11 @@ def run(model, epochs, train_loader, test_loader,
         tst_trues, tst_preds = [], []
         with torch.no_grad():
             for i, (x, y) in enumerate(test_loader):
-                x, y = x.to(device), y.to(device)
+                if resize:
+                    x, y = F.interpolate(x, size=(64, 64, 64)).to(device), y.to(device)
+            
+                else:
+                    x, y = x.to(device), y.to(device)
 
                 y_pred = model.forward(x).to(device)
 

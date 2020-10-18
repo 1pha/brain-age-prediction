@@ -1,6 +1,7 @@
 from glob import glob
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 
 import nibabel as nib
 
@@ -8,7 +9,9 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 class MyDataset(Dataset):
-    def __init__(self, task_type, test_size=0.2, test=False):
+    def __init__(self, task_type, test_size=0.2, test=False, scaler='minmax'):
+
+        self.scaler = scaler
 
         RANDOM_STATE = 42
         np.random.seed(RANDOM_STATE)
@@ -34,8 +37,14 @@ class MyDataset(Dataset):
             self.label_file = label_file[task_type].values[shuffled_index[:train_num]]
 
     def __getitem__(self, idx):
-        # print(idx)
-        x = torch.tensor(nib.load(self.data_files[idx]).get_fdata())[None, :, :].float() / 255
+        
+        if self.scaler == 'minmax':
+            x = MinMaxScaler().fit_transform(nib.load(self.data_files[idx]).get_fdata().reshape(-1, 1)).reshape(256, 256, 256)
+
+        else:
+            x = nib.load(self.data_files[idx]).get_fdata()
+            
+        x = torch.tensor(x)[None, :, :].float()
         y = torch.tensor(self.label_file[idx]).float()
         return x, y
 
