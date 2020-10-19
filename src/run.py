@@ -132,5 +132,6 @@ def run(model, epochs, train_loader, test_loader,
             print(f'TRAIN :: [ACC%] {trn_acc:.3f} | VALID :: [ACC%] {tst_acc:.3f}')
             print(f'TRAIN :: [REPORT]\n{trn_rep}')
             print(f'VALID :: [REPORT]\n{tst_rep}')
+            print(f'BEST ACC FOR TEST :: {best_acc}')
 
     return model, (trn_losses, tst_losses), (trn_trues, trn_preds), (tst_trues, tst_preds)
