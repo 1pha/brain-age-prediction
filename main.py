@@ -1,4 +1,5 @@
 from datetime import datetime
+import seaborn as sns
 
 import torch
 import torch.nn as nn
@@ -81,22 +82,30 @@ if __name__ == "__main__":
     # 03. Run
     print("# 03. Run Epochs")
     summary = SummaryWriter(f'./tensorboard/{datetime.now().strftime("%Y-%m-%d_%H%M")}') if args.save else None
-    fname = f'{datetime.now().strftime("%Y-%m-%d_%H%M-")}' if args.save else None
-    model, losses = run(model=model, epochs=EPOCHS, train_loader=train_loader, test_loader=test_loader,
+    fname = f'{datetime.now().strftime("%Y-%m-%d_%H%M")}' if args.save else None
+    model, losses, trns, preds = run(model=model, epochs=EPOCHS, train_loader=train_loader, test_loader=test_loader,
                         optimizer=optimizer, loss_fn=loss_fn, device=device,
                         resize=args.resize, summary=summary, scheduler=scheduler, verbose=True)
 
-    if args.save:
-        torch.save(model, f"./models/{fname}_model.pth")
-
     # 04. Evaluate
-    print("# 04. Loss Plot")
+    #print("# 04. Loss Plot")
     # 04-1. Loss Plot
     #loss_plot(*losses, EPOCHS, args.loss_function)
 
-    # 04-2. Result Plot
-    train_true, train_pred = eval(model=model, loader=train_loader, device=device)
-    result_plot(task_type=args.task_type, trues=train_true, preds=train_pred, title='Train', fname=fname)
+    # 04-2. Result Plot - NOT USED(Too much memory allocation and time loss)
 
-    test_true, test_pred = eval(model=model, loader=test_loader, device=device)
-    result_plot(task_type=args.task_type, trues=test_true, preds=test_pred, title='Test', fname=fname)
+    sns_plot = sns.heatmap(confusion_matrix(*trns), annot=True)
+    if fname:
+        figure = sns_plot.get_figure()
+        figure.savefig(f'./result/{fname}_{title}_binary.png', dpi=400)
+
+    sns_plot = sns.heatmap(confusion_matrix(*preds), annot=True)
+    if fname:
+        figure = sns_plot.get_figure()
+        figure.savefig(f'./result/{fname}_{title}_binary.png', dpi=400)
+
+    # train_true, train_pred = eval(model=model, loader=train_loader, device=device)
+    # result_plot(task_type=args.task_type, trues=train_true, preds=train_pred, title='Train', fname=fname)
+
+    # test_true, test_pred = eval(model=model, loader=test_loader, device=device)
+    # result_plot(task_type=args.task_type, trues=test_true, preds=test_pred, title='Test', fname=fname)

@@ -41,6 +41,7 @@ class Levakov(nn.Module):
 
 
     def forward(self, x):
+        
         x = self.BN(x)
         x = self.layer1(x)
         x = self.layer2(x)
@@ -53,6 +54,6 @@ class Levakov(nn.Module):
         x = F.relu(self.fc3(x))
         x = torch.sigmoid(self.fc4(x))
         
-        #x = self.dropout(x)
+        x = self.dropout(x)
 
         return x

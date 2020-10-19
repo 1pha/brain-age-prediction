@@ -99,14 +99,16 @@ def run(model, epochs, train_loader, test_loader,
                 summary.add_scalar('lr', scheduler.get_last_lr(), e)
 
         if best_acc + .02 < tst_acc:
-            torch.save(model, f"./models/{f'{datetime.now().strftime("%Y-%m-%d_%H%M-")}'}_{tst_acc}_model.pth")
+            date = f'{datetime.now().strftime("%Y-%m-%d_%H%M")}'
+            fname = f"./models/{date}_{tst_acc:.3f}_model.pth"
+            torch.save(model, fname)
             best_acc = max(tst_acc, best_acc)
 
         if verbose:
             print(f'EPOCHS {e}')
             print(f'TRAIN :: [LOSS] {trn_losses[-1]:.3f} | VALID :: [LOSS] {tst_losses[-1]:.3f}')
             print(f'TRAIN :: [ACC%] {sum(trn_trues==trn_preds) / len(trn_trues):.3f} | VALID :: [ACC%] {sum(tst_trues==tst_preds) / len(tst_trues):.3f}')
-            print(f'[TRAIN - REPORT]\n{classification_report(trn_trues, trn_preds)}')
-            print(f'[TEST  - REPORT]\n{classification_report(tst_trues, tst_preds)}')
+            print(f'[TRAIN - REPORT]\n{classification_report(trn_trues, trn_preds, target_names=["Old", "Young"])}')
+            print(f'[TEST  - REPORT]\n{classification_report(tst_trues, tst_preds, target_names=["Old", "Young"])}')
 
-    return model, (trn_losses, tst_losses)
+    return model, (trn_losses, tst_losses), (trn_trues, trn_preds), (tst_trues, tst_preds)
