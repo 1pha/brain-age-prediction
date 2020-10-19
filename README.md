@@ -1,4 +1,20 @@
 # MRI Data 3D Brain Convolution
+### 10.19(Mon)
++ Changes
+  + Display
+    + Accuracy available on the terminal
+    + Plot with results from run.py, not re-calculating(too much waste of time)
+  + Tensorboard
+    + Accuracy available on Tensorboard as well
+  + Save
+    + Save model with best validation accuracy from now on(since each run takes too much time)
+    + Save me... tired...
++ Results
+  + Currently running with extra `Dropout` on the end(with p=.3)
+  + Since sever overfitting is has occurred, need to find a way through it...
+  + F1
+    + **train** .94
+    + **test** .51
 ### 10.18(Sun)
 + Changes
   + **MinMaxScaler**
