@@ -11,6 +11,8 @@
     + Save me... tired...
 + Results
   + Currently running with extra `Dropout` on the end(with p=.3)
+    + didn't work(obviously, dropping the last layer out(which is critical) was stupid)
+    + instead, dropouts after every FC layers
   + Since sever overfitting is has occurred, need to find a way through it...
   + F1
     + **train** .94
