@@ -1,4 +1,5 @@
 from itertools import chain
+from datetime import datetime
 
 import numpy as np
 import seaborn as sns
@@ -13,6 +14,7 @@ def run(model, epochs, train_loader, test_loader,
         resize=64, summary=None, scheduler=None, verbose=True):
 
     trn_losses, tst_losses = [], []
+    best_acc = 0
 
     for e in epochs:
 
@@ -51,6 +53,7 @@ def run(model, epochs, train_loader, test_loader,
         torch.cuda.empty_cache()
         trn_trues = np.array(list(chain(*trn_trues)))
         trn_preds = (np.array(list(chain(*trn_preds))) >= .5) * 1
+        trn_acc = sum(trn_trues==trn_preds) / len(trn_trues)
         trn_losses.append(trn_bth_loss / len(train_loader))
 
         # TEST
@@ -78,12 +81,16 @@ def run(model, epochs, train_loader, test_loader,
         tst_losses.append(tst_bth_loss / len(test_loader))
         tst_trues = np.array(list(chain(*tst_trues)))
         tst_preds = (np.array(list(chain(*tst_preds))) >= .5) * 1
+        tst_acc = sum(tst_trues==tst_preds) / len(tst_trues)
         torch.cuda.empty_cache()
 
         if summary:
-            summary.add_scalars('loss/MSE_loss',
+            summary.add_scalars('loss/BCE_loss',
                                 {'Train Loss': trn_losses[-1],
                                  'Valid Loss': tst_losses[-1]}, e)
+            summary.add_scalars('acc/accuracy',
+                                {'Train Acc': sum(trn_trues==trn_preds) / len(trn_trues),
+                                 'Valid Acc': sum(tst_trues==tst_preds) / len(tst_trues)}, e)
 
             summary.add_pr_curve('pr_curve/train', trn_trues, trn_preds, e)
             summary.add_pr_curve('pr_curve/test', tst_trues, tst_preds, e)
@@ -91,8 +98,14 @@ def run(model, epochs, train_loader, test_loader,
             if scheduler:
                 summary.add_scalar('lr', scheduler.get_last_lr(), e)
 
+        if best_acc + .02 < tst_acc:
+            torch.save(model, f"./models/{f'{datetime.now().strftime("%Y-%m-%d_%H%M-")}'}_{tst_acc}_model.pth")
+            best_acc = max(tst_acc, best_acc)
+
         if verbose:
-            print(f'EPOCHS {e} | TRAIN :: [LOSS] {trn_losses[-1]:.3f} | VALID :: [LOSS] {tst_losses[-1]:.3f}')
+            print(f'EPOCHS {e}')
+            print(f'TRAIN :: [LOSS] {trn_losses[-1]:.3f} | VALID :: [LOSS] {tst_losses[-1]:.3f}')
+            print(f'TRAIN :: [ACC%] {sum(trn_trues==trn_preds) / len(trn_trues):.3f} | VALID :: [ACC%] {sum(tst_trues==tst_preds) / len(tst_trues):.3f}')
             print(f'[TRAIN - REPORT]\n{classification_report(trn_trues, trn_preds)}')
             print(f'[TEST  - REPORT]\n{classification_report(tst_trues, tst_preds)}')
 
