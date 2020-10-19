@@ -18,8 +18,6 @@ def run(model, epochs, train_loader, test_loader,
 
     for e in epochs:
 
-        if scheduler: scheduler.step()
-
         # TRAIN
         trn_bth_loss = 0
         trn_trues, trn_preds = [], []
@@ -44,23 +42,34 @@ def run(model, epochs, train_loader, test_loader,
 
             loss.backward()
             optimizer.step()
+            if scheduler: scheduler.step()
 
             trn_bth_loss += loss.item()
 
             if i % 20 == 0:
                 print(f'{i:<4}th Batch. Loss: {loss.item():.3f}')
 
+
         torch.cuda.empty_cache()
+        # COLLECT TRAIN RESULTS
+        ### loss
+        trn_losses.append(trn_bth_loss / len(train_loader))
+
+        ### collect trues/predictions
+        # TODO:: trn_trues doesn't need to be calcaulted like this(since it is a real true value...)
         trn_trues = np.array(list(chain(*trn_trues)))
         trn_preds = (np.array(list(chain(*trn_preds))) >= .5) * 1
+
+        ### calculate accuracy and classification report
         trn_acc = sum(trn_trues==trn_preds) / len(trn_trues)
-        trn_losses.append(trn_bth_loss / len(train_loader))
+        trn_rep = classification_report(trn_trues, trn_preds, target_names=["Old", "Young"])
+        
 
         # TEST
         tst_bth_loss = 0
         model.eval()
         tst_trues, tst_preds = [], []
-        with torch.no_grad():
+        with torch.no_grad(): # to not give loads on GPU... :(
             for i, (x, y) in enumerate(test_loader):
                 if resize:
                     x, y = F.interpolate(x, size=(64, 64, 64)).to(device), y.to(device)
@@ -78,37 +87,50 @@ def run(model, epochs, train_loader, test_loader,
 
                 tst_bth_loss += loss.item()
 
+        torch.cuda.empty_cache()
+        # COLLECT TRAIN RESULTS
+        ### loss
         tst_losses.append(tst_bth_loss / len(test_loader))
+
+        ### collect trues/predictions
         tst_trues = np.array(list(chain(*tst_trues)))
         tst_preds = (np.array(list(chain(*tst_preds))) >= .5) * 1
-        tst_acc = sum(tst_trues==tst_preds) / len(tst_trues)
-        torch.cuda.empty_cache()
 
+        ### calculate accuracy and classification report
+        tst_acc = sum(tst_trues==tst_preds) / len(tst_trues)
+        tst_rep = classification_report(tst_trues, tst_preds, target_names=["Old", "Young"])
+
+
+        # to tensorboard
         if summary:
             summary.add_scalars('loss/BCE_loss',
                                 {'Train Loss': trn_losses[-1],
                                  'Valid Loss': tst_losses[-1]}, e)
             summary.add_scalars('acc/accuracy',
-                                {'Train Acc': sum(trn_trues==trn_preds) / len(trn_trues),
-                                 'Valid Acc': sum(tst_trues==tst_preds) / len(tst_trues)}, e)
+                                {'Train Acc': trn_acc,
+                                 'Valid Acc': tst_acc}, e)
 
-            summary.add_pr_curve('pr_curve/train', trn_trues, trn_preds, e)
-            summary.add_pr_curve('pr_curve/test', tst_trues, tst_preds, e)
+            summary.add_pr_curve('pr_curve/train', trn_trues, trn_preds, 0)
+            summary.add_pr_curve('pr_curve/test', tst_trues, tst_preds, 0)
 
             if scheduler:
                 summary.add_scalar('lr', scheduler.get_last_lr(), e)
 
+
+        # save when valid accuracy hits the best
         if best_acc + .02 < tst_acc:
             date = f'{datetime.now().strftime("%Y-%m-%d_%H%M")}'
             fname = f"./models/{date}_{tst_acc:.3f}_model.pth"
             torch.save(model, fname)
             best_acc = max(tst_acc, best_acc)
 
+
+        # print results
         if verbose:
             print(f'EPOCHS {e}')
             print(f'TRAIN :: [LOSS] {trn_losses[-1]:.3f} | VALID :: [LOSS] {tst_losses[-1]:.3f}')
-            print(f'TRAIN :: [ACC%] {sum(trn_trues==trn_preds) / len(trn_trues):.3f} | VALID :: [ACC%] {sum(tst_trues==tst_preds) / len(tst_trues):.3f}')
-            print(f'[TRAIN - REPORT]\n{classification_report(trn_trues, trn_preds, target_names=["Old", "Young"])}')
-            print(f'[TEST  - REPORT]\n{classification_report(tst_trues, tst_preds, target_names=["Old", "Young"])}')
+            print(f'TRAIN :: [ACC%] {trn_acc:.3f} | VALID :: [ACC%] {tst_acc:.3f}')
+            print(f'TRAIN :: [REPORT]\n{trn_rep}')
+            print(f'VALID :: [REPORT]\n{tst_rep}')
 
     return model, (trn_losses, tst_losses), (trn_trues, trn_preds), (tst_trues, tst_preds)
