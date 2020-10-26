@@ -55,8 +55,9 @@ class Registration:
                                         sigmas=self.sigmas,
                                         factors=self.factors)
 
-        # Transformation
-        
+
+    def optimize(self):
+
         translation = self.transformation()
         rigid = self.rigid(translation)
         affine = self.affine(rigid)
