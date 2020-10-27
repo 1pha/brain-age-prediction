@@ -27,4 +27,4 @@ if __name__=="__main__":
         print(f"{fname}")
         affreg = Registration(template=template, moving=moving).optimize()
         warped = affreg.transform(nib.load(moving).get_fdata())
-        np.save(f'../../../brainmask_reg/{fname}_registered.npy')
+        np.save(f'../../../brainmask_reg/{fname}_registered.npy', warped)
