@@ -135,3 +135,115 @@ def run(model, epochs, train_loader, test_loader,
             print(f'BEST ACC FOR TEST :: {best_acc}')
 
     return model, (trn_losses, tst_losses), (trn_trues, trn_preds), (tst_trues, tst_preds)
+
+def run_reg(model, epochs, train_loader, test_loader,
+            optimizer, loss_fn, device,
+            resize=64, summary=None, scheduler=None, verbose=True):
+
+    
+    trn_losses, tst_losses = [], []
+    best_loss = 100
+    for e in epochs:
+
+        # TRAIN
+        trn_bth_loss = 0
+        trn_trues, trn_preds = [], []
+        model.train()
+        for i, (x, y) in enumerate(train_loader):
+
+            if resize:
+                x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+
+            else:
+                x, y = x.to(device), y.to(device)
+
+            optimizer.zero_grad()
+
+            y_pred = model.forward(x).to(device)
+
+            trn_trues.append(y.to('cpu'))
+            trn_preds.append(y_pred.to('cpu'))
+
+            loss = torch.sqrt(loss_fn(y_pred.squeeze(1), y))
+            del x, y, y_pred
+
+            loss.backward()
+            optimizer.step()
+            if scheduler: scheduler.step()
+
+            trn_bth_loss += loss.item()
+
+        torch.cuda.empty_cache()
+        
+        ### loss
+        trn_losses.append(trn_bth_loss / len(train_loader))
+
+        ### collect trues/predictions
+        trn_trues = list(chain(*trn_trues))
+        trn_preds = list(chain(*trn_preds))
+
+            
+        # TEST
+        tst_bth_loss = 0
+        model.eval()
+        tst_trues, tst_preds = [], []
+        with torch.no_grad(): # to not give loads on GPU... :(
+            for i, (x, y) in enumerate(test_loader):
+                if resize:
+                    x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+
+                else:
+                    x, y = x.to(device), y.to(device)
+
+                y_pred = model.forward(x).to(device)
+
+                tst_trues.append(y.to('cpu'))
+                tst_preds.append(y_pred.to('cpu'))
+
+                loss = torch.sqrt(loss_fn(y_pred.squeeze(1), y))
+                del x, y, y_pred
+
+                tst_bth_loss += loss.item()
+
+        torch.cuda.empty_cache()
+        ### loss
+        tst_losses.append(tst_bth_loss / len(test_loader))
+
+        ### collect trues/predictions
+        tst_trues = list(chain(*tst_trues))
+        tst_preds = list(chain(*tst_preds))
+        
+        reg_df = pd.DataFrame({
+            'True': list(map(float, trn_trues + tst_trues)),
+            'Prediction': list(map(float, trn_preds + tst_preds)),
+            'Label': ['train'] * 250 + ['test'] * 62
+        })
+
+        if verbose:
+
+            print(f'EPOCHS {e}')
+            print(f'RMSE :: [TRAIN] {trn_losses[-1]:.3f} | [VALID] {tst_losses[-1]:.3f}')
+            
+            sns.lmplot(data=reg_df, x='True', y='Prediction', hue='Label')
+            plt.grid()
+            plt.show()
+
+            if e % 20 == 0:
+                plt.plot(trn_losses, label='Train')
+                plt.plot(tst_losses, label='Valid')
+                plt.title(f"RMSE Losses among epochs, {e}th")
+                plt.grid()
+                plt.legend()
+            
+        if best_loss - .02 > tst_losses[-1]:
+            
+            date = f'{datetime.now().strftime("%Y-%m-%d_%H%M")}'
+            fname = f"./models/{date}_{tst_losses[-1]:.3f}_model.pth"
+            torch.save(model, fname)
+            best_loss = min(tst_losses[-1], best_loss)
+
+        if summary:
+            summary.add_scalars('loss/RMSE_loss',
+                                {'Train Loss': trn_losses[-1],
+                                 'Valid Loss': tst_losses[-1]}, e)
+        
