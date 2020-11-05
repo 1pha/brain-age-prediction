@@ -16,10 +16,11 @@ args = parser.parse_args()
 
 if __name__=="__main__":
 
-    data_files = list(filter(lambda x: x.split('\\')[-1][:3] == 'IXI', glob('../../../brainmask_nii/*.nii')))
+    data_files = glob('../../../brainmask_nii/*.nii')
     data_files.sort()
 
-    template = data_files.pop(args.template) if args.template else data_files.pop(0)
+    template = data_files.pop(args.template) if args.template else data_files.pop()
+    print(f'Using {template} as a template.')
 
     for i, moving in enumerate(data_files[args.start:args.end]):
 
@@ -27,4 +28,4 @@ if __name__=="__main__":
         print(f"{fname}")
         affreg = Registration(template=template, moving=moving).optimize()
         warped = affreg.transform(nib.load(moving).get_fdata())
-        np.save(f'../../../brainmask_reg/{fname}_registered.npy', warped)
+        np.save(f'../../../brainmask_tlrc/{fname}_tlrc.npy', warped)
