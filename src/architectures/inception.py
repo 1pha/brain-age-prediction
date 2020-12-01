@@ -5,8 +5,13 @@ from torch import Tensor
 from typing import Callable, Any, Optional, Tuple, List
 
 
-
 class Inception(nn.Module):
+
+    def __init__(self, num_classes: int = 1, aux_logits=True transform_input=False,
+    ):
+
+
+class InceptionA(nn.Module):
 
     def __init__(self, in_channels: int, pool_features: int):
         super(Inception, self).__init__()
