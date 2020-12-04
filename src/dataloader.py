@@ -36,7 +36,7 @@ class MyDataset(Dataset):
         test_fname = [data_files[i] for i in shuffled_index[-test_num:]]
         
 
-        if test:
+        if test and fold is None:
             self.data_files = [data_files[i] for i in shuffled_index[-test_num:]]
             self.label_file = label_file[task_type].values[shuffled_index[-test_num:]]
             self.fname = label_file['id'].values[shuffled_index[-test_num:]]
@@ -51,9 +51,17 @@ class MyDataset(Dataset):
                 for i, idx in enumerate(kfold.split(self.label_file)):
                     
                     if i == fold:
-                        self.data_files = np.array(self.data_files)[idx[0]]
-                        self.label_file = self.label_file[idx[0]]
+
+                        if test:
+                            self.data_files = np.array(self.data_files)[idx[1]]
+                            self.label_file = self.label_file[idx[1]]
+
+                        else:
+                            self.data_files = np.array(self.data_files)[idx[0]]
+                            self.label_file = self.label_file[idx[0]]
                         break
+
+                        
 
     def __getitem__(self, idx):
         
