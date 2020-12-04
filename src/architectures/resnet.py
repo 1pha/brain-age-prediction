@@ -4,11 +4,15 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchsummary import summary
+# from torchsummary import summary
 
 
-def get_inplanes():
-    return [64, 128, 256, 512]
+def get_inplanes(shorten=None):
+    if shorten is not None:
+        return [64, 128, 256, 512]
+
+    elif shorten is None:
+        return [16, 32, 64, 128]
 
 
 def conv3x3x3(in_planes, out_planes, stride=1):
@@ -240,6 +244,7 @@ class Option:
     def __init__(self, model_depth=10,
                 n_classes=1,
                 n_input_channels=1,
+                shortcut_type='A',
                 conv1_t_size=3,
                 conv1_t_stride=1,
                 no_max_pool=False,
@@ -249,6 +254,7 @@ class Option:
         self.model_depth = model_depth
         self.n_classes = n_classes
         self.n_input_channels = n_input_channels
+        self.shortcut_type = shortcut_type
         self.conv1_t_size = conv1_t_size
         self.conv1_t_stride = conv1_t_stride
         self.no_max_pool = no_max_pool
@@ -264,7 +270,7 @@ if __name__=="__main__":
     model = generate_model(model_depth=opt.model_depth,
                                 n_classes=opt.n_classes,
                                 n_input_channels=opt.n_input_channels,
-    #                               shortcut_type=opt.resnet_shortcut,
+                                shortcut_type=opt.shortcut_type,
                                 conv1_t_size=opt.conv1_t_size,
                                 conv1_t_stride=opt.conv1_t_stride,
                                 no_max_pool=opt.no_max_pool,

@@ -246,4 +246,120 @@ def run_reg(model, epochs, train_loader, test_loader,
             summary.add_scalars('loss/RMSE_loss',
                                 {'Train Loss': trn_losses[-1],
                                  'Valid Loss': tst_losses[-1]}, e)
+
+def run_folds(model, epochs, train_loader, test_loader,
+              optimizer, loss_fn, device, folds,
+              resize=64, summary=None, scheduler=None, verbose=True):
+
+    best_loss = 10
+
+    trn_fold_losses, tst_fold_losses = [], []
+    trn_fold_corrs, tst_fold_corrs = [], []
+    for fold in folds:
         
+        train_dset = MyDataset(task_type='age', fold=fold)
+        train_loader = DataLoader(train_dset, batch_size=8)
+        
+        trn_losses, tst_losses = [], []
+        for e in epochs:
+
+            # TRAIN
+            trn_bth_loss = 0
+            trn_trues, trn_preds = [], []
+            model.train()
+            for i, (x, y) in enumerate(train_loader):
+
+                if resize:
+                    x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+
+                else:
+                    x, y = x.to(device), y.to(device)
+
+                optimizer.zero_grad()
+
+                y_pred = model.forward(x).to(device)
+
+                trn_trues.append(y.to('cpu'))
+                trn_preds.append(y_pred.to('cpu'))
+
+                loss = loss_fn(y_pred.squeeze(1), y)
+                del x, y, y_pred
+
+                loss.backward()
+                optimizer.step()
+                if scheduler: scheduler.step()
+
+                trn_bth_loss += loss.item()
+
+            torch.cuda.empty_cache()
+
+            ### loss
+            trn_losses.append(trn_bth_loss / len(train_loader))
+
+            ### collect trues/predictions
+            trn_trues = list(chain(*trn_trues))
+            trn_preds = list(chain(*trn_preds))
+
+
+            # TEST
+            tst_bth_loss = 0
+            model.eval()
+            tst_trues, tst_preds = [], []
+            with torch.no_grad(): # to not give loads on GPU... :(
+                for i, (x, y) in enumerate(test_loader):
+                    if resize:
+                        x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+
+                    else:
+                        x, y = x.to(device), y.to(device)
+
+                    y_pred = model.forward(x).to(device)
+
+                    tst_trues.append(y.to('cpu'))
+                    tst_preds.append(y_pred.to('cpu'))
+
+                    loss = loss_fn(y_pred.squeeze(1), y)
+                    del x, y, y_pred
+
+                    tst_bth_loss += loss.item()
+
+            torch.cuda.empty_cache()
+            ### loss
+            tst_losses.append(tst_bth_loss / len(test_loader))
+
+            ### collect trues/predictions
+            tst_trues = list(chain(*tst_trues))
+            tst_preds = list(chain(*tst_preds))
+
+            reg_df = pd.DataFrame({
+                'True': list(map(float, trn_trues + tst_trues)),
+                'Prediction': list(map(float, trn_preds + tst_preds)),
+                'Label': ['train'] * len(trn_trues) + ['test'] * len(tst_trues)
+            })
+
+            trn_corr = reg_df[reg_df['Label'] == 'train'].corr().Prediction['True']
+            tst_corr = reg_df[reg_df['Label'] == 'test' ].corr().Prediction['True']
+
+            print(f'FOLD {fold}')
+            print(f'EPOCHS {e}')
+            print(f'RMSE :: [TRAIN] {trn_losses[-1]:.3f} | [VALID] {tst_losses[-1]:.3f}')
+            print(f'CORR :: [TRAIN] {trn_corr:.3f} | [VALID] {tst_corr:.3f}')
+
+            sns.lmplot(data=reg_df, x='True', y='Prediction', hue='Label')
+            plt.grid()
+            plt.show()
+
+            if e % 20 == 0:
+                plt.plot(trn_losses, label='Train')
+                plt.plot(tst_losses, label='Valid')
+                plt.title(f"L1 Losses among epochs, {e}th")
+                #plt.ylim(0, 500)
+                plt.grid()
+                plt.legend()
+        
+        trn_fold_losses.append(trn_losses)
+        trn_fold_corrs.append(trn_corr)
+        tst_fold_losses.append(tst_losses)
+        tst_fold_corrs.append(tst_corr)
+
+    return model, (trn_fold_losses, tst_fold_losses), (trn_fold_corrs, tst_fold_corrs)
