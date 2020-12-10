@@ -4,14 +4,19 @@ import torch.nn.functional as F
 
 class Dinsdale(nn.Module):
 
-    def __init__(self, in_channels, num_classes, filters=None):
+    def __init__(self, in_channels, num_classes, filters=1):
 
         super(Dinsdale, self).__init__()
 
-        if filters is None:
-            self.filters = [32, 64, 64, 64, 96]
+        filter_lst = {
+            1: [ 8, 16, 16, 16, 32],
+            2: [16, 32, 32, 32, 64],
+            3: [32, 64, 64, 64, 96],
+        }
+        if isinstance(filters, int):
+            self.filters = filter_lst[filters]
 
-        else:
+        elif isinstance(filters, list):
             self.filters = filters
 
         f1, f2, f3, f4, f5 = self.filters
@@ -43,8 +48,8 @@ class Dinsdale(nn.Module):
         )
 
         self.fc = nn.Sequential(
-            nn.Linear(1024, 512),
-            nn.Linear(512, num_classes)
+            nn.Linear(64, 64),
+            nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
@@ -78,7 +83,7 @@ class BasicConv3d(nn.Module):
 
         self.ada_pool = ada_pool
         if self.ada_pool:
-            self.adapool = nn.AdaptiveAvgPool3d(1024)
+            self.adapool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
     def forward(self, x):
 
