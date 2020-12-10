@@ -363,3 +363,131 @@ def run_folds(model, epochs, train_loader, test_loader,
         tst_fold_corrs.append(tst_corr)
 
     return model, (trn_fold_losses, tst_fold_losses), (trn_fold_corrs, tst_fold_corrs)
+
+
+def make_df(data, label):
+    
+    trues, preds = data
+    return pd.DataFrame({
+        'True': list(map(float, trues)),
+        'Prediction': list(map(float, preds)),
+        'Label': [label] * len(trues)
+    })
+
+def train(model, dataloader, resize, device,
+          loss_fn, mae_fn, rmse_fn,
+          losses, maes, rmses,
+          optimizer, scheduler, lamb):
+    
+    bth_loss, bth_mae, bth_rmse = 0, 0, 0
+    trues, preds = [], []
+    model.train()
+    for i, (x, y) in enumerate(dataloader):
+
+        if resize:
+            x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+
+        else:
+            x, y = x.to(device), y.to(device)
+
+        optimizer.zero_grad()
+
+        y_pred = model.forward(x).to(device)
+
+        trues.append(y.to('cpu'))
+        preds.append(y_pred.to('cpu'))
+
+        # Loss
+        loss = loss_fn(y_pred.squeeze(1), y)
+        
+        if lamb:
+            l2_reg = torch.tensor(0.).to(device)
+            for param in model.parameters():
+                l2_reg += torch.norm(param)
+            loss += lamb * l2_reg
+        
+        # Metrics
+        mae = mae_fn(y_pred.squeeze(1), y)
+        rmse = rmse_fn(y_pred.squeeze(1), y)
+
+        del x, y, y_pred
+
+        loss.backward()
+        optimizer.step()
+        if scheduler: scheduler.step()
+
+        bth_loss += loss.item()
+        bth_mae  += mae.item()
+        bth_rmse += rmse.item()
+
+    torch.cuda.empty_cache()
+
+    ### loss
+    M = len(dataloader)
+    losses.append(bth_loss / M)
+    maes.append(bth_mae / M)
+    rmses.append(bth_rmse / M)
+
+    ### collect trues/predictions
+    trues = list(chain(*trues))
+    preds = list(chain(*preds))
+    
+    return model, (losses, maes, rmses), (trues, preds)
+
+def eval(model, dataloader, resize, device,
+          loss_fn, mae_fn, rmse_fn,
+        losses, maes, rmses):
+    
+    bth_loss, bth_mae, bth_rmse = 0, 0, 0
+    trues, preds = [], []
+    model.eval()
+    with torch.no_grad(): # to not give loads on GPU... :(
+        for i, (x, y) in enumerate(dataloader):
+
+            if resize:
+                x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+
+            else:
+                x, y = x.to(device), y.to(device)
+
+            optimizer.zero_grad()
+
+            y_pred = model.forward(x).to(device)
+
+            trues.append(y.to('cpu'))
+            preds.append(y_pred.to('cpu'))
+
+            # Loss
+            loss = loss_fn(y_pred.squeeze(1), y)
+
+            # Metrics
+            mae = mae_fn(y_pred.squeeze(1), y)
+            rmse = rmse_fn(y_pred.squeeze(1), y)
+
+            del x, y, y_pred
+
+            bth_loss += loss.item()
+            bth_mae  += mae.item()
+            bth_rmse += rmse.item()
+
+    torch.cuda.empty_cache()
+
+    ### loss
+    M = len(dataloader)
+    losses.append(bth_loss / M)
+    maes.append(bth_mae / M)
+    rmses.append(bth_rmse / M)
+
+    ### collect trues/predictions
+    trues = list(chain(*trues))
+    preds = list(chain(*preds))
+    
+    return model, (losses, maes, rmses), (trues, preds)
+
+def info(state, fold, epoch, loss, mae, rmse, corr):
+
+    print(f'FOLD {fold}', end='')
+    print(f'MSE  :: [TEST] {loss[-1]:.3f}')
+    print(f'MAE  :: [TEST] {mae[-1]:.3f}')
+    print(f'RMSE :: [TEST] {rmse[-1]:.3f}')
+    print(f'CORR :: [TEST] {corr:.3f}')
