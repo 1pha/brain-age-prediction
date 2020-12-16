@@ -1,6 +1,7 @@
 from itertools import chain
 from datetime import datetime
 
+import pandas as pd
 import numpy as np
 import seaborn as sns
 from sklearn.metrics import confusion_matrix as cf
@@ -449,8 +450,6 @@ def eval(model, dataloader, resize, device,
 
             else:
                 x, y = x.to(device), y.to(device)
-
-            optimizer.zero_grad()
 
             y_pred = model.forward(x).to(device)
 
