@@ -1,6 +1,7 @@
 from glob import glob
 import numpy as np
 import pandas as pd
+from scipy.ndimage import shift
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import KFold
 
@@ -11,9 +12,11 @@ from torch.utils.data import Dataset, DataLoader
 
 class MyDataset(Dataset):
     def __init__(self, task_type, test_size=0.2, test=False, scaler='minmax',
-                path='../../brainmask_tlrc/*.npy', fold=None):
+                path='../../brainmask_tlrc/*.npy', fold=None,
+                augment=None):
 
         self.scaler = scaler
+        self.augment = augment
 
         RANDOM_STATE = 42
         np.random.seed(RANDOM_STATE)
@@ -71,6 +74,9 @@ class MyDataset(Dataset):
 
         else:
             x = np.load(self.data_files[idx])
+
+        if self.augment:
+            x = torch.tensor(shift(x, shift=[1, 1, 1])).float()
             
         x = torch.tensor(x)[None, :, :].float()
         y = torch.tensor(self.label_file[idx]).float()
