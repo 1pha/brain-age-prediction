@@ -76,9 +76,11 @@ class MyDataset(Dataset):
             x = np.load(self.data_files[idx])
 
         if self.augment:
-            x = torch.tensor(shift(x, shift=[1, 1, 1])).float()
+            x = torch.tensor(shift(x, shift=[1, 1, 1]))[None, :, :].float()
             
-        x = torch.tensor(x)[None, :, :].float()
+        else:
+            x = torch.tensor(x)[None, :, :].float()
+            
         y = torch.tensor(self.label_file[idx]).float()
         
         return x, y
