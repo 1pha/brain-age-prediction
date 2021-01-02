@@ -9,6 +9,7 @@ import nibabel as nib
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+import torchio as tio
 
 class MyDataset(Dataset):
     def __init__(self, task_type, test_size=0.2, test=False, scaler='minmax',
@@ -63,7 +64,11 @@ class MyDataset(Dataset):
                             self.data_files = np.array(self.data_files)[idx[0]]
                             self.label_file = self.label_file[idx[0]]
                         break
-
+        
+        self.transform = tio.OneOf({
+            tio.RandomAffine(),
+            tio.RandomFlip(axes=['left-right'])
+        })
                         
 
     def __getitem__(self, idx):
@@ -79,7 +84,8 @@ class MyDataset(Dataset):
             x = torch.tensor(shift(x, shift=[1, 1, 1]))[None, :, :].float()
             
         else:
-            x = torch.tensor(x)[None, :, :].float()
+            # x = torch.tensor(x)[None, :, :].float()
+            x = self.transform(x[None, ...])
             
         y = torch.tensor(self.label_file[idx]).float()
         
