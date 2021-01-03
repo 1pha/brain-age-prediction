@@ -9,6 +9,7 @@ from sklearn.metrics import classification_report
 
 import torch
 import torch.nn.functional as F
+from .dataloader import * 
 
 def run(model, epochs, train_loader, test_loader,
         optimizer, loss_fn, device,
@@ -375,10 +376,13 @@ def make_df(data, label):
         'Label': [label] * len(trues)
     })
 
-def train(model, dataloader, resize, device,
+def train(model, test, augment, fold, resize, device,
           loss_fn, mae_fn, rmse_fn,
           losses, maes, rmses,
           optimizer, scheduler, lamb):
+
+    dset = MyDataset(task_type='age', test=test, augment=augment, fold=fold)
+    dataloader = DataLoader(dset, batch_size=16)
     
     bth_loss, bth_mae, bth_rmse = 0, 0, 0
     trues, preds = [], []
@@ -435,9 +439,12 @@ def train(model, dataloader, resize, device,
     
     return model, (losses, maes, rmses), (trues, preds)
 
-def eval(model, dataloader, resize, device,
+def eval(model, test, augment, fold, resize, device,
           loss_fn, mae_fn, rmse_fn,
         losses, maes, rmses):
+
+    dset = MyDataset(task_type='age', test=test, augment=augment, fold=fold)
+    dataloader = DataLoader(dset, batch_size=16)
     
     bth_loss, bth_mae, bth_rmse = 0, 0, 0
     trues, preds = [], []
