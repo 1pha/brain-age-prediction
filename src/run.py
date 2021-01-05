@@ -1,3 +1,4 @@
+import time
 from itertools import chain
 from datetime import datetime
 
@@ -11,6 +12,18 @@ import torch
 import torch.nn.functional as F
 from .dataloader import * 
 
+
+def logging_time(original_fn):
+
+    def wrapper_fn(*args, **kwargs):
+        start_time = time.time()
+        result = original_fn(*args, **kwargs)
+        end_time = time.time()
+        print("WorkingTime[{}]: {} sec".format(original_fn.__name__, end_time-start_time))
+        return result
+    return wrapper_fn
+
+@logging_time
 def run(model, epochs, train_loader, test_loader,
         optimizer, loss_fn, device,
         resize=64, summary=None, scheduler=None, verbose=True):
@@ -138,6 +151,7 @@ def run(model, epochs, train_loader, test_loader,
 
     return model, (trn_losses, tst_losses), (trn_trues, trn_preds), (tst_trues, tst_preds)
 
+@logging_time
 def run_reg(model, epochs, train_loader, test_loader,
             optimizer, loss_fn, device,
             resize=64, summary=None, scheduler=None, verbose=True):
@@ -249,6 +263,7 @@ def run_reg(model, epochs, train_loader, test_loader,
                                 {'Train Loss': trn_losses[-1],
                                  'Valid Loss': tst_losses[-1]}, e)
 
+@logging_time
 def run_folds(model, epochs, train_loader, test_loader,
               optimizer, loss_fn, device, folds,
               resize=64, summary=None, scheduler=None, verbose=True):
@@ -367,6 +382,7 @@ def run_folds(model, epochs, train_loader, test_loader,
     return model, (trn_fold_losses, tst_fold_losses), (trn_fold_corrs, tst_fold_corrs)
 
 
+@logging_time
 def make_df(data, label):
     
     trues, preds = data
@@ -376,13 +392,14 @@ def make_df(data, label):
         'Label': [label] * len(trues)
     })
 
-def train(model, test, augment, fold, resize, device,
+@logging_time
+def train(model, test, augment, fold, resize, device, batch_size,
           loss_fn, mae_fn, rmse_fn,
           losses, maes, rmses,
           optimizer, scheduler, lamb):
 
     dset = MyDataset(task_type='age', test=test, augment=augment, fold=fold)
-    dataloader = DataLoader(dset, batch_size=16)
+    dataloader = DataLoader(dset, batch_size=batch_size)
     
     bth_loss, bth_mae, bth_rmse = 0, 0, 0
     trues, preds = [], []
@@ -439,12 +456,13 @@ def train(model, test, augment, fold, resize, device,
     
     return model, (losses, maes, rmses), (trues, preds)
 
-def eval(model, test, augment, fold, resize, device,
+@logging_time
+def eval(model, test, augment, fold, resize, device, batch_size,
           loss_fn, mae_fn, rmse_fn,
         losses, maes, rmses):
 
     dset = MyDataset(task_type='age', test=test, augment=augment, fold=fold)
-    dataloader = DataLoader(dset, batch_size=16)
+    dataloader = DataLoader(dset, batch_size=batch_size)
     
     bth_loss, bth_mae, bth_rmse = 0, 0, 0
     trues, preds = [], []
