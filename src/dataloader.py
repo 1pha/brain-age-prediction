@@ -67,7 +67,8 @@ class MyDataset(Dataset):
         
         self.transform = tio.OneOf({
             tio.RandomAffine(),
-            tio.RandomFlip(axes=['left-right'])
+            tio.RandomFlip(axes=['left-right']),
+            tio.RandomElasticDeformation()
         })
                         
 
