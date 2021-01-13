@@ -27,7 +27,8 @@ class MyDataset(Dataset):
             
         label_file = pd.read_csv('../rsc/age_ixidlbsoas13.csv', index_col=0)
         
-        idx = label_file[label_file['used'] == 1].index
+        # idx = label_file[label_file['used'] == 1].index
+        idx = label_file[label_file.src.map(lambda x: x not in ['Oasis3'])].index
         data_files = np.array(glob('../../brainmask_tlrc/*.npy'))
         data_files.sort()
         data_files = data_files[idx].tolist()
