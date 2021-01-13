@@ -1,10 +1,17 @@
+import numpy as np
 import matplotlib.pyplot as plt
+import nibabel as nib
 
 class SliceViewer:
 
     def __init__(self, subject):
 
-        self.subject = subject
+        if isinstance(subject, str):
+            self.subject = np.load(subject)
+
+        else:
+            self.subject = subject
+            
         self.vertex  = self.subject.shape[0]
 
 
