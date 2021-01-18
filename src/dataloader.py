@@ -52,7 +52,7 @@ class MyDataset(Dataset):
             self.fname = label_file['id'].values[shuffled_index[:train_num]]
                 
             if fold is not None:
-                kfold = KFold(10)
+                kfold = KFold(5)
                 for i, idx in enumerate(kfold.split(self.label_file)):
                     
                     if i == fold:
