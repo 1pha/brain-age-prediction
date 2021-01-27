@@ -138,7 +138,7 @@ class DataPacket:
 
     def info(self):
         for name, data in self.data.items():
-            print(f'[{name.upper()}] {data[-1]:.3f}', end=' ')
+            print(f'{name.capitalize()}={data[-1]:.3f}', end=' ')
 
 def to_df(res: tuple):
 

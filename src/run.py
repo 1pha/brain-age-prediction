@@ -137,11 +137,3 @@ def eval(model, loss_fns, DP, CFG, fold=None):
     targets = torch.cat(targets).detach().numpy()
     
     return model, DP, (predictions, targets)
-
-def info(state, fold, epoch, loss, mae, rmse, corr):
-
-    print(f'FOLD {fold}', end='')
-    print(f'MSE  :: [TEST] {loss[-1]:.3f}')
-    print(f'MAE  :: [TEST] {mae[-1]:.3f}')
-    print(f'RMSE :: [TEST] {rmse[-1]:.3f}')
-    print(f'CORR :: [TEST] {corr:.3f}')
