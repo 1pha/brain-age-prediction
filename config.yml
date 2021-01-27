@@ -1,0 +1,23 @@
+seed: 42
+batch_size: 16
+epochs: 100
+folds: 20
+loss: MSE
+metrics:
+- RMSE
+- MAE
+resize: true
+scheduler: false
+
+model_name: resnet
+test_size: 0.2
+test: false
+fold: null
+lamb: 0.0005
+learning_rate: 0.0001
+best_mae: 10.0
+
+task_type: age
+scaler: minmax
+npy_path: ../../brainmask_tlrc/*.npy
+label_path: ../rsc/age_ixidlbsoas13.csv
