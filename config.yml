@@ -1,7 +1,7 @@
 seed: 42
 batch_size: 16
 epochs: 100
-folds: 20
+folds: 5
 loss: MSE
 metrics:
 - RMSE

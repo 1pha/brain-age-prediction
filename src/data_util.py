@@ -133,12 +133,19 @@ class DataPacket:
         for name in self.data:
             self.data[name] = list(getattr(self, name))
 
+    def delete(self, name):
+        del self.data[name]
+        delattr(self, name)
+
     def get_df(self):
         return pd.DataFrame(self.data)
 
-    def info(self):
+    def info(self, label=False):
+        if label:
+            print(f'[{label.upper()}]:: ', end='')
         for name, data in self.data.items():
             print(f'{name.capitalize()}={data[-1]:.3f}', end=' ')
+        print()
 
 def to_df(res: tuple):
 
