@@ -23,7 +23,7 @@ def logging_time(original_fn):
         start_time = time.time()
         result = original_fn(*args, **kwargs)
         end_time = time.time()
-        end = '' if original_fn.__name__=='train' else ' '
+        end = '' if original_fn.__name__=='train' else '\n'
         print(f"[{original_fn.__name__}] {end_time-start_time:.1f} sec ", end=end)
         return result
 
