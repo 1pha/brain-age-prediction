@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix as cf
 from sklearn.metrics import classification_report
 
@@ -64,22 +65,22 @@ def run(cfg, fold):
             
         df = pd.concat([make_df(trn_res, 'Train'),
                         make_df(aug_res, 'Aug'),
-                        make_df(tst_res, 'Test')], ignore_index=True)
+                        make_df(tst_res, 'Valid')], ignore_index=True)
         
         trn_dp.corr.update(df[df['Label'] == 'Train'].corr().Prediction['True'])
         trn_dp.refresh()
-        tst_dp.corr.update(df[df['Label'] == 'Test'].corr().Prediction['True'])
+        tst_dp.corr.update(df[df['Label'] == 'Valid'].corr().Prediction['True'])
         tst_dp.refresh()
 
         if e % 1 == 0:
             trn_dp.info('train')
             aug_dp.info('augme')
-            tst_dp.info('test ')
+            tst_dp.info('valid')
 
         if (e+1) % 5 == 0:
             plt.title(f"L1 Losses among epochs, {e}th")
             plt.plot(list(trn_dp.loss), label='Train')
-            plt.plot(list(tst_dp.loss), label='Test')
+            plt.plot(list(tst_dp.loss), label='Valid')
             plt.grid(); plt.legend()
 
             sns.lmplot(data=df, x='True', y='Prediction', hue='Label')
@@ -88,7 +89,7 @@ def run(cfg, fold):
             
         torch.cuda.empty_cache()
 
-    return model, (trn_dp, aug_dp, tst_dp)
+    return model, (trn_dp, aug_dp, tst_dp), (trn_res, tst_res)
 
 @logging_time
 def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
