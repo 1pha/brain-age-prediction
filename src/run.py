@@ -38,7 +38,7 @@ def make_df(data, label):
         'Label': [label] * len(trues)
     })
 
-def run(cfg, fold):
+def run(cfg, fold, db=None):
 
     model, cfg.device = load_model(cfg.model_name, verbose=False)
     optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
@@ -50,12 +50,14 @@ def run(cfg, fold):
     fold = None
     for e in range(cfg.epochs):
         
+        start_time = time.time()
         print(f'Epoch {e+1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
         cfg.test = False
         model, trn_dp, trn_res = train(model, optimizer, fn_lst, trn_dp, cfg, fold=fold)
         model, aug_dp, aug_res = train(model, optimizer, fn_lst, aug_dp, cfg, fold=fold, augment=True)
         cfg.test = True
         model, tst_dp, tst_res = eval(model, fn_lst, tst_dp, cfg, fold=fold)
+        elapsed_time = round(time.time() - start_time, 3)
         
         if best_mae > tst_dp.mae[-1]:
             
@@ -86,6 +88,11 @@ def run(cfg, fold):
             sns.lmplot(data=df, x='True', y='Prediction', hue='Label')
             plt.grid()
             plt.show()
+
+            if db is not None:
+                data = gather_data(e=e, time=elapsed_time, cfg=cfg,
+                        train=trn_dp, valid=tst_dp, aug=aug_dp)
+                write_db(db, data)
             
         torch.cuda.empty_cache()
 
