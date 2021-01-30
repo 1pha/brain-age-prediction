@@ -147,10 +147,6 @@ class DataPacket:
             print(f'{name.capitalize()}={data[-1]:.3f}', end=' ')
         print()
 
-def to_df(res: tuple):
-
-    res = tuple()
-
 if __name__ == "__main__":
 
     train_dset = MyDataset()

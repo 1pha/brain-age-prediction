@@ -103,11 +103,17 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
     predictions, targets = [], []
     for i, (x, y) in enumerate(dataloader):
 
-        if CFG.resize:
-            x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+        try: 
+            if CFG.resize:
+                x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
 
-        else:
-            x, y = x.to(device), y.to(device)
+            else:
+                x, y = x.to(device), y.to(device)
+
+        except FileNotFoundError as e:
+            print(e)
+            time.sleep(20)
+            pass
 
         optimizer.zero_grad()
 
@@ -158,11 +164,17 @@ def eval(model, loss_fns, DP, CFG, fold=None):
     with torch.no_grad(): # to not give loads on GPU... :(
         for i, (x, y) in enumerate(dataloader):
 
-            if CFG.resize:
-                x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
+            try: 
+                if CFG.resize:
+                    x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
 
-            else:
-                x, y = x.to(device), y.to(device)
+                else:
+                    x, y = x.to(device), y.to(device)
+
+            except FileNotFoundError as e:
+                print(e)
+                time.sleep(20)
+                pass
 
             y_pred = model.forward(x).to(device).squeeze(1)
             predictions.append(y_pred.cpu())
