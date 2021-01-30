@@ -117,6 +117,7 @@ class Data:
     def __repr__(self):
         return str(self.data)
 
+
 class DataPacket:
 
     def __init__(self, names=None):
@@ -146,6 +147,52 @@ class DataPacket:
         for name, data in self.data.items():
             print(f'{name.capitalize()}={data[-1]:.3f}', end=' ')
         print()
+
+def gather_data(e=None, f=None, **kwargs):
+
+    data = dict()
+    if e is not None:
+        data['Epoch/Config'] = str(e)
+
+    if f is not None:
+        data['Fold'] = str(f)
+
+    for key, value in kwargs.items():
+
+        if key == 'train':
+            
+            data['Train MAE'] = value.data['mae'][-1]
+            data['Train LOSS'] = value.data['loss'][-1]
+            data['Train RMSE'] = value.data['rmse'][-1]
+            data['Train CORR'] = value.data['corr'][-1]
+
+        elif key == 'aug':
+            
+            data['Aug MAE'] = value.data['mae'][-1]
+            data['Aug LOSS'] = value.data['loss'][-1]
+            data['Aug RMSE'] = value.data['rmse'][-1]
+
+        elif key == 'valid':
+            
+            data['Valid MAE'] = value.data['mae'][-1]
+            data['Valid LOSS'] = value.data['loss'][-1]
+            data['Valid RMSE'] = value.data['rmse'][-1]
+            data['Valid CORR'] = value.data['corr'][-1]
+
+        elif key == 'test':
+            
+            data['Test MAE'] = value.data['mae'][-1]
+            data['Test LOSS'] = value.data['loss'][-1]
+            data['Test RMSE'] = value.data['rmse'][-1]
+            data['Test CORR'] = value.data['corr'][-1]
+
+        elif key == 'time':
+            data['Elapsed Time'] = value
+            
+        elif key == 'cfg':
+            data['Learning Rate'] = value.learning_rate
+
+    return data
 
 if __name__ == "__main__":
 
