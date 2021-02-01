@@ -194,6 +194,48 @@ def gather_data(e=None, f=None, **kwargs):
 
     return data
 
+def mlflow_data(**kwargs):
+
+    data = dict()
+
+    for key, value in kwargs.items():
+
+        if key == 'train':
+            
+            data['Train_MAE'] = value.data['mae'][-1]
+            data['Train_LOSS'] = value.data['loss'][-1]
+            data['Train_RMSE'] = value.data['rmse'][-1]
+            data['Train_CORR'] = value.data['corr'][-1]
+
+        elif key == 'aug':
+            
+            data['Aug_MAE'] = value.data['mae'][-1]
+            data['Aug_LOSS'] = value.data['loss'][-1]
+            data['Aug_RMSE'] = value.data['rmse'][-1]
+
+        elif key == 'valid':
+            
+            data['Valid_MAE'] = value.data['mae'][-1]
+            data['Valid_LOSS'] = value.data['loss'][-1]
+            data['Valid_RMSE'] = value.data['rmse'][-1]
+            data['Valid_CORR'] = value.data['corr'][-1]
+
+        elif key == 'test':
+            
+            data['Test_MAE'] = value.data['mae'][-1]
+            data['Test_LOSS'] = value.data['loss'][-1]
+            data['Test_RMSE'] = value.data['rmse'][-1]
+            data['Test_CORR'] = value.data['corr'][-1]
+
+        elif key == 'time':
+            data['Elapsed_Time'] = value
+            
+        elif key == 'cfg':
+            data['Learning_Rate'] = value.learning_rate
+
+    return data
+
+
 if __name__ == "__main__":
 
     train_dset = MyDataset()

@@ -78,8 +78,7 @@ def run(cfg, fold, db=None, mlflow=None):
         tst_dp.corr.update(df[df['Label'] == 'Valid'].corr().Prediction['True'])
         tst_dp.refresh()
 
-        data = gather_data(e=e, time=elapsed_time, cfg=cfg,
-                        train=trn_dp, valid=tst_dp, aug=aug_dp)
+
 
         if e % 1 == 0:
             trn_dp.info('train')
@@ -97,13 +96,17 @@ def run(cfg, fold, db=None, mlflow=None):
             plt.show()
 
             if db is not None:
+                data = gather_data(e=e, time=elapsed_time, cfg=cfg,
+                                    train=trn_dp, valid=tst_dp, aug=aug_dp)
                 write_db(db, data)
             
         if mlflow:
-            mlflow.log_metrics(data)
+            metrics = mlflow_data(time=elapsed_time, train=trn_dp, valid=tst_dp, aug=aug_dp)
+            mlflow.log_metrics(metrics, e)
 
         torch.cuda.empty_cache()
 
+    mlflow.end_run()
     return model, (trn_dp, aug_dp, tst_dp), (trn_res, tst_res)
 
 @logging_time
