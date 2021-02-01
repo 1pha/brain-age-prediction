@@ -16,6 +16,10 @@ from .data_util import *
 from .losses import RMSELoss, fn_lst
 from .architectures.model_util import load_model, save_checkpoint
 
+import sys
+sys.path.append('../')
+from DeepNotion.build import write_db
+
 
 def logging_time(original_fn):
 
@@ -38,7 +42,7 @@ def make_df(data, label):
         'Label': [label] * len(trues)
     })
 
-def run(cfg, fold, db=None):
+def run(cfg, fold, db=None, mlflow=None):
 
     model, cfg.device = load_model(cfg.model_name, verbose=False)
     optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
@@ -74,6 +78,9 @@ def run(cfg, fold, db=None):
         tst_dp.corr.update(df[df['Label'] == 'Valid'].corr().Prediction['True'])
         tst_dp.refresh()
 
+        data = gather_data(e=e, time=elapsed_time, cfg=cfg,
+                        train=trn_dp, valid=tst_dp, aug=aug_dp)
+
         if e % 1 == 0:
             trn_dp.info('train')
             aug_dp.info('augme')
@@ -90,10 +97,11 @@ def run(cfg, fold, db=None):
             plt.show()
 
             if db is not None:
-                data = gather_data(e=e, time=elapsed_time, cfg=cfg,
-                        train=trn_dp, valid=tst_dp, aug=aug_dp)
                 write_db(db, data)
             
+        if mlflow:
+            mlflow.log_metrics(data)
+
         torch.cuda.empty_cache()
 
     return model, (trn_dp, aug_dp, tst_dp), (trn_res, tst_res)

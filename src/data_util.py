@@ -62,9 +62,9 @@ class MyDataset(Dataset):
                         break
         
         self.transform = tio.OneOf({
-            tio.RandomAffine(),
-            tio.RandomFlip(axes=['left-right']),
-            tio.RandomElasticDeformation()
+            tio.RandomAffine(): 0.45,
+            tio.RandomFlip(axes=['left-right']): 0.45,
+            tio.RandomElasticDeformation(): 0.1
         })
                         
 
