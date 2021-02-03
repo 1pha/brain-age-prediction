@@ -8,3 +8,6 @@ debug.ipynb
 *.npy
 attention_maps/
 config.yml
+mlruns/
+models/
+resized_attmap/
