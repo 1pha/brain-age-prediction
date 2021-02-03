@@ -78,8 +78,6 @@ def run(cfg, fold, db=None, mlflow=None):
         tst_dp.corr.update(df[df['Label'] == 'Valid'].corr().Prediction['True'])
         tst_dp.refresh()
 
-
-
         if e % 1 == 0:
             trn_dp.info('train')
             aug_dp.info('augme')
