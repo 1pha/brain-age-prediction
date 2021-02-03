@@ -61,13 +61,12 @@ class MyDataset(Dataset):
                             self.label_file = self.label_file[idx[0]]
                         break
         
-        self.transform = tio.OneOf({
-            tio.RandomAffine(): 0.45,
-            tio.RandomFlip(axes=['left-right']): 0.45,
-            tio.RandomElasticDeformation(): 0.1
-        })
+        self.transform = {
+            'affine': tio.RandomAffine(),
+            'flip':   tio.RandomFlip(axes=['left-right']),
+            'elastic_deform': tio.RandomElasticDeformation()
+        }
                         
-
     def __getitem__(self, idx):
         
         if self.scaler == 'minmax':
@@ -78,8 +77,17 @@ class MyDataset(Dataset):
             x = np.load(self.data_files[idx])
 
         if self.augment:
+            
             # x = torch.tensor(shift(x, shift=[1, 1, 1]))[None, :, :].float()
-            x = self.transform(x[None, ...])
+            aug_choice = np.random.choice(list(self.transform.keys()))
+            print(aug_choice)
+
+            if aug_choice == 'elastic_deform':
+                fname = self.data_files[idx].replace('/brainmask_tlrc', '/brainmask_elasticdeform')
+                x = np.load(fname)
+
+            else:
+                x = self.transform[aug_choice](x[None, ...])
 
         else:
             x = torch.tensor(x)[None, :, :].float()
@@ -90,6 +98,7 @@ class MyDataset(Dataset):
 
     def __len__(self):
         return len(self.data_files)
+
 
 class Data:
 
@@ -148,6 +157,7 @@ class DataPacket:
             print(f'{name.capitalize()}={data[-1]:.3f}', end=' ')
         print()
 
+
 def gather_data(e=None, f=None, **kwargs):
 
     data = dict()
@@ -193,6 +203,7 @@ def gather_data(e=None, f=None, **kwargs):
             data['Learning Rate'] = value.learning_rate
 
     return data
+
 
 def mlflow_data(**kwargs):
 
