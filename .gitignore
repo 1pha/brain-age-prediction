@@ -9,5 +9,5 @@ debug.ipynb
 attention_maps/
 config.yml
 mlruns/
-models/
+models/*
 resized_attmap/
