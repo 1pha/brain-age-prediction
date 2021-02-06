@@ -60,7 +60,7 @@ class MyDataset(Dataset):
                             self.data_files = np.array(self.data_files)[idx[0]]
                             self.label_file = self.label_file[idx[0]]
                         break
-        
+          
         self.transform = {
             'affine': tio.RandomAffine(),
             'flip':   tio.RandomFlip(axes=['left-right']),
@@ -80,7 +80,7 @@ class MyDataset(Dataset):
             
             # x = torch.tensor(shift(x, shift=[1, 1, 1]))[None, :, :].float()
             aug_choice = np.random.choice(list(self.transform.keys()))
-            print(aug_choice)
+            # print(aug_choice)
 
             if aug_choice == 'elastic_deform':
                 fname = self.data_files[idx].replace('/brainmask_tlrc', '/brainmask_elasticdeform')
