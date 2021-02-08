@@ -17,6 +17,7 @@ class MyDataset(Dataset):
 
         self.scaler = CFG.scaler
         self.augment = augment
+        self.cfg = CFG
         
         RANDOM_STATE = CFG.seed
         np.random.seed(RANDOM_STATE)
@@ -79,8 +80,10 @@ class MyDataset(Dataset):
         if self.augment:
             
             # x = torch.tensor(shift(x, shift=[1, 1, 1]))[None, :, :].float()
-            aug_choice = np.random.choice(list(self.transform.keys()))
-            # print(aug_choice)
+            p = list(self.cfg['augmentation'].values())
+            aug_choice = np.random.choice(list(self.transform.keys()), p=p)
+            if self.cfg['verbose_loader']:
+                print(aug_choice)
 
             if aug_choice == 'elastic_deform':
                 fname = self.data_files[idx].replace('/brainmask_tlrc', '/brainmask_elasticdeform')
@@ -162,7 +165,7 @@ def gather_data(e=None, f=None, **kwargs):
 
     data = dict()
     if e is not None:
-        data['Epoch/Config'] = str(e)
+        data['Epoch'] = str(e)
 
     if f is not None:
         data['Fold'] = str(f)
