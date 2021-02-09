@@ -83,7 +83,7 @@ def run(cfg, fold, db=None, mlflow=None):
             aug_dp.info('augme')
             tst_dp.info('valid')
 
-        if (e+1) % 5 == 0:
+        if e % 5 == 0:
             plt.title(f"L1 Losses among epochs, {e}th")
             plt.plot(list(trn_dp.loss), label='Train')
             plt.plot(list(tst_dp.loss), label='Valid')
