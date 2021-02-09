@@ -5,6 +5,7 @@ from src.architectures.resnet import *
 from src.architectures.levakov_96 import *
 from src.architectures.inception import *
 from src.architectures.dinsdale import *
+from src.architectures.sfcn import *
 
 def load_model(model, verbose=True):
     
@@ -32,6 +33,9 @@ def load_model(model, verbose=True):
 
     elif model == 'dinsdale':
         model = Dinsdale(1, 1, 2)
+
+    elif model == 'sfcn':
+        model = SFCN()
 
     else: return None
 
