@@ -12,3 +12,4 @@ mlruns/
 models/*
 resized_attmap/
 DeepNotion/
+result/
