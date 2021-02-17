@@ -20,13 +20,15 @@ class BaseLitModel(pl.LightningModule):
         self.test_acc = pl.metrics.regression.MeanAbsoluteError()
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.cfg.learning_rate)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.cfg.learning_rate)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5)
+        return optimizer, scheduler
 
     def loss_fn(self, logits, y):
 
         loss = nn.MSELoss()(logits, y)
         if self.cfg.lamb:
-            l2_reg = torch.tensor(0.)
+            l2_reg = torch.tensor(0.).type_as(loss)
             for param in self.parameters():
                 l2_reg += torch.norm(param)
             

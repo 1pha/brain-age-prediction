@@ -85,6 +85,8 @@ class MyDataset(Dataset):
             if self.cfg['verbose_loader']:
                 print(aug_choice)
 
+            else: pass
+
             if aug_choice == 'elastic_deform':
                 fname = self.data_files[idx].replace('/brainmask_tlrc', '/brainmask_elasticdeform')
                 x = np.load(fname)
