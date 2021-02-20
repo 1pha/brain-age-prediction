@@ -7,7 +7,7 @@ from src.architectures.inception import *
 from src.architectures.dinsdale import *
 from src.architectures.sfcn import *
 
-def load_model(model, verbose=True):
+def load_model(model, gpu=True, verbose=True):
     
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'Model {model.capitalize()} is selected.')
@@ -39,7 +39,9 @@ def load_model(model, verbose=True):
 
     else: return None
 
-    model.to(device)
+    if gpu:
+        model.to(device)
+        
     if verbose:
         print(summary(model, input_size=(1, 96, 96, 96)))
     
