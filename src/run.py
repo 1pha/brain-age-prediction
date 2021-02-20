@@ -139,6 +139,12 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 
         loss = loss_fns['mse'](y_pred, y)
 
+        if i % 8 == 0 and cfg.debug:
+            fig, ax = plt.subplots()
+            ax.set_title(f"Augment {i}, MAE {loss_fns['mae'](y_pred, y).item()}")
+            ax.imshow(x.detach().cpu()[0][0][:, 48, :].T, cmap='gray', origin='lower')
+            plt.show()
+
         # Track down results
         DP.loss.batch_update(loss.item(), 1)
         DP.mae.batch_update(loss_fns['mae'](y_pred, y).item(), 1)
@@ -168,7 +174,7 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 
 
 @logging_time
-def eval(model, loss_fns, DP, CFG, fold=None):
+def valid(model, loss_fns, DP, CFG, fold=None):
 
     dset = MyDataset(CFG, augment=False, fold=fold)
     dataloader = DataLoader(dset, batch_size=CFG.batch_size)
@@ -198,6 +204,12 @@ def eval(model, loss_fns, DP, CFG, fold=None):
 
             loss = loss_fns['mse'](y_pred, y)
 
+            if i % 3 == 0 and cfg.debug:
+                fig, ax = plt.subplots()
+                ax.set_title(f"Eval {i}, MAE {loss_fns['mae'](y_pred, y).item()}")
+                ax.imshow(x.detach().cpu()[0][0][:, 48, :].T, cmap='gray', origin='lower')
+                plt.show()
+             
             # Track down results
             DP.loss.batch_update(loss.item(), 1)
             DP.mae.batch_update(loss_fns['mae'](y_pred, y).item(), 1)
