@@ -245,8 +245,8 @@ class Option:
                 n_classes=1,
                 n_input_channels=1,
                 shortcut_type='A',
-                conv1_t_size=3,
-                conv1_t_stride=1,
+                conv1_t_size=7,
+                conv1_t_stride=2,
                 no_max_pool=False,
                 resnet_widen_factor=1.0
                 ):
