@@ -4,12 +4,12 @@ import torch.nn as nn
 
 class Vanilla3d(nn.Module):
 
-    def __init__(self, cfg):
+    def __init__(self, cfg=None):
         super(Vanilla3d, self).__init__()
         self.cfg = cfg
 
         self.layer1 = nn.Sequential(
-            nn.Conv3d(1, 8, 3, 3),
+            nn.Conv3d(1, 8, 3, 2),
             nn.BatchNorm3d(8),
             nn.ReLU(),
             nn.Dropout(.2),
@@ -17,7 +17,7 @@ class Vanilla3d(nn.Module):
         )
 
         self.layer2 = nn.Sequential(
-            nn.Conv3d(8, 16, 3, 3),
+            nn.Conv3d(8, 16, 3, 2),
             nn.BatchNorm3d(16),
             nn.ReLU(),
             nn.Dropout(.2),
@@ -25,7 +25,7 @@ class Vanilla3d(nn.Module):
         )
 
         self.layer3 = nn.Sequential(
-            nn.Conv3d(16, 32, 3, 3),
+            nn.Conv3d(16, 32, 3, 2),
             nn.BatchNorm3d(32),
             nn.ReLU(),
             nn.Dropout(.2),

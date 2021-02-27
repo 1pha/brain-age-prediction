@@ -1,13 +1,15 @@
 import os
 import torch
 from torchsummary import summary
-from src.architectures.resnet import *
-from src.architectures.levakov_96 import *
-from src.architectures.inception import *
-from src.architectures.dinsdale import *
-from src.architectures.sfcn import *
+from .dinsdale import *
+from .levakov_64 import *
+from .levakov_96 import *
+from .resnet import *
+from .sequential import *
+from .sfcn import *
+from .vanilla import *
 
-def load_model(model, gpu=True, verbose=True):
+def load_model(model, cfg=None, gpu=True, verbose=True):
     
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'Model {model.capitalize()} is selected.')
@@ -36,6 +38,9 @@ def load_model(model, gpu=True, verbose=True):
 
     elif model == 'sfcn':
         model = SFCN()
+
+    elif model == 'vanilla':
+        model = Vanilla3d(cfg)
 
     else: return None
 

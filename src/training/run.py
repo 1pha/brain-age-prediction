@@ -12,9 +12,9 @@ from sklearn.metrics import classification_report
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from .data_util import * 
+from ..data.data_util import * 
 from .losses import RMSELoss, fn_lst
-from .architectures.model_util import load_model, save_checkpoint
+from ..models.model_util import load_model, save_checkpoint
 
 import sys
 sys.path.append('../')
