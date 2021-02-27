@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import Function
 
-class CAM():
+class CAM:
     def __init__(self,model):
         self.gradient = []
         # self.h = model.module.layer[-1].register_backward_hook(self.save_gradient)

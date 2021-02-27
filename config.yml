@@ -1,23 +1,111 @@
+# MISC
 seed: 42
-batch_size: 16
-epochs: 100
-folds: 5
+debug: False
+folds: 20
+
+# MODEL
+model_name: resnet
+lamb: 0.0005
+learning_rate: 0.0001
+scheduler: false
 loss: MSE
 metrics:
-- RMSE
-- MAE
-resize: true
-scheduler: false
+  - RMSE
+  - MAE
+resize:
+  - 96
+  - 96
+  - 96
 
-model_name: resnet
+# DATA
 test_size: 0.2
 test: false
 fold: null
-lamb: 0.0005
-learning_rate: 0.0001
-best_mae: 10.0
-
+batch_size: 16
+augmentation:
+  affine: 0.33
+  flip: 0.33
+  elastic_deform: 0.33
 task_type: age
 scaler: minmax
 npy_path: ../../brainmask_tlrc/*.npy
 label_path: ../rsc/age_ixidlbsoas13.csv
+verbose_loader: False
+
+# TRAIN
+epochs: 100
+best_mae: 10.0
+verbose_period: 5
+
+# NOTION
+notion:
+  use: false
+  token_v2: 246da72b5feada0be4e9f747a5ecea90c49a0c0d80c00f9d65974676c5019bb89125b19bf65c8476036f5e0c78bb74450a5b6687126ce114091ea10c8af580cb092b9cb1b994d3ceb3a7ba2147df
+  url: https://www.notion.so/Database-for-3dCNN-cd08db2ce51d4ccaa48ffc4d32d6e43f
+  schema: {
+    "title" : {"name" : "Fold", "type" : "text"},
+    "Epoch" : {"name" : "Epoch", "type": "number"},
+
+    'Train MAE' : {'name': 'Train MAE', "type": "number"},
+    'Train LOSS': {'name': 'Train LOSS', "type": "number"},
+    'Train RMSE': {'name': 'Train RMSE', "type": "number"},
+    'Train CORR': {'name': 'Train CORR', "type": "number"},
+
+    'Valid MAE' : {'name': 'Valid MAE', "type": "number"},
+    'Valid LOSS': {'name': 'Valid LOSS', "type": "number"},
+    'Valid RMSE': {'name': 'Valid RMSE', "type": "number"},
+    'Valid CORR': {'name': 'Valid CORR', "type": "number"},
+
+    'Aug MAE' : {'name': 'Aug MAE', "type": "number"},
+    'Aug LOSS': {'name': 'Aug LOSS', "type": "number"},
+    'Aug RMSE': {'name': 'Aug RMSE', "type": "number"},
+
+    'Learning Rate': {'name': 'Learning Rate', "type": "number"},
+    'Elapsed Time': {'name': 'Elapsed Time', "type": "number"},
+  }
+  no_fold_aug_schema: {
+    "title": {"name": "Epoch", "type": "text"},
+
+    'Train MAE' : {'name': 'Train MAE', "type": "number"},
+    'Train LOSS': {'name': 'Train LOSS', "type": "number"},
+    'Train RMSE': {'name': 'Train RMSE', "type": "number"},
+    'Train CORR': {'name': 'Train CORR', "type": "number"},
+
+    'Valid MAE' : {'name': 'Valid MAE', "type": "number"},
+    'Valid LOSS': {'name': 'Valid LOSS', "type": "number"},
+    'Valid RMSE': {'name': 'Valid RMSE', "type": "number"},
+    'Valid CORR': {'name': 'Valid CORR', "type": "number"},
+
+    'Learning Rate': {'name': 'Learning Rate', "type": "number"},
+    'Elapsed Time': {'name': 'Elapsed Time', "type": "number"},
+  }
+
+  no_fold_aug_schema: {
+    "title": {"name": "Epoch", "type": "text"},
+
+    'Train MAE' : {'name': 'Train MAE', "type": "number"},
+    'Train LOSS': {'name': 'Train LOSS', "type": "number"},
+    'Train RMSE': {'name': 'Train RMSE', "type": "number"},
+    'Train CORR': {'name': 'Train CORR', "type": "number"},
+
+    'Valid MAE' : {'name': 'Valid MAE', "type": "number"},
+    'Valid LOSS': {'name': 'Valid LOSS', "type": "number"},
+    'Valid RMSE': {'name': 'Valid RMSE', "type": "number"},
+    'Valid CORR': {'name': 'Valid CORR', "type": "number"},
+
+    'Aug MAE' : {'name': 'Aug MAE', "type": "number"},
+    'Aug LOSS': {'name': 'Aug LOSS', "type": "number"},
+    'Aug RMSE': {'name': 'Aug RMSE', "type": "number"},
+
+    'Learning Rate': {'name': 'Learning Rate', "type": "number"},
+    'Elapsed Time': {'name': 'Elapsed Time', "type": "number"},
+  }
+
+  test_schema: {
+    'title': {'name': 'Fold', "type": "text"},
+
+    'Test MAE' : {'name': 'Test MAE', "type": "number"},
+    'Test LOSS': {'name': 'Test LOSS', "type": "number"},
+    'Test RMSE': {'name': 'Test RMSE', "type": "number"},           
+    'Test CORR': {'name': 'Test CORR', "type": "number"},   
+  }
