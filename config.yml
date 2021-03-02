@@ -27,10 +27,17 @@ augmentation:
   flip: 0.33
   elastic_deform: 0.33
 task_type: age
-scaler: minmax
+preprocess:
+  scaler: minmax
+  resize:
+    - 96
+    - 96
+    - 96
 npy_path: ../../brainmask_tlrc/*.npy
 label_path: ../rsc/age_ixidlbsoas13.csv
 verbose_loader: False
+unused_src:
+  - Oasis3
 
 # TRAIN
 epochs: 100

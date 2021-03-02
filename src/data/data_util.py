@@ -1,15 +1,19 @@
+import os
 import numpy as np
 import pandas as pd
 from glob import glob
 
 from scipy.ndimage import shift
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import KFold
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.model_selection import KFold, train_test_split
+from sklearn.utils import shuffle
 
 import nibabel as nib
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+
 import torchio as tio
 
 class MyDataset(Dataset):
@@ -104,6 +108,122 @@ class MyDataset(Dataset):
     def __len__(self):
         return len(self.data_files)
 
+
+class DatasetPlus(Dataset):
+
+    def __init__(self, cfg=None, augment=False, test=False):
+
+        self.cfg = cfg
+        self.augment = augment
+        self.test = test
+
+        # If it's a testset then augment should set to be false
+        if test: assert augment == False
+
+        # set seed
+        RANDOM_STATE = cfg.seed
+        np.random.seed(RANDOM_STATE)
+
+        label_file = pd.read_csv(cfg.label_path, index_col=0)
+        # cfg.unused_src: list
+        unused = label_file['src'].apply(lambda row: row.lower() in map(str.lower, cfg.unused_src))
+        label_file.drop(label_file[unused].index, inplace=True)
+        
+        label_file.loc[:, 'id'] = label_file.loc[:, ['id', 'src']].apply(DatasetPlus.path_maker, axis=1)
+
+        train_idx, test_idx, train_age, test_age = train_test_split(label_file.id,
+                                                                    label_file.age,
+                                                                    test_size=cfg.test_size,
+                                                                    random_state=RANDOM_STATE)
+        if augment:
+            aug_idx = train_idx.apply(lambda x: x+'*') 
+            aug_age = train_age   
+
+        if not test: # Training set
+            self.data_files = shuffle(pd.concat([train_idx, aug_idx]), random_state=RANDOM_STATE) if augment else train_idx
+            self.data_labels = shuffle(pd.concat([train_age, aug_age]), random_state=RANDOM_STATE) if augment else train_age
+
+        else: # Test set
+            self.data_files = test_idx
+            self.data_labels = test_age
+
+        self.data_files = self.data_files.to_list()
+        self.data_labels = self.data_labels.to_list()
+
+    @staticmethod
+    def path_maker(row, ROOT=None, SUFFIX=None):
+    
+        brain_id = row.id
+        src = row.src
+        
+        ROOT = '../../brainmask_tlrc/' if ROOT is None else ROOT
+        SUFFIX = '-brainmask_tlrc.npy' if SUFFIX is None else SUFFIX
+        
+        if src == 'Oasis3':
+            SUFFIX = '_tlrc.npy'
+            
+        path = ROOT + brain_id + SUFFIX
+        return path if os.path.exists(path) else brain_id
+
+    
+    def __getitem__(self, idx):
+
+        if os.path.exists(self.data_files[idx]): # original data
+            x = np.load(self.data_files[idx])
+
+        else: # augmented data
+            x = self.augmentation(self.data_files[idx][:-1])
+
+        # Preprocessing
+        if self.cfg.preprocess['scaler']:
+            
+            if self.cfg.preprocess['scaler'] == 'minmax':
+                x = MinMaxScaler().fit_transform(x.reshape(-1, 1)).reshape(141, 172, 110)
+
+            elif self.cfg.preprocess['scaler'] == 'znorm':
+                x = StandardScaler().fit_transform(x.reshape(-1, 1)).reshape(141, 172, 110)
+
+        else:
+            x = np.reshape(-1, 1).reshape(141, 172, 110)
+
+        if self.cfg.preprocess['resize']:
+            x = F.interpolate(torch.tensor(x)[None, None, ...], size=self.cfg.preprocess['resize'])
+            x = x.squeeze(0).float()
+
+        else:
+            x = torch.tensor(x)[None, ...].float()
+
+        return x, torch.tensor(self.data_labels[idx]).float()
+
+    def augmentation(self, path):
+
+        self.transform = {
+            'affine': tio.RandomAffine(),
+            'flip':   tio.RandomFlip(axes=['left-right']),
+            'elastic_deform': tio.RandomElasticDeformation()
+        }
+
+        p = list(self.cfg['augmentation'].values())
+        norm = sum(p)
+        p = list(map(lambda x: x / norm, p))
+        aug_choice = np.random.choice(list(self.transform.keys()), p=p)
+        if self.cfg['verbose_loader']:
+            print(aug_choice)
+
+        else: pass
+
+        if aug_choice == 'elastic_deform':
+            fname = path.replace('/brainmask_tlrc', '/brainmask_elasticdeform')
+            x = np.load(fname)
+
+        else:
+            x = np.load(path)
+            x = self.transform[aug_choice](x[None, ...])
+        
+        return x
+
+    def __len__(self):
+        return len(self.data_files)
 
 class Data:
 

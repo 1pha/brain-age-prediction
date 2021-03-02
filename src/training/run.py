@@ -110,7 +110,8 @@ def run(cfg, fold, db=None, mlflow=None):
 @logging_time
 def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 
-    dset = MyDataset(CFG, augment=augment, fold=fold)
+    # dset = MyDataset(CFG, augment=augment, fold=fold)
+    dset = DatasetPlus(CFG, augment=True, test=False)
     dataloader = DataLoader(dset, batch_size=CFG.batch_size)
 
     device = CFG.device
@@ -120,11 +121,7 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
     for i, (x, y) in enumerate(dataloader):
 
         try: 
-            if CFG.resize:
-                x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
-
-            else:
-                x, y = x.to(device), y.to(device)
+            x, y = x.to(device), y.to(device)
 
         except FileNotFoundError as e:
             print(e)
@@ -139,7 +136,7 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 
         loss = loss_fns['mse'](y_pred, y)
 
-        if i % 8 == 0 and cfg.debug:
+        if i % 8 == 0 and CFG.debug:
             fig, ax = plt.subplots()
             ax.set_title(f"Augment {i}, MAE {loss_fns['mae'](y_pred, y).item()}")
             ax.imshow(x.detach().cpu()[0][0][:, 48, :].T, cmap='gray', origin='lower')
@@ -176,7 +173,8 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 @logging_time
 def valid(model, loss_fns, DP, CFG, fold=None):
 
-    dset = MyDataset(CFG, augment=False, fold=fold)
+    # dset = MyDataset(CFG, augment=False, fold=fold)
+    dset = DatasetPlus(CFG, augment=False, test=True)
     dataloader = DataLoader(dset, batch_size=CFG.batch_size)
 
     device = CFG.device
@@ -186,12 +184,8 @@ def valid(model, loss_fns, DP, CFG, fold=None):
     with torch.no_grad(): # to not give loads on GPU... :(
         for i, (x, y) in enumerate(dataloader):
 
-            try: 
-                if CFG.resize:
-                    x, y = F.interpolate(x, size=(96, 96, 96)).to(device), y.to(device)
-
-                else:
-                    x, y = x.to(device), y.to(device)
+            try:
+                x, y = x.to(device), y.to(device)
 
             except FileNotFoundError as e:
                 print(e)
@@ -204,7 +198,7 @@ def valid(model, loss_fns, DP, CFG, fold=None):
 
             loss = loss_fns['mse'](y_pred, y)
 
-            if i % 3 == 0 and cfg.debug:
+            if i % 3 == 0 and CFG.debug:
                 fig, ax = plt.subplots()
                 ax.set_title(f"Eval {i}, MAE {loss_fns['mae'](y_pred, y).item()}")
                 ax.imshow(x.detach().cpu()[0][0][:, 48, :].T, cmap='gray', origin='lower')
