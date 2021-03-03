@@ -140,14 +140,14 @@ class DatasetPlus(Dataset):
             aug_age = train_age   
 
         if not test: # Training set
-            self.data_files = shuffle(pd.concat([train_idx, aug_idx]), random_state=RANDOM_STATE) if augment else train_idx
+            self.data_files  = shuffle(pd.concat([train_idx, aug_idx]), random_state=RANDOM_STATE) if augment else train_idx
             self.data_labels = shuffle(pd.concat([train_age, aug_age]), random_state=RANDOM_STATE) if augment else train_age
 
         else: # Test set
-            self.data_files = test_idx
+            self.data_files  = test_idx
             self.data_labels = test_age
 
-        self.data_files = self.data_files.to_list()
+        self.data_files  = self.data_files.to_list()
         self.data_labels = self.data_labels.to_list()
 
     @staticmethod

@@ -1,127 +1,101 @@
+import matplotlib.pyplot as plt
+from skimage.transform import resize
+
 import torch
+import torch.nn.functional as F
 from torch.autograd import Function
 
 class CAM:
-    def __init__(self,model):
+    def __init__(self, cfg, model):
         self.gradient = []
-        # self.h = model.module.layer[-1].register_backward_hook(self.save_gradient)
-        # self.h = model.layer4[0].conv1.register_backward_hook(self.save_gradient)
-        self.h = model.conv1.register_backward_hook(self.save_gradient)
 
+        self.cfg = cfg
+        self.model = model
+
+        self.resized_cams = None
+
+    def register_hooks(self, model_name=None):
+
+        if model_name is None:
+            model_name = self.cfg.model_name
+
+        self.hooks = dict()
+        if model_name == 'resnet':
+            conv_layers = [
+                    self.model.conv1,
+                    self.model.layer1[0].conv1,
+                    self.model.layer1[0].conv2,
+                    self.model.layer2[0].conv1,
+                    self.model.layer2[0].conv2,
+                    self.model.layer3[0].conv1,
+                    self.model.layer3[0].conv2,
+                    self.model.layer4[0].conv1,
+                    self.model.layer4[0].conv2,
+                    ]
+
+            for i, layer in enumerate(conv_layers):
+                self.hooks[i] = layer.register_backward_hook(self.save_gradient)
         
-    def save_gradient(self,*args):
+        else:
+            raise NotImplementedError
+            
+        
+    def save_gradient(self, *args):
         grad_input = args[1]
         grad_output= args[2]
         self.gradient.append(grad_output[0])
       
-    def get_gradient(self,idx):
+    def get_gradient(self, idx):
         return self.gradient[idx]
     
     def remove_hook(self):
-        self.h.remove()
+        for layer in self.hooks.values():
+            layer.remove()
             
-    def normalize_cam(self,x):
+    def normalize_cam(self, x):
         x = 2*(x-torch.min(x))/(torch.max(x)-torch.min(x)+1e-8)-1
         x[x<torch.max(x)]=-1
         return x
     
-    def visualize(self,cam_img,img_var):
-        cam_img = resize(cam_img.cpu().data.numpy(),output_shape=(28,28))
-        x = img_var[0,:,:].cpu().data.numpy()
+    def visualize(self, slc=48):
 
-        plt.subplot(1,3,1)
-        plt.imshow(cam_img)
+        fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(20, 20))
 
-        plt.subplot(1,3,2)
-        plt.imshow(x,cmap="gray")
+        self.resized_cams = self.resizing() if self.resized_cams is None else self.resized_cams
+        for idx, cam_ in enumerate(self.resized_cams):
 
-        plt.subplot(1,3,3)
-        plt.imshow(x+cam_img)
-        plt.show()
-    
-    def get_cam(self,idx):
-        grad = self.get_gradient(idx)
-        alpha = torch.sum(grad,dim=3,keepdim=True)
-        alpha = torch.sum(alpha,dim=2,keepdim=True)
+            row, col = idx // 3, idx % 3
+            ax[row, col].imshow(cam_[:, slc, :], cmap='gray')
+                       
         
-        cam = alpha[idx]*grad[idx]
-        cam = torch.sum(cam,dim=0)
-        cam = self.normalize_cam(cam)
+    
+    def get_cam(self, idx):
+        '''
+        Get CAM = ReLU(sum(alpha*grad_cam))
+        '''
+        grad = self.gradient[idx]
+        alpha = torch.sum(grad,  dim=4, keepdim=True)
+        alpha = torch.sum(alpha, dim=3, keepdim=True)
+        alpha = torch.sum(alpha, dim=2, keepdim=True)
+        
+        cam = alpha * grad
+        cam = torch.sum(cam, dim=0)
+        cam = torch.sum(cam, dim=0)
         
         self.remove_hook()
-        return cam
+        return F.relu(cam)
 
-class GuidedBackpropRelu(Function):
-    @staticmethod
-    def forward(ctx,input):
-        ctx.save_for_backward(input)
-        return input.clamp(min=0)
-    
-    @staticmethod
-    def backward(ctx,grad_output):
-        input = ctx.saved_tensors[0]
-        grad_input = grad_output.clone()
-        grad_input[grad_input<0] = 0
-        grad_input[input<0]=0
-        return grad_input
-     
+    def cam_over_layers(self):
+        self.cams = [self.get_cam(idx) for idx, _ in enumerate(self.gradient)]
+        return self.cams
 
-class GuidedReluModel:
-    def __init__(self,model,to_be_replaced,replace_to):
-        self.model = model
-        self.to_be_replaced = to_be_replaced
-        self.replace_to = replace_to
-        self.layers=[]
-        self.output=[]
-        
-        for m in self.model.modules():
-            if isinstance(m,self.to_be_replaced):
-                self.layers.append(self.replace_to )
-                #self.layers.append(m)
-            elif isinstance(m,nn.Conv2d):
-                self.layers.append(m)
-            elif isinstance(m,nn.BatchNorm2d):
-                self.layers.append(m)
-            elif isinstance(m,nn.Linear):
-                self.layers.append(m)
-            elif isinstance(m,nn.AvgPool2d):
-                self.layers.append(m)
-                
-        for i in self.layers:
-            print(i)
-        
-    def reset_output(self):
-        self.output = []
-    
-    def hook(self,grad):
-        out = grad[:,0,:,:].cpu().data#.numpy()
-        print("out_size:",out.size())
-        self.output.append(out)
-        
-    def visualize(self,idx,origina_img):
-        grad = self.output[0][idx]
-        x = origina_img[idx].cpu().data.numpy()[0]
-        
-        plt.subplot(1,2,1)
-        plt.imshow(grad,cmap="gray")
-        plt.subplot(1,2,2)
-        plt.imshow(x,cmap="gray")
-        plt.show()
-        
-    def forward(self,x):
-        out = x 
-        out.register_hook(self.hook)
-        for i in self.layers[:-3]:
-            out = i(out)
-        out = out.view(out.size()[0],-1)
-        for j in self.layers[-3:]:
-            out = j(out)
-        return out
+    def resizing(self):
 
+        self.resized_cams = [resize(c.cpu().numpy(), output_shape=self.cfg.preprocess['resize'])
+                            for c in self.cams]
+        return self.resized_cams
+        
 
 if __name__=="__main__":
 
-    # How to use
-    # 1. Make Inference (e.g. outputs = mode.forward(x))
-    # 2. 
     pass
