@@ -35,13 +35,15 @@ preprocess:
     - 96
 npy_path: ../../brainmask_tlrc/*.npy
 label_path: ../rsc/age_ixidlbsoas13.csv
+brain_dir: ../../brainmask_tlrc/
+brain_dir_suffix: -brainmask_tlrc.npy
 verbose_loader: False
 unused_src:
   - Oasis3
 
 # TRAIN
 epochs: 100
-best_mae: 10.0
+best_mae: 8.0
 verbose_period: 5
 
 # NOTION
