@@ -129,7 +129,9 @@ class DatasetPlus(Dataset):
         unused = label_file['src'].apply(lambda row: row.lower() in map(str.lower, cfg.unused_src))
         label_file.drop(label_file[unused].index, inplace=True)
         
-        label_file.loc[:, 'id'] = label_file.loc[:, ['id', 'src']].apply(DatasetPlus.path_maker, axis=1)
+        self.load = lambda fname: DatasetPlus.load_file(fname, REG=cfg.registration)
+        path_maker = lambda row: DatasetPlus.path_maker(row, REG=cfg.registration)
+        label_file.loc[:, 'id'] = label_file.loc[:, ['id', 'src']].apply(path_maker, axis=1)
 
         train_idx, test_idx, train_age, test_age = train_test_split(label_file.id,
                                                                     label_file.age,
@@ -151,13 +153,18 @@ class DatasetPlus(Dataset):
         self.data_labels = self.data_labels.to_list()
 
     @staticmethod
-    def path_maker(row, ROOT=None, SUFFIX=None):
+    def path_maker(row, REG='tlrc'):
     
         brain_id = row.id
         src = row.src
         
-        ROOT = '../../brainmask_tlrc/' if ROOT is None else ROOT
-        SUFFIX = '-brainmask_tlrc.npy' if SUFFIX is None else SUFFIX
+        if REG == 'tlrc':
+            ROOT = '../../brainmask_tlrc/'
+            SUFFIX = '-brainmask_tlrc.npy'
+
+        elif REG == 'raw':
+            ROOT = '../../brainmask_nii/'
+            SUFFIX = '-brainmask.nii'
         
         if src == 'Oasis3':
             SUFFIX = '_tlrc.npy'
@@ -169,22 +176,29 @@ class DatasetPlus(Dataset):
     def __getitem__(self, idx):
 
         if os.path.exists(self.data_files[idx]): # original data
-            x = np.load(self.data_files[idx])
+            x = self.load(self.data_files[idx])
 
         else: # augmented data
             x = self.augmentation(self.data_files[idx][:-1])
+
+
+        if self.cfg.registration == 'tlrc':
+            size = (141, 172, 110)
+
+        elif self.cfg.registration == 'raw':
+            size = (256, 256, 256)
 
         # Preprocessing
         if self.cfg.preprocess['scaler']:
             
             if self.cfg.preprocess['scaler'] == 'minmax':
-                x = MinMaxScaler().fit_transform(x.reshape(-1, 1)).reshape(141, 172, 110)
+                x = MinMaxScaler().fit_transform(x.reshape(-1, 1)).reshape(*size)
 
             elif self.cfg.preprocess['scaler'] == 'znorm':
-                x = StandardScaler().fit_transform(x.reshape(-1, 1)).reshape(141, 172, 110)
+                x = StandardScaler().fit_transform(x.reshape(-1, 1)).reshape(*size)
 
         else:
-            x = np.reshape(-1, 1).reshape(141, 172, 110)
+            x = np.reshape(-1, 1).reshape(*size)
 
         if self.cfg.preprocess['resize']:
             x = F.interpolate(torch.tensor(x)[None, None, ...], size=self.cfg.preprocess['resize'])
@@ -214,16 +228,25 @@ class DatasetPlus(Dataset):
 
         if aug_choice == 'elastic_deform':
             fname = path.replace('/brainmask_tlrc', '/brainmask_elasticdeform')
-            x = np.load(fname)
+            x = self.load(fname)
 
         else:
-            x = np.load(path)
+            x = self.load(path)
             x = self.transform[aug_choice](x[None, ...])
         
         return x
 
     def __len__(self):
         return len(self.data_files)
+
+    @staticmethod
+    def load_file(fname, REG='tlrc'):
+
+        if REG == 'tlrc':
+            return np.load(fname)
+
+        elif REG == 'raw':
+            return nib.load(fname).get_fdata()
 
 class Data:
 

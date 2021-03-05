@@ -35,8 +35,7 @@ preprocess:
     - 96
 npy_path: ../../brainmask_tlrc/*.npy
 label_path: ../rsc/age_ixidlbsoas13.csv
-brain_dir: ../../brainmask_tlrc/
-brain_dir_suffix: -brainmask_tlrc.npy
+registration: tlrc
 verbose_loader: False
 unused_src:
   - Oasis3
