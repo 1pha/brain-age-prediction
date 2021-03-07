@@ -8,6 +8,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.model_selection import KFold, train_test_split
 from sklearn.utils import shuffle
 
+from nilearn.image import get_data, crop_img
 import nibabel as nib
 
 import torch
@@ -162,7 +163,7 @@ class DatasetPlus(Dataset):
             ROOT = '../../brainmask_tlrc/'
             SUFFIX = '-brainmask_tlrc.npy'
 
-        elif REG == 'raw':
+        elif REG == 'raw' or REG == 'raw_cropped':
             ROOT = '../../brainmask_nii/'
             SUFFIX = '-brainmask.nii'
         
@@ -175,20 +176,15 @@ class DatasetPlus(Dataset):
     
     def __getitem__(self, idx):
 
-        if os.path.exists(self.data_files[idx]): # original data
+        # original data
+        if os.path.exists(self.data_files[idx]): 
             x = self.load(self.data_files[idx])
 
         else: # augmented data
             x = self.augmentation(self.data_files[idx][:-1])
 
-
-        if self.cfg.registration == 'tlrc':
-            size = (141, 172, 110)
-
-        elif self.cfg.registration == 'raw':
-            size = (256, 256, 256)
-
         # Preprocessing
+        size = x.shape
         if self.cfg.preprocess['scaler']:
             
             if self.cfg.preprocess['scaler'] == 'minmax':
@@ -226,7 +222,7 @@ class DatasetPlus(Dataset):
 
         else: pass
 
-        if aug_choice == 'elastic_deform':
+        if aug_choice == 'elastic_deform' and self.cfg.registration == 'tlrc':
             fname = path.replace('/brainmask_tlrc', '/brainmask_elasticdeform')
             x = self.load(fname)
 
@@ -236,9 +232,6 @@ class DatasetPlus(Dataset):
         
         return x
 
-    def __len__(self):
-        return len(self.data_files)
-
     @staticmethod
     def load_file(fname, REG='tlrc'):
 
@@ -246,7 +239,13 @@ class DatasetPlus(Dataset):
             return np.load(fname)
 
         elif REG == 'raw':
-            return nib.load(fname).get_fdata()
+            return get_data(fname)
+
+        elif REG == 'raw_cropped':
+            return crop_img(fname)
+
+    def __len__(self):
+        return len(self.data_files)
 
 class Data:
 
