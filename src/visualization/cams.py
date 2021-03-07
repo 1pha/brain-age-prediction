@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Function
 
@@ -125,7 +126,64 @@ class CAM:
         self.resized_cams = [resize(c.cpu().numpy(), output_shape=self.cfg.preprocess['resize'])
                             for c in self.cams]
         return self.resized_cams
+
+
+def run_gradcam(model, data, cfg):
+    
+    model.eval()
+    cam = CAM(cfg, model)
+    cam.register_hooks()
+    
+    x, y = data
+    device = next(model.parameters()).device
+    output = model.forward(x.to(device))
+    output.backward()
+    
+    cam.cam_over_layers()
+    cam.remove_hook()
+    return cam.resizing()[-1]
+
+
+class GuidedBackpropRelu(Function):
+
+    @staticmethod
+    def forward(ctx, input):
+        ctx.save_for_backward(input)
+        return input.clamp(min=0)
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        input = ctx.saved_tensors[0] # forwarding 할 때의 입력값
+        grad_input = grad_output.clone() # backward 할 때의 입력된 미분 값
+        grad_input[grad_input < 0] = 0 # 미분 양인 것만
+        grad_input[input < 0] = 0 # 입력도 양인 것만
+        return grad_input
+
+
+class GuidedReluModel(nn.Module):
+
+    def __init__(self, model):
+        super(GuidedReluModel, self).__init__()
+        self.model = model
+        self.output = []
         
+    def reset_output(self):
+        self.output = []
+    
+    def hook(self, grad):
+        # out = grad[:, 0, :, :].cpu().data#.numpy()
+        out = grad.cpu().data
+        self.output.append(out)
+        
+    def get_visual(self):
+        grad = self.output[0].squeeze()
+        return grad
+        
+    def forward(self,x):
+        x.register_hook(self.hook)
+        x = self.model(x)
+        return x
+
 
 if __name__=="__main__":
 
