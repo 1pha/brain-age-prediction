@@ -230,7 +230,7 @@ class DatasetPlus(Dataset):
             x = self.load(path)
             x = self.transform[aug_choice](x[None, ...])
         
-        return x
+        return x.squeeze()
 
     @staticmethod
     def load_file(fname, REG='tlrc'):
@@ -242,7 +242,7 @@ class DatasetPlus(Dataset):
             return get_data(fname)
 
         elif REG == 'raw_cropped':
-            return crop_img(fname)
+            return crop_img(fname).get_fdata()
 
     def __len__(self):
         return len(self.data_files)
