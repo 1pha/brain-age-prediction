@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchsummary import summary
 
 class SFCN(nn.Module):
     def __init__(self, channel_number=[32, 64, 128, 256, 256, 64], output_dim=40, dropout=True):
@@ -62,3 +63,10 @@ class SFCN(nn.Module):
         x = F.log_softmax(x, dim=1)
         out.append(x)
         return out
+
+if __name__=="__main__":
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(device)
+    model = SFCN().to("cuda")
+    print(summary(model, input_size=(1, 160, 192, 160)))

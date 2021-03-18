@@ -9,14 +9,13 @@ from .sequential import *
 from .sfcn import *
 from .vanilla import *
 
-def load_model(model, cfg=None, gpu=True, verbose=True):
+def load_model(model_name, cfg=None, gpu=True, verbose=True):
     
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print(f'Model {model.capitalize()} is selected.')
+    print(f'Model {model_name.capitalize()} is selected.')
 
-    if model == 'resnet':
+    if model_name == 'resnet' or model_name == 'resnet_no_maxpool':
         
-
         opt = Option()
         model = generate_model(model_depth=opt.model_depth,
                                     n_classes=opt.n_classes,
@@ -27,19 +26,22 @@ def load_model(model, cfg=None, gpu=True, verbose=True):
                                     no_max_pool=opt.no_max_pool,
                                     widen_factor=opt.resnet_widen_factor)
 
-    elif model == 'levakov':
+        if model_name == 'resnet_no_maxpool':
+            model.no_max_pool = True
+
+    elif model_name == 'levakov':
         model = Levakov(task_type='age')
 
-    elif model == 'inception':
+    elif model_name == 'inception':
         model = Inception3()
 
-    elif model == 'dinsdale':
+    elif model_name == 'dinsdale':
         model = Dinsdale(1, 1, 2)
 
-    elif model == 'sfcn':
+    elif model_name == 'sfcn':
         model = SFCN()
 
-    elif model == 'vanilla':
+    elif model_name == 'vanilla':
         model = Vanilla3d(cfg)
 
     else: return None
