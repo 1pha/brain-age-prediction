@@ -1,7 +1,18 @@
+from functools import partial
+from collections import OrderedDict
+
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torchsummary import summary
 
-    
+def conv3x3x3(in_planes, out_planes, stride=1):
+    return nn.Conv3d(in_planes,
+                     out_planes,
+                     kernel_size=3,
+                     stride=stride,
+                     padding=1,
+                     bias=False)
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -14,7 +25,7 @@ class BasicBlock(nn.Module):
         self.relu = nn.ReLU(inplace=True) if activation is None else activation
         self.conv2 = conv3x3x3(planes, planes)
         self.bn2 = nn.BatchNorm3d(planes)
-        self.downsample = downsample
+        self.downsample = partial(self._downsample_basic_block, planes=planes, stride=stride)
         self.stride = stride
 
     def _downsample_basic_block(self, x, planes, stride):
@@ -49,7 +60,42 @@ class BasicBlock(nn.Module):
 
 class Residual(nn.Module):
 
-    def __init__(self, cfg):
+    def __init__(self, cfg=None):
+        super().__init__()
+
+        layers = cfg.layers if cfg is not None else [4, 8, 16, 32]
+        self.feature_extractor = nn.Sequential(
+            BasicBlock(1, layers[0]),
+            BasicBlock(layers[0], layers[0], stride=2),
+
+            BasicBlock(layers[0], layers[1]),
+            BasicBlock(layers[1], layers[1], stride=2),
+
+            BasicBlock(layers[1], layers[2]),
+            BasicBlock(layers[2], layers[2], stride=2),
+
+            BasicBlock(layers[2], layers[3]),
+            BasicBlock(layers[3], layers[3], stride=2)
+        )
+
+        self.avgpool = nn.AdaptiveAvgPool3d((2, 2, 2))
+        self.classifier = nn.Sequential(OrderedDict([
+            ('fc', nn.Linear(256, 1))
+        ]))
+
+    def forward(self, x):
+
+        x = self.feature_extractor(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
+if __name__=="__main__":
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    model = Residual().to(device)
+    print(summary(model, input_size=(1, 96, 96, 96)))
 
 
 

@@ -8,6 +8,7 @@ from .resnet import *
 from .sequential import *
 from .sfcn import *
 from .vanilla import *
+from .residual_vanilla import *
 
 def load_model(model_name, cfg=None, gpu=True, verbose=True):
     
@@ -43,6 +44,9 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
 
     elif model_name == 'vanilla':
         model = Vanilla3d(cfg)
+
+    elif model_name == 'vanilla_residual':
+        model = Residual()
 
     else: return None
 
