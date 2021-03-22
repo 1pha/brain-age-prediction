@@ -46,7 +46,7 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
         model = Vanilla3d(cfg)
 
     elif model_name == 'vanilla_residual':
-        model = Residual()
+        model = Residual(cfg)
 
     else: return None
 
@@ -65,6 +65,9 @@ def save_checkpoint(state, model_filename, model_dir='./models/', is_best=False)
     # torch.save(state, os.path.join(model_dir, model_filename))    
     if is_best:
         torch.save(state, os.path.join(model_dir, 'best_' + model_filename))
+
+    else:
+        torch.save(state, os.path.join(model_dir, model_filename))
 
 if __name__ == "__main__":
 

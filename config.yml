@@ -16,6 +16,11 @@ resize:
   - 96
   - 96
   - 96
+layers:
+  - 4
+  - 8
+  - 16
+  - 32
 
 # DATA
 test_size: 0.2

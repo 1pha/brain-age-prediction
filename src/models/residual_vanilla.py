@@ -80,7 +80,7 @@ class Residual(nn.Module):
 
         self.avgpool = nn.AdaptiveAvgPool3d((2, 2, 2))
         self.classifier = nn.Sequential(OrderedDict([
-            ('fc', nn.Linear(256, 1))
+            ('fc', nn.Linear(layers[-1] * 8, 1))
         ]))
 
     def forward(self, x):
@@ -93,8 +93,12 @@ class Residual(nn.Module):
 
 if __name__=="__main__":
 
+    class CFG:
+        layers = [8, 16, 32, 64]
+    cfg = CFG()
+
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    model = Residual().to(device)
+    model = Residual(cfg).to(device)
     print(summary(model, input_size=(1, 96, 96, 96)))
 
 

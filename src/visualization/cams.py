@@ -21,7 +21,7 @@ class CAM:
             model_name = self.cfg.model_name
 
         self.hooks = dict()
-        if model_name == 'resnet':
+        if model_name == 'resnet' or model_name == 'resnet_no_maxpool':
             self.conv_layers = [
                 self.model.conv1,
                 self.model.layer1[0].conv1,
@@ -45,7 +45,6 @@ class CAM:
                 'layer4_conv2': self.model.layer4[0].conv2,
             }
 
-
         elif model_name == 'CNN':
             self.conv_layers = [
                 self.model.layer[0],
@@ -54,10 +53,31 @@ class CAM:
                 self.model.layer[11],
             ]
 
+        elif model_name == 'vanilla_residual':
+        
+            self.conv_layers = [
+                self.model.feature_extractor[0].conv1,
+                self.model.feature_extractor[0].conv2,
+                self.model.feature_extractor[1].conv1,
+                self.model.feature_extractor[1].conv2,
+                self.model.feature_extractor[2].conv1,
+                self.model.feature_extractor[2].conv2,
+                self.model.feature_extractor[3].conv1,
+                self.model.feature_extractor[3].conv2,
+                self.model.feature_extractor[4].conv1,
+                self.model.feature_extractor[4].conv2,
+                self.model.feature_extractor[5].conv1,
+                self.model.feature_extractor[5].conv2,
+                self.model.feature_extractor[6].conv1,
+                self.model.feature_extractor[6].conv2,
+                self.model.feature_extractor[7].conv1,
+                self.model.feature_extractor[7].conv2,
+            ]
+
         else:
             raise NotImplementedError
 
-        for i, layer in enumerate(self.conv_layers.values()):
+        for i, layer in enumerate(self.conv_layers):
             self.hooks[i] = layer.register_backward_hook(self.save_gradient)
         
     def save_gradient(self, *args):
@@ -80,7 +100,7 @@ class CAM:
     def visualize(self, slc=48):
 
         self.resized_cams = self.resizing() if self.resized_cams is None else self.resized_cams
-        if self.cfg.model_name == 'resnet':
+        if self.cfg.model_name == 'resnet' or self.cfg.model_name == 'resnet_no_maxpool':
 
             fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(20, 20))
             for idx, (cam_, layer) in enumerate(zip(self.resized_cams, self.conv_layers.keys())):
@@ -89,8 +109,7 @@ class CAM:
                 ax[row, col].imshow(cam_[:, slc, :])
                 ax[row, col].set_title(layer)
 
-        elif self.cfg.model_name == 'CNN':
-
+        else:
             fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(15, 15))
             for idx, cam_ in enumerate(self.resized_cams):
 
@@ -141,7 +160,7 @@ def run_gradcam(model, data, cfg):
     
     cam.cam_over_layers()
     cam.remove_hook()
-    return cam.resizing()[-1]
+    return cam.resizing()
 
 
 class GuidedBackpropRelu(Function):
@@ -183,6 +202,35 @@ class GuidedReluModel(nn.Module):
         x.register_hook(self.hook)
         x = self.model(x)
         return x
+
+def make_gbpmodel(cfg):
+
+    if cfg.model_name == 'resnet' or cfg.model_name == 'resnet_no_maxpool':
+
+        opt = Option()
+        opt.activation = GuidedBackpropRelu.apply
+        model = generate_model(model_depth=opt.model_depth,
+                            n_classes=opt.n_classes,
+                            n_input_channels=opt.n_input_channels,
+                            shortcut_type=opt.shortcut_type,
+                            conv1_t_size=opt.conv1_t_size,
+                            conv1_t_stride=opt.conv1_t_stride,
+                            no_max_pool=opt.no_max_pool,
+                            widen_factor=opt.resnet_widen_factor,
+                            activation=opt.activation)
+
+
+def run_gbp(model, data, cfg):
+    
+    guide.eval()
+    model = make_gbpmodel(cfg)
+    
+    x, y = data
+    device = next(guide.parameters()).device
+    x.requires_grad = True
+    output = guide.forward(x.to(device))
+    output.backward()
+    return guide.get_visual()
 
 
 if __name__=="__main__":
