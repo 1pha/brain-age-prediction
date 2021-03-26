@@ -1,7 +1,10 @@
 # MISC
 seed: 42
-debug: False
 folds: 20
+
+# DEBUG
+debug: False
+rot90: False
 
 # MODEL
 model_name: resnet
@@ -21,6 +24,7 @@ layers:
   - 8
   - 16
   - 32
+batchnorm: True
 
 # DATA
 test_size: 0.2

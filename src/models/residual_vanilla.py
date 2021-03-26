@@ -17,7 +17,7 @@ def conv3x3x3(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, downsample=None, activation=None):
+    def __init__(self, in_planes, planes, stride=1, downsample=None, activation=None, batchnorm=True):
         super().__init__()
 
         self.conv1 = conv3x3x3(in_planes, planes, stride)
@@ -27,6 +27,7 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.downsample = partial(self._downsample_basic_block, planes=planes, stride=stride)
         self.stride = stride
+        self.batchnorm = batchnorm
 
     def _downsample_basic_block(self, x, planes, stride):
         out = F.avg_pool3d(x, kernel_size=1, stride=stride)
@@ -43,11 +44,11 @@ class BasicBlock(nn.Module):
         residual = x
 
         out = self.conv1(x)
-        out = self.bn1(out)
+        if self.batchnorm: out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        if self.batchnorm: out = self.bn2(out)
 
         if self.downsample is not None:
             residual = self.downsample(x)
@@ -64,18 +65,19 @@ class Residual(nn.Module):
         super().__init__()
 
         layers = cfg.layers if cfg is not None else [4, 8, 16, 32]
+        batchnorm = cfg.batchnorm
         self.feature_extractor = nn.Sequential(
-            BasicBlock(1, layers[0]),
-            BasicBlock(layers[0], layers[0], stride=2),
+            BasicBlock(1, layers[0], batchnorm=batchnorm),
+            BasicBlock(layers[0], layers[0], stride=2, batchnorm=batchnorm),
 
-            BasicBlock(layers[0], layers[1]),
-            BasicBlock(layers[1], layers[1], stride=2),
+            BasicBlock(layers[0], layers[1], batchnorm=batchnorm),
+            BasicBlock(layers[1], layers[1], stride=2, batchnorm=batchnorm),
 
-            BasicBlock(layers[1], layers[2]),
-            BasicBlock(layers[2], layers[2], stride=2),
+            BasicBlock(layers[1], layers[2], batchnorm=batchnorm),
+            BasicBlock(layers[2], layers[2], stride=2, batchnorm=batchnorm),
 
-            BasicBlock(layers[2], layers[3]),
-            BasicBlock(layers[3], layers[3], stride=2)
+            BasicBlock(layers[2], layers[3], batchnorm=batchnorm),
+            BasicBlock(layers[3], layers[3], stride=2, batchnorm=batchnorm)
         )
 
         self.avgpool = nn.AdaptiveAvgPool3d((2, 2, 2))

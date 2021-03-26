@@ -203,7 +203,13 @@ class DatasetPlus(Dataset):
         else:
             x = torch.tensor(x)[None, ...].float()
 
-        return x, torch.tensor(self.data_labels[idx]).float()
+        if self.cfg.rot90:
+            return torch.rot90(x, 1, [1, 2]), torch.tensor(self.data_labels[idx]).float()
+
+        else:
+            return x, torch.tensor(self.data_labels[idx]).float()
+
+        
 
     def augmentation(self, path):
 
