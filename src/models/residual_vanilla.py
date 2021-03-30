@@ -66,20 +66,36 @@ class Residual(nn.Module):
 
         layers = cfg.layers if cfg is not None else [4, 8, 16, 32]
         batchnorm = cfg.batchnorm
-        self.feature_extractor = nn.Sequential(
+
+        feature_extractor = [
             BasicBlock(1, layers[0], batchnorm=batchnorm),
-            BasicBlock(layers[0], layers[0], stride=2, batchnorm=batchnorm),
+            BasicBlock(layers[0], layers[0], stride=2, batchnorm=batchnorm)
+        ]
 
-            BasicBlock(layers[0], layers[1], batchnorm=batchnorm),
-            BasicBlock(layers[1], layers[1], stride=2, batchnorm=batchnorm),
+        for _prev, _next in zip(layers, layers[1:]):
 
-            BasicBlock(layers[1], layers[2], batchnorm=batchnorm),
-            BasicBlock(layers[2], layers[2], stride=2, batchnorm=batchnorm),
+            if cfg.double:
+                feature_extractor.append(BasicBlock(_prev, _next, batchnorm=batchnorm))
+                feature_extractor.append(BasicBlock(_next, _next, stride=2, batchnorm=batchnorm))
 
-            BasicBlock(layers[2], layers[3], batchnorm=batchnorm),
-            BasicBlock(layers[3], layers[3], stride=2, batchnorm=batchnorm)
-        )
+            else:
+                feature_extractor.append(BasicBlock(_prev, _next, stride=2, batchnorm=batchnorm))
 
+        self.feature_extractor = nn.Sequential(*feature_extractor)
+
+        # self.feature_extractor = nn.Sequential(
+        #     BasicBlock(1, layers[0], batchnorm=batchnorm),
+        #     BasicBlock(layers[0], layers[0], stride=2, batchnorm=batchnorm),
+
+        #     BasicBlock(layers[0], layers[1], batchnorm=batchnorm),
+        #     BasicBlock(layers[1], layers[1], stride=2, batchnorm=batchnorm),
+
+        #     BasicBlock(layers[1], layers[2], batchnorm=batchnorm),
+        #     BasicBlock(layers[2], layers[2], stride=2, batchnorm=batchnorm),
+
+        #     BasicBlock(layers[2], layers[3], batchnorm=batchnorm),
+        #     BasicBlock(layers[3], layers[3], stride=2, batchnorm=batchnorm)
+        # )
         self.avgpool = nn.AdaptiveAvgPool3d((2, 2, 2))
         self.classifier = nn.Sequential(OrderedDict([
             ('fc', nn.Linear(layers[-1] * 8, 1))
@@ -97,10 +113,13 @@ if __name__=="__main__":
 
     class CFG:
         layers = [8, 16, 32, 64]
+        batchnorm = True
+        double = False
     cfg = CFG()
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = Residual(cfg).to(device)
+    print(model)
     print(summary(model, input_size=(1, 96, 96, 96)))
 
 

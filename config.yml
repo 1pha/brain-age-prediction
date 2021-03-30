@@ -15,16 +15,10 @@ loss: MSE
 metrics:
   - RMSE
   - MAE
-resize:
-  - 96
-  - 96
-  - 96
-layers:
-  - 4
-  - 8
-  - 16
-  - 32
+resize: [96, 96, 96]
+layers: [4, 8, 16, 32]
 batchnorm: True
+double: False
 
 # DATA
 test_size: 0.2
@@ -35,13 +29,14 @@ augmentation:
   affine: 0.33
   flip: 0.33
   elastic_deform: 0.33
+aug_intensity:
+  affine: null
+  flip: null
+  elastic_deform: null
 task_type: age
 preprocess:
   scaler: minmax
-  resize:
-    - 96
-    - 96
-    - 96
+  resize: [96, 96, 96]
 npy_path: ../../brainmask_tlrc/*.npy
 label_path: ../rsc/age_ixidlbsoas13.csv
 registration: tlrc
