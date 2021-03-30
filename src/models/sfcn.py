@@ -4,8 +4,11 @@ import torch.nn.functional as F
 from torchsummary import summary
 
 class SFCN(nn.Module):
-    def __init__(self, channel_number=[32, 64, 128, 256, 256, 64], output_dim=40, dropout=True):
+    def __init__(self, cfg):
         super(SFCN, self).__init__()
+        channel_number = cfg.channel_number if cfg else [32, 64, 128, 256, 256, 64]
+        dropout = cfg.dropout
+        output_dim = 1
         n_layer = len(channel_number)
         self.feature_extractor = nn.Sequential()
         for i in range(n_layer):
@@ -61,12 +64,22 @@ class SFCN(nn.Module):
         x_f = self.feature_extractor(x)
         x = self.classifier(x_f)
         x = F.log_softmax(x, dim=1)
-        out.append(x)
-        return out
+        # out.append(x)
+        # return out
+        return x
 
 if __name__=="__main__":
 
+    class CFG:
+        channel_number = [32, 64, 128, 256, 64]
+        output_dim = 1
+        dropout = True
+    cfg = CFG()
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(device)
-    model = SFCN().to("cuda")
-    print(summary(model, input_size=(1, 160, 192, 160)))
+    model = SFCN(cfg=cfg).to(device)
+    # print(model)
+    # print(summary(model, input_size=(1, 96, 96, 96)))
+
+    sample = torch.zeros((2, 1, 96, 96, 96)).to(device)
+    print(model(sample).squeeze(1))

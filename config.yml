@@ -17,8 +17,10 @@ metrics:
   - MAE
 resize: [96, 96, 96]
 layers: [4, 8, 16, 32]
-batchnorm: True
-double: False
+batchnorm: True # Vres
+double: False # Vres
+dropout: True # SFCN
+channel_number: [32, 64, 128, 256, 64] # SFCN
 
 # DATA
 test_size: 0.2

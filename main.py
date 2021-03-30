@@ -1,111 +1,158 @@
-from datetime import datetime
-import seaborn as sns
+# importing the libraries
+import os
+import pandas as pd
+import numpy as np
+from itertools import chain
+from IPython.display import clear_output
 
+# for reading and displaying images
+from glob import glob
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# for creating validation set
+from sklearn.model_selection import train_test_split
+
+# PyTorch libraries and modules
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+# models
+from src.models.model_util import load_model, save_checkpoint
+
+# other files
+from src.config import *
+from src.training.run import *
+from src.data.data_util import *
+
+# Torch
+from torch.optim import *
 import torch.optim as optim
-from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
+from torchsummary import summary
+# from tensorboardX import SummaryWriter
 
-from src.run import run
-from src.dataloader import MyDataset
-from src.evaluate import eval, loss_plot, result_plot
-from src.model.vanilla import Vanilla3d
-from src.model.paper_ieee.levakov import Levakov
+# Maintenance
+import mlflow
+from DeepNotion.build import *
 
-import argparse
+# CAM - M3dCam
+# from medcam import medcam
 
-parser = argparse.ArgumentParser(description='Age Prediction of sMRI Data')
-parser.add_argument('--model', '-m', type=str, default='vanilla',
-                    help='Which model to use, default=vanilla')
-parser.add_argument('--task_type', '-t', type=str, default='binary',
-                    help='Task type between Classification of 2/9 classes, Regression')
-parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4,
-                    help='Learning Rate, default=1e-4')
-parser.add_argument('--optimizer', '-o', type=str, default='adam',
-                    help='Type of Optimizer, default=adam')
-parser.add_argument('--scheduler', '-sc', type=str, default=None,
-                    help='Type of Scheduler, default=None')
-parser.add_argument('--loss_function', '-l', type=str, default='bce',
-                    help='Define Loss function, default=bce')
-parser.add_argument('--epochs', '-e', type=int, default=20,
-                    help='Number of epochs, default=20')
-parser.add_argument('--batch_size', '-b', type=int, default=8,
-                    help='Size of the minibatch, default=8')
-parser.add_argument('--resize', '-r', type=int, default=64,
-                    help='Size of resizing, default=64. Original raw data is 256-cube')
-parser.add_argument('--save', '-s', action='store_true', default=True)
-args = parser.parse_args()
+if __name__=="__main__":
 
-model_list = {
-    'vanilla': Vanilla3d,
-    'levakov': Levakov,
-}
+    
+    cfg = load_config()
 
-optimizer_list = {
-    'adam': optim.Adam
-}
+    random_seed = cfg.seed
+    np.random.seed(random_seed)
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
 
-loss_list = {
-    'mse': nn.MSELoss,
-    'bce': nn.BCELoss
-}
+    exp_name = '3dcnn_smri_comparison_test'
+    try:
+        mlflow.create_experiment(name=exp_name)
+    except:
+        print('Existing experiment')
+        
+    mlflow.set_experiment(exp_name)
 
-scheduler_list = {
-    'cosine': optim.lr_scheduler.CosineAnnealingLR
-}
+    #################################
+    ### CHANGE CONFIGURATION HERE ###
+    #################################
+    cfg.model_name = 'sfcn'
+    cfg.registration = 'tlrc'
+    #################################
+    cfg.refresh()
+    model, cfg.device = load_model(cfg.model_name, verbose=False, cfg=cfg)
+    print(cfg.device)
 
-if __name__ == "__main__":
+    optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
 
-    # 00. Load Data
-    print("# 00. Loading Data")
-    train_dset = MyDataset(args.task_type)
-    test_dset = MyDataset(args.task_type, test=True)
+    trn_dp, tst_dp = DataPacket(), DataPacket()
 
-    train_loader = DataLoader(train_dset, batch_size=args.batch_size)
-    test_loader = DataLoader(test_dset, batch_size=args.batch_size)
+    run_date = today().replace('.', '_').replace(':', '') + '_' + cfg.model_name
+    condition = 'TLRC Aug, 100 ep, SFCN Default'
+    mlflow.start_run(run_name=condition)
 
-    # 01. Define Model
-    print("# 01. Define Model")
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(f'Using {device}')
-    model = model_list[args.model](args.task_type).to(device)
+    fold = None
+    # cfg.epochs = 200
+    db = make_db(page, client=client, schema=cfg['notion']['no_fold_aug_schema'], title='Results') if cfg['notion']['use'] else None
+    for e in range(cfg.epochs):
+        
+        start_time = time.time()
+        print(f'Epoch {e+1} / {cfg.epochs}, BEST MAE {cfg.best_mae:.3f}')
+        
+        model, trn_dp, trn_res = train(model, optimizer, fn_lst, trn_dp, cfg, fold=fold, augment=True)
+        model, tst_dp, tst_res = valid(model, fn_lst, tst_dp, cfg, fold=fold)
+        elapsed_time = round(time.time() - start_time, 3)
+        
+        if cfg.best_mae > tst_dp.mae[-1]:
+            
+            cfg.best_mae = tst_dp.mae[-1]
+            model_name = f'{cfg.model_name}_ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{cfg.best_mae:.3f}.pth'
+            save_checkpoint(model.state_dict(), model_name, model_dir=f'./result/models/{run_date}/', is_best=True)
+            
+        df = pd.concat([make_df(trn_res, 'Train'),
+                        make_df(tst_res, 'Test')], ignore_index=True)
+        
+        trn_dp.corr.update(df[df['Label'] == 'Train'].corr().Prediction['True'])
+        trn_dp.refresh()
+        tst_dp.corr.update(df[df['Label'] == 'Test'].corr().Prediction['True'])
+        tst_dp.refresh()
 
-    # 02. Setups
-    print("# 02. Setups - Optim, Loss, Scheduler")
-    optimizer = optimizer_list[args.optimizer](model.parameters(),
-                                               lr=args.learning_rate)
-    scheduler = scheduler_list[args.scheduler](optimizer, len(train_loader), eta_min=0) if args.scheduler else None
-    loss_fn = loss_list[args.loss_function]()
-    EPOCHS = range(args.epochs)
+        if e % 1 == 0:
+            trn_dp.info('train')
+            tst_dp.info('test ')
 
-    # 03. Run
-    print("# 03. Run Epochs")
-    summary = SummaryWriter(f'./tensorboard/{datetime.now().strftime("%Y-%m-%d_%H%M")}') if args.save else None
-    fname = f'{datetime.now().strftime("%Y-%m-%d_%H%M")}' if args.save else None
-    model, losses, trns, preds = run(model=model, epochs=EPOCHS, train_loader=train_loader, test_loader=test_loader,
-                        optimizer=optimizer, loss_fn=loss_fn, device=device,
-                        resize=args.resize, summary=summary, scheduler=scheduler, verbose=True)
+        if e % cfg.verbose_period == 0:
+            # plt.title(f"L1 Losses among epochs, {e}th")
+            # plt.plot(list(trn_dp.loss), label='Train')
+            # plt.plot(list(tst_dp.loss), label='Test')
+            # plt.grid(); plt.legend()
 
-    # 04. Evaluate
-    #print("# 04. Loss Plot")
-    # 04-1. Loss Plot
-    #loss_plot(*losses, EPOCHS, args.loss_function)
+            # sns.lmplot(data=df, x='True', y='Prediction', hue='Label')
+            # plt.grid()
+            # plt.show()
+            
+            model_name = f'{cfg.model_name}_ep{e}-{str(cfg.epochs).zfill(3)}_sd{cfg.seed}_mae{cfg.best_mae:.3f}.pth'
+            save_checkpoint(model.state_dict(), model_name, model_dir=f'./result/models/{run_date}/', is_best=False)
+            
+            if db:
+                data = gather_data(e=e, time=elapsed_time, cfg=cfg,
+                                train=trn_dp, valid=tst_dp)
+                write_db(db, data)
+        
+        metrics = mlflow_data(time=elapsed_time, train=trn_dp, valid=tst_dp)
+        mlflow.log_metrics(metrics, e)
+        
+        torch.cuda.empty_cache()
+        
+    # Save Parameters to MLFlow
+    cfg.best_mae = min(tst_dp.mae)
+    cfg.refresh()
+    params = dict()
+    for name, value in cfg.get_dict().items():
+        if name not in ['notion']:  
+            params[name] = str(value)
+    mlflow.log_params(params)
 
-    # 04-2. Result Plot - NOT USED(Too much memory allocation and time loss)
+    save_checkpoint(cfg.get_dict(), 'cfg.pt', model_dir=f'./result/models/{run_date}/', is_best=True)
 
-    sns_plot = sns.heatmap(confusion_matrix(*trns), annot=True)
-    if fname:
-        figure = sns_plot.get_figure()
-        figure.savefig(f'./result/{fname}_{title}_binary.png', dpi=400)
+    # Save Plots to MLFlow
+    sns.jointplot(data=df[df['Label'] == 'Test'], x='Prediction', y='True', kind='reg')
+    plt.grid()
+    plt.savefig(f'./result/models/{run_date}/test_jointplot.png')
+    plt.show()
+    # mlflow.log_artifact(f'./result/models/{run_date}/test_jointplot.png')
+    plt.close()
 
-    sns_plot = sns.heatmap(confusion_matrix(*preds), annot=True)
-    if fname:
-        figure = sns_plot.get_figure()
-        figure.savefig(f'./result/{fname}_{title}_binary.png', dpi=400)
+    plt.title(f"L1 Losses\n{condition}")
+    plt.plot(list(trn_dp.loss), label='Train')
+    plt.plot(list(tst_dp.loss), label='Test')
+    plt.grid(); plt.legend()
+    plt.savefig(f'./result/models/{run_date}/loss_plot.png')
+    plt.show()
+    # mlflow.log_artifact(f'./result/models/{run_date}/loss_plot.png')
 
-    # train_true, train_pred = eval(model=model, loader=train_loader, device=device)
-    # result_plot(task_type=args.task_type, trues=train_true, preds=train_pred, title='Train', fname=fname)
-
-    # test_true, test_pred = eval(model=model, loader=test_loader, device=device)
-    # result_plot(task_type=args.task_type, trues=test_true, preds=test_pred, title='Test', fname=fname)
+    mlflow.end_run()

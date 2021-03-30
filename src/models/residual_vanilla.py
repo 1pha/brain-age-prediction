@@ -119,8 +119,11 @@ if __name__=="__main__":
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = Residual(cfg).to(device)
-    print(model)
-    print(summary(model, input_size=(1, 96, 96, 96)))
+    # print(model)
+    # print(summary(model, input_size=(1, 96, 96, 96)))
+
+    sample = torch.zeros((2, 1, 96, 96, 96)).to(device)
+    print(model(sample).squeeze())
 
 
 

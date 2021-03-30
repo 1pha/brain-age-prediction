@@ -130,7 +130,7 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 
         optimizer.zero_grad()
 
-        y_pred = model.forward(x).to(device).squeeze(1)
+        y_pred = model.forward(x).to(device).squeeze()
         predictions.append(y_pred.cpu())
         targets.append(y.cpu())
 
@@ -192,7 +192,7 @@ def valid(model, loss_fns, DP, CFG, fold=None):
                 time.sleep(20)
                 pass
 
-            y_pred = model.forward(x).to(device).squeeze(1)
+            y_pred = model.forward(x).to(device).squeeze()
             predictions.append(y_pred.cpu())
             targets.append(y.cpu())
 

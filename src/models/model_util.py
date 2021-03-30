@@ -40,7 +40,7 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
         model = Dinsdale(1, 1, 2)
 
     elif model_name == 'sfcn':
-        model = SFCN()
+        model = SFCN(cfg)
 
     elif model_name == 'vanilla':
         model = Vanilla3d(cfg)
