@@ -61,6 +61,7 @@ if __name__=="__main__":
     ### CHANGE CONFIGURATION HERE ###
     #################################
     cfg.model_name = 'sfcn'
+    cfg.channel_number = [32, 64, 128, 256, 256, 64]
     cfg.registration = 'tlrc'
     #################################
     cfg.refresh()
@@ -68,23 +69,26 @@ if __name__=="__main__":
     print(cfg.device)
 
     optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
     trn_dp, tst_dp = DataPacket(), DataPacket()
 
     run_date = today().replace('.', '_').replace(':', '') + '_' + cfg.model_name
-    condition = 'TLRC Aug, 100 ep, SFCN Default'
+    condition = 'TLRC Aug, 100 ep, SFCN Original (256)'
     mlflow.start_run(run_name=condition)
 
     fold = None
-    # cfg.epochs = 200
+    # cfg.epochs = 200 
     db = make_db(page, client=client, schema=cfg['notion']['no_fold_aug_schema'], title='Results') if cfg['notion']['use'] else None
     for e in range(cfg.epochs):
         
         start_time = time.time()
-        print(f'Epoch {e+1} / {cfg.epochs}, BEST MAE {cfg.best_mae:.3f}')
+        print(f'Epoch {e+1} / {cfg.epochs} | BEST MAE {cfg.best_mae:.3f} | LR {optimizer.param_groups[0]["lr"]}')
         
         model, trn_dp, trn_res = train(model, optimizer, fn_lst, trn_dp, cfg, fold=fold, augment=True)
         model, tst_dp, tst_res = valid(model, fn_lst, tst_dp, cfg, fold=fold)
+
+        scheduler.step(tst_dp.mae[-1])
         elapsed_time = round(time.time() - start_time, 3)
         
         if cfg.best_mae > tst_dp.mae[-1]:

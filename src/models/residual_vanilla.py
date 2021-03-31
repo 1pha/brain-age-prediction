@@ -83,19 +83,6 @@ class Residual(nn.Module):
 
         self.feature_extractor = nn.Sequential(*feature_extractor)
 
-        # self.feature_extractor = nn.Sequential(
-        #     BasicBlock(1, layers[0], batchnorm=batchnorm),
-        #     BasicBlock(layers[0], layers[0], stride=2, batchnorm=batchnorm),
-
-        #     BasicBlock(layers[0], layers[1], batchnorm=batchnorm),
-        #     BasicBlock(layers[1], layers[1], stride=2, batchnorm=batchnorm),
-
-        #     BasicBlock(layers[1], layers[2], batchnorm=batchnorm),
-        #     BasicBlock(layers[2], layers[2], stride=2, batchnorm=batchnorm),
-
-        #     BasicBlock(layers[2], layers[3], batchnorm=batchnorm),
-        #     BasicBlock(layers[3], layers[3], stride=2, batchnorm=batchnorm)
-        # )
         self.avgpool = nn.AdaptiveAvgPool3d((2, 2, 2))
         self.classifier = nn.Sequential(OrderedDict([
             ('fc', nn.Linear(layers[-1] * 8, 1))

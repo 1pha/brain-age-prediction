@@ -32,7 +32,7 @@ class SFCN(nn.Module):
                                                                   kernel_size=1,
                                                                   padding=0))
         self.classifier = nn.Sequential()
-        avg_shape = [5, 6, 5]
+        avg_shape = [2, 2, 2]
         self.classifier.add_module('average_pool', nn.AvgPool3d(avg_shape))
         if dropout is True:
             self.classifier.add_module('dropout', nn.Dropout(0.5))
@@ -63,7 +63,7 @@ class SFCN(nn.Module):
         out = list()
         x_f = self.feature_extractor(x)
         x = self.classifier(x_f)
-        x = F.log_softmax(x, dim=1)
+        # x = F.log_softmax(x, dim=1)
         # out.append(x)
         # return out
         return x
@@ -71,7 +71,7 @@ class SFCN(nn.Module):
 if __name__=="__main__":
 
     class CFG:
-        channel_number = [32, 64, 128, 256, 64]
+        channel_number = [32, 64, 128, 256, 256, 64]
         output_dim = 1
         dropout = True
     cfg = CFG()
