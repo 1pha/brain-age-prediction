@@ -44,8 +44,8 @@ class SliceViewer:
         coronal  = self.subject[:, :, i]
 
         fig, axes = plt.subplots(1, 3)
-        for i, s in enumerate([saggital, axial, coronal]):
-            axes[i].imshow(s.T, cmap="gray", origin="lower")
+        for _i, s in enumerate([saggital, axial, coronal]):
+            axes[_i].imshow(s.T, cmap="gray", origin="lower")
         plt.suptitle(f"{i}th Slice view for EPI image")
         plt.show()
         plt.close()
