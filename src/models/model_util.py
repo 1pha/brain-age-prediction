@@ -48,6 +48,9 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
     elif model_name == 'vanilla_residual':
         model = Residual(cfg)
 
+    elif model_name == 'vanilla_residual_past':
+        model = ResidualPast(cfg)
+
     else: return None
 
     if gpu:

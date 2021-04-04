@@ -96,6 +96,40 @@ class Residual(nn.Module):
         x = self.classifier(x)
         return x
 
+class ResidualPast(nn.Module):
+
+    def __init__(self, cfg=None):
+        super().__init__()
+
+        layers = cfg.layers if cfg is not None else [4, 8, 16, 32]
+        batchnorm = cfg.batchnorm
+        self.feature_extractor = nn.Sequential(
+            BasicBlock(1, layers[0], batchnorm=batchnorm),
+            BasicBlock(layers[0], layers[0], stride=2, batchnorm=batchnorm),
+
+            BasicBlock(layers[0], layers[1], batchnorm=batchnorm),
+            BasicBlock(layers[1], layers[1], stride=2, batchnorm=batchnorm),
+
+            BasicBlock(layers[1], layers[2], batchnorm=batchnorm),
+            BasicBlock(layers[2], layers[2], stride=2, batchnorm=batchnorm),
+
+            BasicBlock(layers[2], layers[3], batchnorm=batchnorm),
+            BasicBlock(layers[3], layers[3], stride=2, batchnorm=batchnorm)
+        )
+
+        self.avgpool = nn.AdaptiveAvgPool3d((2, 2, 2))
+        self.classifier = nn.Sequential(OrderedDict([
+            ('fc', nn.Linear(layers[-1] * 8, 1))
+        ]))
+
+    def forward(self, x):
+
+        x = self.feature_extractor(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
 if __name__=="__main__":
 
     class CFG:
