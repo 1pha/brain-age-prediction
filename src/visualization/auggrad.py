@@ -40,6 +40,7 @@ class AugGrad:
 
         x.requires_grad = True
         output = self.pretrained_model(x).squeeze()
+        print(f'[predicted]: {float(output.data.cpu()):.3f}')
         output.backward()
         total_gradients = x.grad.data.cpu().numpy()
         x.requires_grad = False
@@ -50,7 +51,7 @@ class AugGrad:
             x_aug.requires_grad = True
             output = self.pretrained_model(x_aug).squeeze()
             if verbose:
-                print(float(output.data.cpu()))
+                print(f'{sample}th [{aug_choice}]: {float(output.data.cpu()):.3f}')
             (output - y.to(self.cfg.device)).backward()
 
             total_gradients += x_aug.grad.data.cpu().numpy()
