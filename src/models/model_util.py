@@ -25,7 +25,8 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
                                     conv1_t_size=opt.conv1_t_size,
                                     conv1_t_stride=opt.conv1_t_stride,
                                     no_max_pool=opt.no_max_pool,
-                                    widen_factor=opt.resnet_widen_factor)
+                                    widen_factor=opt.resnet_widen_factor,
+                                    start_channels=cfg.start_channels)
 
         if model_name == 'resnet_no_maxpool':
             model.no_max_pool = True

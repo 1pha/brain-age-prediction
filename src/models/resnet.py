@@ -4,15 +4,21 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# from torchsummary import summary
+from torchsummary import summary
 
 
-def get_inplanes(shorten=None):
-    if shorten is not None:
-        return [64, 128, 256, 512]
+def get_inplanes(start_channels=16):
+    if start_channels == 8:
+        return [8, 16, 32, 64]
 
-    elif shorten is None:
+    elif start_channels == 16:
         return [16, 32, 64, 128]
+
+    elif start_channels == 32:
+        return [32, 64, 128, 256]
+
+    elif start_channels == 64:
+        return [64, 128, 256, 512]
 
 
 def conv3x3x3(in_planes, out_planes, stride=1):
@@ -220,13 +226,13 @@ class ResNet(nn.Module):
         return x
 
 
-def generate_model(model_depth, **kwargs):
+def generate_model(model_depth, start_channels, **kwargs):
     assert model_depth in [10, 18, 34, 50, 101, 152, 200]
 
     if model_depth == 10:
-        model = ResNet(BasicBlock, [1, 1, 1, 1], get_inplanes(), **kwargs)
+        model = ResNet(BasicBlock, [1, 1, 1, 1], get_inplanes(start_channels), **kwargs)
     elif model_depth == 18:
-        model = ResNet(BasicBlock, [2, 2, 2, 2], get_inplanes(), **kwargs)
+        model = ResNet(BasicBlock, [2, 2, 2, 2], get_inplanes(start_channels), **kwargs)
     elif model_depth == 34:
         model = ResNet(BasicBlock, [3, 4, 6, 3], get_inplanes(), **kwargs)
     elif model_depth == 50:
@@ -250,7 +256,8 @@ class Option:
                 conv1_t_size=7,
                 conv1_t_stride=2,
                 no_max_pool=False,
-                resnet_widen_factor=1.0
+                resnet_widen_factor=1.0,
+                start_channels=16
                 ):
         
         self.model_depth = model_depth
@@ -261,6 +268,7 @@ class Option:
         self.conv1_t_stride = conv1_t_stride
         self.no_max_pool = no_max_pool
         self.resnet_widen_factor = resnet_widen_factor
+        self.start_channels = start_channels
 
 
 if __name__=="__main__":
@@ -269,6 +277,7 @@ if __name__=="__main__":
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
+    opt.start_channels = 32
     model = generate_model(model_depth=opt.model_depth,
                                 n_classes=opt.n_classes,
                                 n_input_channels=opt.n_input_channels,
@@ -276,7 +285,8 @@ if __name__=="__main__":
                                 conv1_t_size=opt.conv1_t_size,
                                 conv1_t_stride=opt.conv1_t_stride,
                                 no_max_pool=opt.no_max_pool,
-                                widen_factor=opt.resnet_widen_factor)
+                                widen_factor=opt.resnet_widen_factor,
+                                start_channels=opt.start_channels)
     model.to(device)
 
     print(summary(model, input_size=(1, 96, 96, 96)))

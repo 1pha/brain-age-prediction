@@ -21,6 +21,7 @@ batchnorm: True # Vres
 double: False # Vres
 dropout: True # SFCN
 channel_number: [32, 64, 128, 256, 64] # SFCN
+start_channel: 16 # RESNET
 
 # DATA
 test_size: 0.2
