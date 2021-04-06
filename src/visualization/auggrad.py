@@ -48,7 +48,7 @@ class AugGrad:
         total_gradients = x.grad.data.cpu().numpy()
         x.requires_grad = False
         for sample in range(self.n_samples):
-
+ 
             aug_choice = np.random.choice(list(self.transform.keys()), p=self.p)
             x_aug = self.transform[aug_choice](x[0].cpu()).to(self.cfg.device)[None, ...]
             x_aug.requires_grad = True
