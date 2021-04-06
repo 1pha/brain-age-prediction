@@ -16,7 +16,7 @@ from src.data.data_util import DatasetPlus
 def plot_vismap(brain, vismap, masked=True, threshold=2,
                 slc=48, alpha=.6, view=0, save=False, epoch=None):
     if masked:
-        vismap = np.ma.masked_where(vismap < 2, vismap)
+        vismap = np.ma.masked_where(vismap < threshold, vismap)
     
     fig, axes = plt.subplots(ncols=3, figsize=(15, 6))
 
@@ -41,7 +41,43 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
     plt.show()
 
 
-def parser(state):
+def convert2nifti(path, data, vismap):
+    '''
+    path: path of original dataloaders', e.g. '../../brainmask_tlrc/PAL318_mpr_wave1_orig-brainmask_tlrc.npy'
+    data: a single brain of 5-dim torch.tensor. Will be converted to numpy automatically
+    vismap: attention map derived from any methods of - GradCAM, GBP, GuidedGCAM
+    
+    Does not return anything but instead saved 2 nifti files (registrated brain, visualization map) in
+    ../../attmap_result_pairs/filename/*.nii.gz 
+    '''
+    
+    ROOT = '../../attmap_result_pairs/'
+    fname = brain_parser(path, full_path=False)[1]
+    
+    if not os.path.exists(f'{ROOT}{fname}'):
+        os.mkdir(f'{ROOT}{fname}')
+    
+    try:
+        # Make Affine
+        affine = nib.load(brain_parser(path)).affine
+
+        # Save vismap as nifti
+        vismap_nifti = nib.Nifti1Image(vismap, affine)
+        nib.save(grad_cam, f'{ROOT}{fname}/{fname}_attmap.nii.gz')
+
+        # Save .npy brain as nifti
+        brain = nib.Nifti1Image(data[0][0][0].numpy(), affine)
+        nib.save(brain, f'{ROOT}{fname}/{fname}_brain.nii.gz')
+        print('Saved')
+    
+    except:
+        print('Error occurred')
+
+
+def exp_parser(state):
+    '''
+    Parses experiment path into date/epoch
+    '''
     
     date, pth_name = state.split('/')[-1].split('\\')
     model_name = pth_name.split('_ep')[0]
@@ -49,9 +85,20 @@ def parser(state):
     
     return date, epoch
 
+def brain_parser(path, full_path=True):
+    '''
+    Parses path that contains registrated .npy file name into registrated .nii(NifTi) file
+    full_path=True will return a single string, otherwise it will return a tuple of (root, .nii)
+    '''
+    
+    root = '/'.join(path.split('/')[:2])+'/brainmask_nii/'
+    fname = path.split('/')[-1].split('_tlrc')[0]+'.nii'
+    return root + fname if full_path else root, fname.split('.nii')[0]
+
 
 class Camsual:
     '''
+    This is for GradCAM and a prototype
     Takes configuration file and saved models path then -
     1. Make a dataset (to pickup samples)
     2. Load Model architecture
@@ -81,7 +128,7 @@ class Camsual:
 
         for idx, state in enumerate(self.saved_models):
 
-            _, epoch = parser(state)
+            _, epoch = exp_parser(state)
             self.model.load_state_dict(torch.load(state))
             resized_cam = run_gradcam(self.model, data, self.cfg)[layer_idx]
             plot_vismap(data[0][0][0], resized_cam, alpha=.4, masked=False, save=True, epoch=epoch)

@@ -25,10 +25,12 @@ class AugGrad:
         self.cfg = cfg
         self.augmentation = cfg.augmentation
 
+        scales, degrees = cfg.aug_intensity['affine']
+        num_control_points, max_displacement = cfg.aug_intensity['elastic_deform']
         self.transform = {
-            'affine': tio.RandomAffine(),
+            'affine': tio.RandomAffine(scales=scales, degrees=degrees),
             'flip': tio.RandomFlip(axes=['left-right']),
-            'elastic_deform': tio.RandomElasticDeformation()
+            'elastic_deform': tio.RandomElasticDeformation(num_control_points=num_control_points, max_displacement=max_displacement)
         }
 
         p = list(self.augmentation.values())
@@ -36,11 +38,12 @@ class AugGrad:
         self.p = list(map(lambda x: x / norm, p))
         
 
-    def __call__(self, x, y, verbose=False):
+    def __call__(self, x, y, normalize=True, verbose=False):
 
         x.requires_grad = True
         output = self.pretrained_model(x).squeeze()
-        print(f'[predicted]: {float(output.data.cpu()):.3f}')
+        print(f'[true]: {int(y.data.cpu())}')
+        print(f'[pred]: {float(output.data.cpu()):.3f}')
         output.backward()
         total_gradients = x.grad.data.cpu().numpy()
         x.requires_grad = False
@@ -58,8 +61,16 @@ class AugGrad:
 
         avg_gradients = total_gradients[0, ...] / self.n_samples
 
-        return avg_gradients
+        return self.normalize(avg_gradients) if normalize else avg_gradients
 
+    def normalize(self, vismap, eps=1e-4):
+
+        numer = vismap - np.min(vismap)
+        denom = (vismap.max() - vismap.min()) + eps
+        vismap = numer / denom
+        vismap = (vismap * 255).astype("uint8")
+
+        return vismap
 
 
 if __name__=="__main__":

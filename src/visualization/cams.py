@@ -33,17 +33,17 @@ class CAM:
                 self.model.layer4[0].conv1,
                 self.model.layer4[0].conv2,
             ]
-            self.conv_layers = {
-                'conv1': self.model.conv1,
-                'layer1_conv1': self.model.layer1[0].conv1,
-                'layer1_conv2': self.model.layer1[0].conv2,
-                'layer2_conv1': self.model.layer2[0].conv1,
-                'layer2_conv2': self.model.layer2[0].conv2,
-                'layer3_conv1': self.model.layer3[0].conv1,
-                'layer3_conv2': self.model.layer3[0].conv2,
-                'layer4_conv1': self.model.layer4[0].conv1,
-                'layer4_conv2': self.model.layer4[0].conv2,
-            }
+            # self.conv_layers = {
+            #     'conv1': self.model.conv1,
+            #     'layer1_conv1': self.model.layer1[0].conv1,
+            #     'layer1_conv2': self.model.layer1[0].conv2,
+            #     'layer2_conv1': self.model.layer2[0].conv1,
+            #     'layer2_conv2': self.model.layer2[0].conv2,
+            #     'layer3_conv1': self.model.layer3[0].conv1,
+            #     'layer3_conv2': self.model.layer3[0].conv2,
+            #     'layer4_conv1': self.model.layer4[0].conv1,
+            #     'layer4_conv2': self.model.layer4[0].conv2,
+            # }
 
         elif model_name == 'CNN':
             self.conv_layers = [

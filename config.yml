@@ -32,9 +32,8 @@ augmentation:
   flip: 0.33
   elastic_deform: 0.33
 aug_intensity:
-  affine: null
-  flip: null
-  elastic_deform: null
+  affine: [0.1, 10]
+  elastic_deform: [7, .5]
 task_type: age
 preprocess:
   scaler: minmax
