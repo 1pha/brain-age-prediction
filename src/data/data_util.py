@@ -207,7 +207,11 @@ class DatasetPlus(Dataset):
             return torch.rot90(x, 1, [1, 2]), torch.tensor(self.data_labels[idx]).float()
 
         else:
-            return x, torch.tensor(self.data_labels[idx]).float()
+            if self.cfg.return_path:
+                return x, torch.tensor(self.data_labels[idx]).float(), self.data_files[idx]
+            
+            else:
+                return x, torch.tensor(self.data_labels[idx]).float()
 
         
 
