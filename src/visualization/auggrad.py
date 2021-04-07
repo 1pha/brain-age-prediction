@@ -18,7 +18,7 @@ import torchio as tio
 
 class AugGrad:
 
-    def __init__(self, pretrained_model, cfg, n_samples=25):
+    def __init__(self, cfg, pretrained_model, n_samples=25):
 
         self.pretrained_model = pretrained_model
         self.n_samples = n_samples
@@ -39,6 +39,10 @@ class AugGrad:
         
 
     def __call__(self, x, y, normalize=True, verbose=False):
+
+        '''
+        x: 
+        '''
 
         x.requires_grad = True
         output = self.pretrained_model(x).squeeze()
@@ -70,7 +74,7 @@ class AugGrad:
         vismap = numer / denom
         vismap = (vismap * 255).astype("uint8")
 
-        return vismap
+        return vismap if len(vismap.shape) < 4 else vismap[0]
 
 
 if __name__=="__main__":

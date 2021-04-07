@@ -1,23 +1,31 @@
 import numpy as np
 
-from ..src.config import *
-from ..src.models.model_utils import *
+from ..config import *
+from ..models.model_util import *
 
 class SmoothGrad:
     
-    def __init__(self, pretrained_model, cfg, stdev=.1, n_samples=25):
+    def __init__(self, cfg, pretrained_model, stdev=.1, n_samples=25):
         
         self.pretrained_model = pretrained_model
         self.stdev = stdev
         self.n_samples = n_samples
         self.cfg = cfg
         
-    def __call__(self, x, y, verbose=False):
+    def __call__(self, x, y, normalize=True, verbose=False):
+        
+        
+
+        x.requires_grad = True
+        output = self.pretrained_model(x).squeeze()
+        print(f'[true]: {int(y.data.cpu())}')
+        print(f'[pred]: {float(output.data.cpu()):.3f}')
+        output.backward()
+        total_gradients = x.grad.data.cpu().numpy()
+        x.requires_grad = False
         
         x = x.data.cpu().numpy()
         stdev = self.stdev * (np.max(x) - np.min(x))
-        total_gradients = np.zeros_like(x)
-        print(f'Y: {y}')
         for i in range(self.n_samples):
             
             noise = np.random.normal(0, stdev, x.shape).astype(np.float32)
@@ -26,7 +34,7 @@ class SmoothGrad:
             x_plus_noise.requires_grad = True
             output = self.pretrained_model(x_plus_noise).squeeze()
             if verbose:
-                print(output)
+                print(f'{i}th: {float(output.data.cpu()):.3f}')
             output.backward()
             
             grad = x_plus_noise.grad.data.cpu().numpy()
@@ -34,7 +42,16 @@ class SmoothGrad:
             
         avg_gradients = total_gradients[0, ...] / self.n_samples
         
-        return avg_gradients
+        return self.normalize(avg_gradients) if normalize else avg_gradients
+
+    def normalize(self, vismap, eps=1e-4):
+
+        numer = vismap - np.min(vismap)
+        denom = (vismap.max() - vismap.min()) + eps
+        vismap = numer / denom
+        vismap = (vismap * 255).astype("uint8")
+
+        return vismap if len(vismap.shape) < 4 else vismap[0]
 
 
 if __name__=="__main__":

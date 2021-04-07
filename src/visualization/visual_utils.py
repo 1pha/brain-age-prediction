@@ -8,31 +8,77 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from src.models.model_util import load_model
-from src.visualization.cams import *
-from src.data.data_util import DatasetPlus
+import sys
+sys.path.append('../')
+try: 
+    from models.model_util import load_model
+    from data.data_util import DatasetPlus
+except:
+    from ..models.model_util import load_model
+    from ..data.data_util import DatasetPlus
+
+from .cams import *
+from .smoothgrad import *
+from .auggrad import *
 
 
 def plot_vismap(brain, vismap, masked=True, threshold=2,
-                slc=48, alpha=.6, view=0, save=False, epoch=None):
+                slc=48, alpha=.6, save=False, epoch=None, title=None):
+
+    '''
+    TODO - automated reshaping function. NUMPY <-> TORCH.TENSOR and 3D <-> 5D
+    brain:
+        Should take 3d input
+    vismap:
+        Also should be 3d.
+    
+    masked:
+        For non-normalized brains, this ables to cut out a value below the threshold.
+        It will move out blues when overlaid
+    threshold:
+        values to be thrown out when masked is turned on
+    slc:
+        slice to plot up
+    alpha:
+        opacity for overlaid vismap
+    save:
+        save plots in './result/att_tmp_plots/'
+    epoch:
+        when using visualizations during the training, able to show up which epoch
+    '''
+
     if masked:
         vismap = np.ma.masked_where(vismap < threshold, vismap)
     
     fig, axes = plt.subplots(ncols=3, figsize=(15, 6))
 
-    fig.suptitle(f'Epoch {epoch}')
+    brain = np.rot90(brain[0][0].permute(1, 2, 0).data.cpu().numpy())
+    vismap = np.rot90(torch.tensor(vismap).permute(1, 2, 0).data.cpu().numpy())
 
-    axes[0].set_title('Saggital')
-    axes[0].imshow(np.rot90(brain[slc, :, :]), cmap='gray', interpolation='none')
-    axes[0].imshow(np.rot90(vismap[slc, :, :]), cmap='jet', interpolation='none', alpha=alpha)
+    if title is not None:
+        fig.suptitle(title)
+
+    elif title is None and epoch is not None:
+        fig.suptitle(f'Epoch {epoch}')
+
+    elif title is None and epoch is None:
+        pass
+
+    else: # Title and Epoch both exists
+        fig.suptitle(f'ep{epoch} - {title}')
+
+    fig.tight_layout()
+    # axes[0].set_title('Saggital')
+    axes[0].imshow(brain[slc, :, :], cmap='gray', interpolation='none')
+    axes[0].imshow(vismap[slc, :, :], cmap='jet', interpolation='none', alpha=alpha)
     
-    axes[1].set_title('Coronal')
-    axes[1].imshow(np.rot90(brain[:, slc, :]), cmap='gray', interpolation='none')
-    axes[1].imshow(np.rot90(vismap[:, slc, :]), cmap='jet', interpolation='none', alpha=alpha)
+    # axes[1].set_title('Coronal')
+    axes[1].imshow(brain[:, slc, :], cmap='gray', interpolation='none')
+    axes[1].imshow(vismap[:, slc, :], cmap='jet', interpolation='none', alpha=alpha)
 
-    axes[2].set_title('Horizontal')
-    axes[2].imshow(np.rot90(brain[:, :, slc]), cmap='gray', interpolation='none')
-    axes[2].imshow(np.rot90(vismap[:, :, slc]), cmap='jet', interpolation='none', alpha=alpha)
+    # axes[2].set_title('Horizontal')
+    axes[2].imshow(brain[:, :, slc], cmap='gray', interpolation='none')
+    axes[2].imshow(vismap[:, :, slc], cmap='jet', interpolation='none', alpha=alpha)
     
     if save:
         if not os.path.exists('./result/att_tmp_plots/'):
@@ -42,6 +88,7 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
 
 
 def convert2nifti(path, data, vismap):
+
     '''
     path: path of original dataloaders', e.g. '../../brainmask_tlrc/PAL318_mpr_wave1_orig-brainmask_tlrc.npy'
     data: a single brain of 5-dim torch.tensor. Will be converted to numpy automatically
@@ -75,6 +122,7 @@ def convert2nifti(path, data, vismap):
 
 
 def exp_parser(state):
+
     '''
     Parses experiment path into date/epoch
     '''
@@ -86,6 +134,7 @@ def exp_parser(state):
     return date, epoch
 
 def brain_parser(path, full_path=True):
+
     '''
     Parses path that contains registrated .npy file name into registrated .nii(NifTi) file
     full_path=True will return a single string, otherwise it will return a tuple of (root, .nii)
@@ -97,6 +146,7 @@ def brain_parser(path, full_path=True):
 
 
 class Camsual:
+
     '''
     This is for GradCAM and a prototype
     Takes configuration file and saved models path then -
@@ -135,6 +185,7 @@ class Camsual:
 
     
     def save_gif(self, gif_path: str):
+
         '''
         gif_path should be 
             1. string  

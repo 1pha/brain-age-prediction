@@ -15,8 +15,9 @@ class CAM:
         self.model.eval()
 
         self.resized_cams = None
+        self.layer_index = None
 
-    def __call__(self, x, y):
+    def __call__(self, x, y, layer_index=None):
         
         '''
         x: 5-dim Brain (1, 1, 96, 96, 96): torch.tensor
@@ -31,8 +32,9 @@ class CAM:
         output.backward()
 
         self.cam_over_layers()
+        vismap = self.resizing()
         self.remove_hook()
-        return self.resizing()
+        return vismap[layer_index] if layer_index else vismap
 
     def register_hooks(self, model_name=None):
 
@@ -108,6 +110,7 @@ class CAM:
         return self.gradient[idx]
     
     def remove_hook(self):
+        self.gradient = []
         for layer in self.hooks.values():
             layer.remove()
             
@@ -117,6 +120,10 @@ class CAM:
         return x
     
     def visualize(self, slc=48):
+
+        '''
+        DEPRECATED
+        '''
 
         self.resized_cams = self.resizing() if self.resized_cams is None else self.resized_cams
         if self.cfg.model_name == 'resnet' or self.cfg.model_name == 'resnet_no_maxpool':
@@ -153,7 +160,6 @@ class CAM:
         cam = torch.sum(cam, dim=0)
         cam = torch.sum(cam, dim=0)
         
-        self.remove_hook()
         return F.relu(cam)
 
     def cam_over_layers(self):
