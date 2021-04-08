@@ -63,7 +63,7 @@ class VisTool:
 
         return vismap
 
-    def run_all(self, path, x, y, slc=None):
+    def run_all(self, path, x, y, slc=None, **kwargs):
 
         '''
         Put path that contains all the .pth during training
@@ -71,12 +71,11 @@ class VisTool:
         slc: Selecting a slice to view
         '''
 
-        self.saved_models = sorted(glob(f'{path}'), \
+        saved_models = sorted(glob(path), \
                               key=lambda x: int(x.split('ep')[1].split('-')[0]))
 
-        for idx, pth in enumerate(path):
+        for idx, pth in enumerate(saved_models):
 
-            _, epoch = exp_parser(state)
+            # _, epoch = exp_parser(pth)
             self.load_weight(pth)
-            vismap = self.run_vistool(x, y)
-            plot_vismap() # TODO
+            vismap = self.run_vistool(x, y, visualize=True, **kwargs)
