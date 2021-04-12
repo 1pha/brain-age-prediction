@@ -148,6 +148,7 @@ def brain_parser(path, full_path=True):
 class Camsual:
 
     '''
+    DEPRECATED
     This is for GradCAM and a prototype
     Takes configuration file and saved models path then -
     1. Make a dataset (to pickup samples)
