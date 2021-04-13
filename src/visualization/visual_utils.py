@@ -23,7 +23,7 @@ from .auggrad import *
 
 
 def plot_vismap(brain, vismap, masked=True, threshold=2,
-                slc=48, alpha=.6, save=False, epoch=None, title=None):
+                slc=48, alpha=.6, save=False, att_path=None, idx=None, title=None):
 
     '''
     TODO - automated reshaping function. NUMPY <-> TORCH.TENSOR and 3D <-> 5D
@@ -43,7 +43,7 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
         opacity for overlaid vismap
     save:
         save plots in './result/att_tmp_plots/'
-    epoch:
+    idx:
         when using visualizations during the training, able to show up which epoch
     '''
 
@@ -58,14 +58,14 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
     if title is not None:
         fig.suptitle(title)
 
-    elif title is None and epoch is not None:
+    elif title is None and udx is not None:
         fig.suptitle(f'Epoch {epoch}')
 
-    elif title is None and epoch is None:
+    elif title is None and idx is None:
         pass
 
     else: # Title and Epoch both exists
-        fig.suptitle(f'ep{epoch} - {title}')
+        fig.suptitle(f'ep{idx} - {title}')
 
     fig.tight_layout()
     # axes[0].set_title('Saggital')
@@ -81,9 +81,9 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
     axes[2].imshow(vismap[:, :, slc], cmap='jet', interpolation='none', alpha=alpha)
     
     if save:
-        if not os.path.exists('./result/att_tmp_plots/'):
-            os.mkdir('./result/att_tmp_plots/')
-        plt.savefig(f'./result/att_tmp_plots/ep{str(epoch).zfill(3)}.png')
+        if not os.path.exists(att_path):
+            os.mkdir(att_path)
+        plt.savefig(f'{att_path}/{str(idx).zfill(3)}.png')
     plt.show()
 
 
@@ -143,6 +143,16 @@ def brain_parser(path, full_path=True):
     root = '/'.join(path.split('/')[:2])+'/brainmask_nii/'
     fname = path.split('/')[-1].split('_tlrc')[0]+'.nii'
     return root + fname if full_path else root, fname.split('.nii')[0]
+
+
+def normalize(vismap, eps=1e-4):
+
+    numer = vismap - np.min(vismap)
+    denom = (vismap.max() - vismap.min()) + eps
+    vismap = numer / denom
+    vismap = (vismap * 255).astype("uint8")
+
+    return vismap if len(vismap.shape) < 4 else vismap[0]
 
 
 class Camsual:

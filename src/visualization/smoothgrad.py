@@ -13,8 +13,6 @@ class SmoothGrad:
         self.cfg = cfg
         
     def __call__(self, x, y, normalize=True, verbose=False):
-        
-        
 
         x.requires_grad = True
         output = self.pretrained_model(x).squeeze()
