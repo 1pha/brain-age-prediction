@@ -16,7 +16,7 @@ class SmoothGrad:
 
         x.requires_grad = True
         output = self.pretrained_model(x).squeeze()
-        print(f'[true]: {int(y.data.cpu())}', end='')
+        print(f'[true]: {int(y.data.cpu())}', end=' ')
         print(f'[pred]: {float(output.data.cpu()):.3f}')
         output.backward()
         total_gradients = x.grad.data.cpu().numpy()

@@ -94,7 +94,7 @@ class VisTool:
             for i, (x, y) in enumerate(dataloader):
 
                 if i % 10 == 0:
-                    print(f"{i / len(dataloader):.3f}% DONE.")
+                    print(f"{i / len(dataloader) * 100:.3f}% DONE.")
 
                 if i == 0:
                     vismap = self.run_vistool(x, y, visualize=visualize, **kwargs)
