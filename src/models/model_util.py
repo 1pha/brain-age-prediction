@@ -9,6 +9,7 @@ from .sequential import *
 from .sfcn import *
 from .vanilla import *
 from .residual_vanilla import *
+from .res_sfcn import *
 
 def load_model(model_name, cfg=None, gpu=True, verbose=True):
     
@@ -51,6 +52,9 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
 
     elif model_name == 'vanilla_residual_past':
         model = ResidualPast(cfg)
+
+    elif model_name == 'res_sfcn':
+        model = ResSFCN(cfg)
 
     else: return None
 

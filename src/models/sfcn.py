@@ -32,8 +32,8 @@ class SFCN(nn.Module):
                                                                   kernel_size=1,
                                                                   padding=0))
         self.classifier = nn.Sequential()
-        # avg_shape = [2, 2, 2]
-        avg_shape = [5, 5, 5]
+        avg_shape = [2, 2, 2]
+        # avg_shape = [5, 5, 5]
         self.classifier.add_module('average_pool', nn.AvgPool3d(avg_shape))
         if dropout is True:
             self.classifier.add_module('dropout', nn.Dropout(0.5))
@@ -79,8 +79,8 @@ if __name__=="__main__":
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = SFCN(cfg=cfg).to(device)
-    # print(model)
-    # print(summary(model, input_size=(1, 96, 96, 96)))
+    print(model)
+    print(summary(model, input_size=(1, 96, 96, 96)))
 
-    sample = torch.zeros((2, 1, 96, 96, 96)).to(device)
-    print(model(sample).squeeze(1))
+    # sample = torch.zeros((2, 1, 96, 96, 96)).to(device)
+    # print(model(sample).squeeze(1))
