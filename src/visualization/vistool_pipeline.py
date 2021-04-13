@@ -63,7 +63,7 @@ class VisTool:
 
         return vismap
 
-    def run_all(self, path, x, y, slc=None, visualize=True, **kwargs):
+    def run_pretrains_single(self, path, x, y, slc=None, visualize=True, **kwargs):
 
         '''
         Put path that contains all the .pth during training
@@ -81,3 +81,27 @@ class VisTool:
             vismaps.append(self.run_vistool(x, y, visualize=visualize, **kwargs))
 
         return vismaps
+
+    def run_pretrains_dataloader(self, path, dataloader, slc=None, visualize=False, **kwargs):
+
+        saved_models = sorted(glob(path), key=lambda x: int(x.split('ep')[1].split('-')[0]))
+        
+        vismap_ts = list()
+        for idx, pth in enumerate(saved_models):
+
+            print(f"{idx}th Pretrained")
+            self.load_weight(pth)
+            for i, (x, y) in enumerate(dataloader):
+
+                if i % 10 == 0:
+                    print(f"{i / len(dataloader):.3f}% DONE.")
+
+                if i == 0:
+                    vismap = self.run_vistool(x, y, visualize=visualize, **kwargs)
+                
+                else:
+                    vismap += self.run_vistool(x, y, visualize=visualize, **kwargs)
+            
+            vismap_ts.append(vismap)
+
+        return vismap_ts
