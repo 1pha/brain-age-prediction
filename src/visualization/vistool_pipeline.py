@@ -1,3 +1,4 @@
+from IPython.display import clear_output
 import sys
 sys.path.append('../')
 try: 
@@ -82,11 +83,36 @@ class VisTool:
 
         return vismaps
 
+
+    def run_dataloader(self, dataloader, pth=None, slc=None, visualize=False, **kwargs):
+        '''
+        Runs VisTool on a single Dataloader
+        No need to give a speicific path if its already pretrained, but you can give it as a input 'pth'
+        '''
+
+        if pth is not None:
+            self.load_weight(pth)
+
+        
+        for i, (x, y) in enumerate(dataloader):
+
+            if i % 10 == 0:
+                print(f"{i / len(dataloader) * 100:.3f}% DONE.")
+
+            if i == 0:
+                avg_vismap = self.run_vistool(x, y, visualize=visualize, **kwargs)
+            
+            else:
+                avg_vismap += self.run_vistool(x, y, visualize=visualize, **kwargs)
+
+        return avg_vismap
+
+
     def run_pretrains_dataloader(self, path, dataloader, slc=None, visualize=False, **kwargs):
 
         saved_models = sorted(glob(path), key=lambda x: int(x.split('ep')[1].split('-')[0]))
         
-        vismap_ts = list()
+        self.vismap_ts = list()
         for idx, pth in enumerate(saved_models):
 
             print(f"{idx}th Pretrained")
@@ -102,6 +128,6 @@ class VisTool:
                 else:
                     vismap += self.run_vistool(x, y, visualize=visualize, **kwargs)
             
-            vismap_ts.append(vismap)
-
-        return vismap_ts
+            vismap /= len(dataloader)
+            self.vismap_ts.append(vismap)
+            clear_output()
