@@ -1,4 +1,5 @@
 import os
+import time
 from glob import glob
 import numpy as np
 np.set_printoptions(precision=4, suppress=True)
@@ -8,6 +9,7 @@ plt.rcParams['image.cmap'] = 'gray'
 plt.rcParams['image.interpolation'] = 'nearest'
 
 import nibabel as nib
+from nilearn.datasets import load_mni152_template, load_mni152_brain_mask
 
 from dipy.viz import regtools
 from dipy.align.imaffine import (AffineMap,
@@ -21,20 +23,29 @@ from dipy.align.imwarp import SymmetricDiffeomorphicRegistration
 from dipy.align.imwarp import DiffeomorphicMap
 from dipy.align.metrics import CCMetric
 
-def inform(func):
-    def wrapper(*args, **kwargs):
-        print(f'{func.__name__.capitalize()}.')
-        return func(*args, **kwargs)
-    return wrapper
+def inform(original_fn):
+
+    def wrapper_fn(*args, **kwargs):
+        start_time = time.time()
+        result = original_fn(*args, **kwargs)
+        end_time = time.time()
+        print(f"[{original_fn.__name__.capitalize()}] {end_time-start_time:.1f} sec ")
+        return result
+
+    return wrapper_fn
 
 class Registration:
 
-    def __init__(self, template, moving, **kwargs):
+    def __init__(self, moving, template=None, **kwargs):
         '''
         template, moving: fname
         '''
 
-        template_img = nib.load(template)
+        if isinstance(template, str):
+            template_img = nib.load(template)
+
+        else:
+            template_img = load_mni152_template()
         self.template_data, self.template_affine = template_img.get_fdata(), template_img.affine
 
         moving_img = nib.load(moving)
