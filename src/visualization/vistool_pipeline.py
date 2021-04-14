@@ -93,7 +93,7 @@ class VisTool:
         if pth is not None:
             self.load_weight(pth)
 
-        
+        print(f"{len(dataloader)} brains in total.")
         for i, (x, y) in enumerate(dataloader):
 
             if i % 10 == 0:
@@ -105,6 +105,7 @@ class VisTool:
             else:
                 avg_vismap += self.run_vistool(x, y, visualize=visualize, **kwargs)
 
+        avg_vismap /= len(dataloader)
         return avg_vismap
 
 
@@ -117,17 +118,6 @@ class VisTool:
 
             print(f"{idx}th Pretrained")
             self.load_weight(pth)
-            for i, (x, y) in enumerate(dataloader):
-
-                if i % 10 == 0:
-                    print(f"{i / len(dataloader) * 100:.3f}% DONE.")
-
-                if i == 0:
-                    vismap = self.run_vistool(x, y, visualize=visualize, **kwargs)
-                
-                else:
-                    vismap += self.run_vistool(x, y, visualize=visualize, **kwargs)
-            
-            vismap /= len(dataloader)
+            vismap = self.run_dataloader(dataloader, visualize=visuzliae, **kwargs)
             self.vismap_ts.append(vismap)
             clear_output()
