@@ -58,8 +58,8 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
     if title is not None:
         fig.suptitle(title)
 
-    elif title is None and udx is not None:
-        fig.suptitle(f'Epoch {epoch}')
+    elif title is None and idx is not None:
+        fig.suptitle(f'Epoch {idx}')
 
     elif title is None and idx is None:
         pass

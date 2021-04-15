@@ -27,8 +27,8 @@ class CAM:
         self.register_hooks()
         x, y = x.to(self.cfg.device), y.to(self.cfg.device)
         output = self.model.forward(x)
-        print(f'[true]: {int(y.data.cpu())}', end=' ')
-        print(f'[pred]: {float(output.data.cpu()):.3f}')
+        print(f'[true] {int(y.data.cpu())}', end=' ')
+        print(f'[pred] {float(output.data.cpu()):.3f}')
         output.backward()
 
         self.cam_over_layers()

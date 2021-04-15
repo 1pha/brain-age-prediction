@@ -60,7 +60,7 @@ class VisTool:
         vismap = self.vis_tool(x, y, **kwargs) # Should return (1, 96, 96, 96) visualization map
 
         if visualize:
-            plot_vismap(brain=x, vismap=vismap, title=title)
+            plot_vismap(brain=x, vismap=vismap, title=title, **kwargs)
 
         return vismap
 
@@ -105,7 +105,7 @@ class VisTool:
             else:
                 avg_vismap += self.run_vistool(x, y, visualize=visualize, **kwargs)
 
-        avg_vismap /= len(dataloader)
+        avg_vismap = avg_vismap / len(dataloader)
         return avg_vismap
 
 
@@ -118,6 +118,7 @@ class VisTool:
 
             print(f"{idx}th Pretrained")
             self.load_weight(pth)
-            vismap = self.run_dataloader(dataloader, visualize=visuzliae, **kwargs)
+            print(f"PTH: {pth}")
+            vismap = self.run_dataloader(dataloader, visualize=visualize, **kwargs)
             self.vismap_ts.append(vismap)
             clear_output()
