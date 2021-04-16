@@ -74,7 +74,7 @@ class CAM:
                 self.model.layer[11],
             ]
 
-        elif model_name == 'vanilla_residual':
+        elif model_name == 'vanilla_residual_past':
         
             self.conv_layers = [
                 self.model.feature_extractor[0].conv1,

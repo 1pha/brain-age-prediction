@@ -145,6 +145,15 @@ def brain_parser(path, full_path=True):
     return root + fname if full_path else root, fname.split('.nii')[0]
 
 
+def ep_mae_parser(_path):
+    
+    _path = _path.split('\\')[-1]
+    
+    ep = _path.split('_ep')[-1].split('-')[0]
+    mae = _path.split('mae')[-1].split('.pth')[0]
+    return f'EPOCH {ep.zfill(3)} | MAE {mae}'
+
+
 def normalize(vismap, eps=1e-4):
 
     numer = vismap - np.min(vismap)
