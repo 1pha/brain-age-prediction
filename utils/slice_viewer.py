@@ -7,7 +7,11 @@ class SliceViewer:
     def __init__(self, subject):
 
         if isinstance(subject, str):
-            self.subject = np.load(subject)
+            if 'nii' in subject.split('.')[-1]:
+                self.subject = nib.load(subject).get_fdata()
+
+            if 'npy' in subject.split('.')[-1]:
+                self.subject = np.load(subject)
 
         else:
             self.subject = subject
