@@ -109,7 +109,7 @@ class VisTool:
         return avg_vismap
 
 
-    def run_pretrains_dataloader(self, path, dataloader, slc=None, visualize=False, **kwargs):
+    def run_pretrains_dataloader(self, path, dataloader, slc=None, visualize=False, checkpoint=True, **kwargs):
 
         saved_models = sorted(glob(path), key=lambda x: int(x.split('ep')[1].split('-')[0]))
         
@@ -121,4 +121,7 @@ class VisTool:
             print(f"PTH: {pth}")
             vismap = self.run_dataloader(dataloader, visualize=visualize, **kwargs)
             self.vismap_ts.append(vismap)
+            if checkpoint:
+                att_path = 'attention_maps'.join(path.split('models'))[:-6] + '_tmp'
+                np.save(f'{att_path}/{str(idx).zfill(3)}.npy', v)
             clear_output()

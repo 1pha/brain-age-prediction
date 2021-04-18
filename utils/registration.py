@@ -48,7 +48,7 @@ class Registration:
     def __init__(self, template=None, **kwargs):
         '''
         # TODO:
-        1. Make **kwargs work for setting up parameters
+        1. Average time, t-test, find out which is weird
         2. Add Explanation
         '''
         self.set_template(template)
