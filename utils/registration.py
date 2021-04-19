@@ -163,6 +163,7 @@ class Registration:
         # 4. Affine
         _start_time = time.time()
         transform = AffineTransform3D()
+        self.affreg.level_iters = [1000, 1000, 100]
         self.affine = self.affreg.optimize(static, moving, transform, self.params0,
                                         static_grid2world, moving_grid2world, starting_affine=self.rigid.affine)
         if logger is not None:
@@ -223,6 +224,16 @@ class Registration:
         except:
             print("Failed Saving")
             raise
+
+def compare_brains(left, right, left_title="A", right_title="B"):
+    '''
+    left, right brains should be in the form of np.ndarray with same dimensions
+    '''
+
+    regtools.overlay_slices(left, right, None, 0, left_title, right_title)
+    regtools.overlay_slices(left, right, None, 1, left_title, right_title)
+    regtools.overlay_slices(left, right, None, 2, left_title, right_title)
+
 
 if __name__=="__main__":
     
