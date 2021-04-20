@@ -44,8 +44,8 @@ class Registration:
     for detailed explanations of usage.
     '''
 
-    __version__ = '0.2'
-    __date__ = 'Apr.17 2021'
+    __version__ = '0.3'
+    __date__ = 'Apr.20 2021'
 
     def __init__(self, template=None, cfg=None, **kwargs):
         '''
