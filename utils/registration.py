@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 plt.rcParams['image.cmap'] = 'gray'
 plt.rcParams['image.interpolation'] = 'nearest'
 
+import yaml
+
 import nibabel as nib
 from nilearn.datasets import load_mni152_template
 
@@ -45,27 +47,42 @@ class Registration:
     __version__ = '0.2'
     __date__ = 'Apr.17 2021'
 
-    def __init__(self, template=None, **kwargs):
+    def __init__(self, template=None, cfg=None, **kwargs):
         '''
         # TODO:
         1. Average time, t-test, find out which is weird
         2. Add Explanation
         '''
         self.set_template(template)
-            
-        # DEFAULT PARAMETERS FOR LINEAR REGISTRATION
-        self.nbins = 32
-        self.sampling_prop = None
-        self.metric = MutualInformationMetric(self.nbins, self.sampling_prop)
 
-        self.level_iters = [10, 10, 5]
-        self.sigmas = [3.0, 1.0, 0.0]
-        self.factors = [4, 2, 1]
-        self.params0 = None
+        # CONFIGURATION FILE
+        if cfg is None:
+            with open('utils/registration.yml', 'r') as y:
+                cfg = yaml.load(y)
 
-        # DEFAULT PARAMETERS FOR NON-LINEAR REGISTRATION
-        self.nonlinear_metric = CCMetric(3)
-        self.nonlinear_level_iters = [10, 10, 5]
+        # CONFIGUATION LINEAR-TRANSFORMATION 
+        self.lin_cfg = cfg['Linear']
+        lin_metric_cfg = self.lin_cfg['metric']
+        self.metric = eval(lin_metric_cfg['name'])(
+            lin_metric_cfg['nbins'],
+            lin_metric_cfg['sampling_prop']
+        )
+
+        self.default_cfg = self.lin_cfg['default']
+        self.params0 = self.default_cfg['params0']
+        self.translation_cfg = self.lin_cfg['translation']
+        self.rigid_cfg = self.lin_cfg['rigid']
+        self.affine_cfg = self.lin_cfg['affine']
+
+        # INSTANTIATE AFFINE-REGISTRATION
+        self.affreg = AffineRegistration(metric=self.metric)
+        self.set_params(**self.default_cfg)
+
+        # CONFIGUATION NONLINEAR-TRANSFORMATION
+        self.nonlin_cfg = cfg['NonLinear']
+        nonlin_metric_cfg = self.nonlin_cfg['metric']
+        self.sdr_cfg = {k: v for k, v in self.nonlin_cfg['symmetricdr'].items()}
+        self.sdr_cfg['metric'] = eval(nonlin_metric_cfg['name'])(nonlin_metric_cfg['dim'])
 
     def __call__(self, moving, template=None, **kwargs):
 
@@ -96,9 +113,11 @@ class Registration:
 
         self.static_data, self.static_affine = template_img.get_fdata(), template_img.affine
 
-    def set_param(self, param_name, value):
+    def set_params(self, **kwargs):
 
-        setattr(self, param_name, value)
+        for key, value in kwargs.items():
+            setattr(self.affreg, key, value)
+
 
     def optimize(self, logger=None):
         
@@ -133,12 +152,6 @@ class Registration:
         static_grid2world = self.static_affine
         moving = self.moving_data
         moving_grid2world = self.moving_affine
-
-        # 0. Instantiate Module
-        self.affreg = AffineRegistration(metric=self.metric,
-                        level_iters=self.level_iters,
-                        sigmas=self.sigmas,
-                        factors=self.factors)
         
         # 1. Get affine matrix from Center of mass
         self.c_of_mass = transform_centers_of_mass(static, static_grid2world, moving, moving_grid2world)
@@ -147,6 +160,7 @@ class Registration:
         # 2. Translation
         _start_time = time.time()
         transform = TranslationTransform3D()
+        self.set_params(**self.translation_cfg)
         self.translation = self.affreg.optimize(static, moving, transform, self.params0,
                                                 static_grid2world, moving_grid2world, starting_affine=starting_affine)
         if logger is not None:
@@ -155,6 +169,7 @@ class Registration:
         # 3. Rigid
         _start_time = time.time()
         transform = RigidTransform3D()
+        self.set_params(**self.rigid_cfg)
         self.rigid = self.affreg.optimize(static, moving, transform, self.params0,
                                         static_grid2world, moving_grid2world, starting_affine=self.translation.affine)
         if logger is not None:
@@ -163,7 +178,7 @@ class Registration:
         # 4. Affine
         _start_time = time.time()
         transform = AffineTransform3D()
-        self.affreg.level_iters = [1000, 1000, 100]
+        self.set_params(**self.affine_cfg)
         self.affine = self.affreg.optimize(static, moving, transform, self.params0,
                                         static_grid2world, moving_grid2world, starting_affine=self.rigid.affine)
         if logger is not None:
@@ -174,7 +189,7 @@ class Registration:
     @inform
     def NonLinear(self, affine):
 
-        sdr = SymmetricDiffeomorphicRegistration(self.nonlinear_metric, self.nonlinear_level_iters)
+        sdr = SymmetricDiffeomorphicRegistration(**self.sdr_cfg)
         mapping = sdr.optimize(self.static_data, self.moving_data,
                                 self.static_affine, self.moving_affine,
                                 affine.affine)
@@ -189,7 +204,7 @@ class Registration:
             regtools.overlay_slices(self.static_data, resampled, None, 1, "Template", "Moving")
             regtools.overlay_slices(self.static_data, resampled, None, 2, "Template", "Moving")
             
-        if step_name is 'all':
+        if step_name == 'all':
             for step_name in self.steps.keys():
                 vis(step_name)
         
