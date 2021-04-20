@@ -92,10 +92,22 @@ class Registration:
         # MISC
         self.opt_res = dict() # OPTIMIZATION RESLUTS(LOSS)
         self.steps = dict()   # TRANSFORMATION INSTANCES ABLES TO TRANSFORM BRAINS
-        self.debug = cfg['Debug']['switch']
+        self.debug = cfg['Misc']['debug']
+        self.verbose = cfg['Misc']['verbose']
+        self.alias = {
+            'c_of_mass': 'transform_centers_of_mass',
+            'translation': 'TranslationTransform3D',
+            'rigid': 'RigidTransform3D',
+            'affine': 'AffineTransform3D',
+            'sdr': 'SymmetricDiffeomorphicRegistration'
+        }
 
     def __call__(self, moving, template=None, **kwargs):
 
+        '''
+        By putting 'moving' brains, a brain that has to being moved,
+        it is now registered to template with the default pipeline.
+        '''
         if template is None:
             pass
 
@@ -112,7 +124,7 @@ class Registration:
     def set_template(self, template):
 
         '''
-        template file should be '.nii' extension files
+        template file should be '.nii' extension files with full path
         '''
 
         if isinstance(template, str):
@@ -154,26 +166,28 @@ class Registration:
         }
         self.starting_affine = None
 
-        for pipes in pipeline:
+        for pipename in pipeline:
 
-            if pipes == 'transform_centers_of_mass':
+            if pipename == 'transform_centers_of_mass': # FIRST TO BE RUN
                 self.c_of_mass = transform_centers_of_mass(**self.opt_cfg)
                 self.starting_affine = self.c_of_mass.affine
 
-                self.opt_cfg['params0'] = self.params0
-
-            elif pipes == 'SymmetricDiffeomorphicRegistration':
+            elif pipename == 'SymmetricDiffeomorphicRegistration': # AFTER AFFINE
+                
+                del self.opt_cfg['params0'], self.opt_cfg['transform'], self.opt_cfg['ret_metric']
+                self.opt_cfg['prealign'] = self.opt_cfg['starting_affine']
+                del self.opt_cfg['starting_affine']
+                
                 sdr = SymmetricDiffeomorphicRegistration(**self.sdr_cfg)
-                self.steps[pipename] = sdr.optimize(self.static_data, self.moving_data,
-                                        self.static_affine, self.moving_affine,
-                                        affine.affine)
+                self.steps[pipename] = sdr.optimize(**self.opt_cfg)
 
             else:
-                self._linear_by_parts('TranslationTransform3D')
+                self._linear_by_parts(pipename)
 
     def _linear_by_parts(self, pipename, ret_metric=True):
 
         _start_time = time.time()
+        self.opt_cfg['params0'] = self.params0
         self.opt_cfg['transform'] = eval(pipename)()
         self.opt_cfg['starting_affine'] = self.starting_affine
         self.opt_cfg['ret_metric'] = ret_metric
@@ -181,7 +195,7 @@ class Registration:
         self.steps[pipename], _, self.opt_res[pipename] = self.affreg.optimize(**self.opt_cfg)
         self.starting_affine = self.steps[pipename].affine
         print(f'[{pipename}] {time.time() - _start_time:.1f} sec',
-                end=f':: LOSS {self.opt_res[pipename]:.5f}\n' if self.debug else '\n')
+                end=f':: LOSS {self.opt_res[pipename]:.5f}\n' if self.verbose['loss'] else '\n')
 
     def visual_warped(self, step_name=None):
 
@@ -197,15 +211,12 @@ class Registration:
                 vis(step_name)
         
         else:
-            if step_name is None:
-                step_name = 'sdr'
-            
+            step_name = self.return_step(step_name)
             vis(step_name)
 
     def save(self, root='../../../brainmask_mni/', fname=None, step_name=None, extension='npy'):
 
-        if step_name is None:
-            step_name = 'SymmetricDiffeomorphicRegistration'
+        step_name = self.return_step(step_name)
 
         try:
             fpath = root + self.fname.split('nii')[0] + extension 
@@ -227,6 +238,29 @@ class Registration:
         except:
             print("Failed Saving")
             raise
+
+    def return_step(self, step_name):
+
+        if isinstance(step_name, int):
+            return self.pipeline[step_name]
+            
+        elif isinstance(step_name, str):
+
+            if step_name in self.steps.keys():
+                return step_name
+            
+            elif step_name in self.alias.keys():
+                return self.alias[step_name]
+
+            else:
+                print(f'''There are no options for {step_name}.
+                Try with full name: {list(self.steps.keys())},
+                or try with alias: {list(self.alias.keys())}.
+                ''')
+
+        elif step_name is None:
+            return 'SymmetricDiffeomorphicRegistration'
+
 
 def compare_brains(left, right, left_title="A", right_title="B"):
     '''

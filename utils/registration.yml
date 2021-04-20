@@ -41,7 +41,9 @@ NonLinear:
     dim: 3
 
   symmetricdr:
-    level_iters: [10, 10, 5]
+    level_iters: [10, 10, 5] # DEFAULT [100, 100, 25]
 
-Debug:
-  switch: True
+Misc:
+  debug: True
+  verbose: 
+    loss: True
