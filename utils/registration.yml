@@ -1,3 +1,10 @@
+Pipeline:   
+  - transform_centers_of_mass
+  - TranslationTransform3D
+  - RigidTransform3D
+  - AffineTransform3D
+  - SymmetricDiffeomorphicRegistration
+            
 Linear:
   metric:
     name: MutualInformationMetric
@@ -28,11 +35,13 @@ Linear:
     factors: [4, 2, 1]
     params0: ~
     
-
 NonLinear:
   metric:
     name: CCMetric
     dim: 3
-    
+
   symmetricdr:
     level_iters: [10, 10, 5]
+
+Debug:
+  switch: True

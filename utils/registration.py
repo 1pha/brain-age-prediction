@@ -55,10 +55,13 @@ class Registration:
         '''
         self.set_template(template)
 
-        # CONFIGURATION FILE
+        ### CONFIGURATION FILE ###
         if cfg is None:
             with open('utils/registration.yml', 'r') as y:
                 cfg = yaml.load(y)
+
+        # CONFIGURE PIPELINE
+        self.pipeline = cfg['Pipeline']
 
         # CONFIGUATION LINEAR-TRANSFORMATION 
         self.lin_cfg = cfg['Linear']
@@ -70,9 +73,11 @@ class Registration:
 
         self.default_cfg = self.lin_cfg['default']
         self.params0 = self.default_cfg['params0']
-        self.translation_cfg = self.lin_cfg['translation']
-        self.rigid_cfg = self.lin_cfg['rigid']
-        self.affine_cfg = self.lin_cfg['affine']
+        self.lin_cfgs_dict = {
+            'TranslationTransform3D': self.lin_cfg['translation'],
+            'RigidTransform3D': self.lin_cfg['rigid'],
+            'AffineTransform3D': self.lin_cfg['affine'], 
+        }
 
         # INSTANTIATE AFFINE-REGISTRATION
         self.affreg = AffineRegistration(metric=self.metric)
@@ -83,6 +88,11 @@ class Registration:
         nonlin_metric_cfg = self.nonlin_cfg['metric']
         self.sdr_cfg = {k: v for k, v in self.nonlin_cfg['symmetricdr'].items()}
         self.sdr_cfg['metric'] = eval(nonlin_metric_cfg['name'])(nonlin_metric_cfg['dim'])
+
+        # MISC
+        self.opt_res = dict() # OPTIMIZATION RESLUTS(LOSS)
+        self.steps = dict()   # TRANSFORMATION INSTANCES ABLES TO TRANSFORM BRAINS
+        self.debug = cfg['Debug']['switch']
 
     def __call__(self, moving, template=None, **kwargs):
 
@@ -118,9 +128,9 @@ class Registration:
         for key, value in kwargs.items():
             setattr(self.affreg, key, value)
 
+    @inform
+    def optimize(self, pipeline=None):
 
-    def optimize(self, logger=None):
-        
         '''
         # STEPS
         1. Transform of Centers of Mass # <newly added
@@ -133,67 +143,45 @@ class Registration:
             3.1 Symmetric Diffeomorphic Registration (SDR)
         '''
 
-        affine = self.AffineReg(logger)
-        self.sdr = self.NonLinear(affine)
+        if pipeline is None:
+            pipeline = self.pipeline
 
-        self.steps = {
-            'center of mass': self.c_of_mass,
-            'translation': self.translation,
-            'rigid': self.rigid,
-            'affine': self.affine,
-            'sdr': self.sdr,
+        self.opt_cfg = {
+            'static': self.static_data,
+            'static_grid2world': self.static_affine,
+            'moving': self.moving_data,
+            'moving_grid2world': self.moving_affine,
         }
-        return self.sdr
+        self.starting_affine = None
 
-    @inform
-    def AffineReg(self, logger=None):
+        for pipes in pipeline:
 
-        static = self.static_data
-        static_grid2world = self.static_affine
-        moving = self.moving_data
-        moving_grid2world = self.moving_affine
-        
-        # 1. Get affine matrix from Center of mass
-        self.c_of_mass = transform_centers_of_mass(static, static_grid2world, moving, moving_grid2world)
-        starting_affine = self.c_of_mass.affine
+            if pipes == 'transform_centers_of_mass':
+                self.c_of_mass = transform_centers_of_mass(**self.opt_cfg)
+                self.starting_affine = self.c_of_mass.affine
 
-        # 2. Translation
+                self.opt_cfg['params0'] = self.params0
+
+            elif pipes == 'SymmetricDiffeomorphicRegistration':
+                sdr = SymmetricDiffeomorphicRegistration(**self.sdr_cfg)
+                self.steps[pipename] = sdr.optimize(self.static_data, self.moving_data,
+                                        self.static_affine, self.moving_affine,
+                                        affine.affine)
+
+            else:
+                self._linear_by_parts('TranslationTransform3D')
+
+    def _linear_by_parts(self, pipename, ret_metric=True):
+
         _start_time = time.time()
-        transform = TranslationTransform3D()
-        self.set_params(**self.translation_cfg)
-        self.translation = self.affreg.optimize(static, moving, transform, self.params0,
-                                                static_grid2world, moving_grid2world, starting_affine=starting_affine)
-        if logger is not None:
-            logger(f"[Translation] {time.time() - _start_time:.1f} sec")
-
-        # 3. Rigid
-        _start_time = time.time()
-        transform = RigidTransform3D()
-        self.set_params(**self.rigid_cfg)
-        self.rigid = self.affreg.optimize(static, moving, transform, self.params0,
-                                        static_grid2world, moving_grid2world, starting_affine=self.translation.affine)
-        if logger is not None:
-            logger(f"[Rigid] {time.time() - _start_time:.1f} sec")
-
-        # 4. Affine
-        _start_time = time.time()
-        transform = AffineTransform3D()
-        self.set_params(**self.affine_cfg)
-        self.affine = self.affreg.optimize(static, moving, transform, self.params0,
-                                        static_grid2world, moving_grid2world, starting_affine=self.rigid.affine)
-        if logger is not None:
-            logger(f"[Affine] {time.time() - _start_time:.1f} sec")
-
-        return self.affine
-
-    @inform
-    def NonLinear(self, affine):
-
-        sdr = SymmetricDiffeomorphicRegistration(**self.sdr_cfg)
-        mapping = sdr.optimize(self.static_data, self.moving_data,
-                                self.static_affine, self.moving_affine,
-                                affine.affine)
-        return mapping
+        self.opt_cfg['transform'] = eval(pipename)()
+        self.opt_cfg['starting_affine'] = self.starting_affine
+        self.opt_cfg['ret_metric'] = ret_metric
+        self.set_params(**self.lin_cfgs_dict[pipename])
+        self.steps[pipename], _, self.opt_res[pipename] = self.affreg.optimize(**self.opt_cfg)
+        self.starting_affine = self.steps[pipename].affine
+        print(f'[{pipename}] {time.time() - _start_time:.1f} sec',
+                end=f':: LOSS {self.opt_res[pipename]:.5f}\n' if self.debug else '\n')
 
     def visual_warped(self, step_name=None):
 
@@ -217,7 +205,7 @@ class Registration:
     def save(self, root='../../../brainmask_mni/', fname=None, step_name=None, extension='npy'):
 
         if step_name is None:
-            step_name = 'sdr'
+            step_name = 'SymmetricDiffeomorphicRegistration'
 
         try:
             fpath = root + self.fname.split('nii')[0] + extension 
