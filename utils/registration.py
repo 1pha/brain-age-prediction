@@ -4,11 +4,11 @@ from glob import glob
 import numpy as np
 np.set_printoptions(precision=4, suppress=True)
 
+import yaml
+import pandas as pd
 import matplotlib.pyplot as plt
 plt.rcParams['image.cmap'] = 'gray'
 plt.rcParams['image.interpolation'] = 'nearest'
-
-import yaml
 
 import nibabel as nib
 from nilearn.datasets import load_mni152_template
@@ -23,7 +23,6 @@ from dipy.align.transforms import (TranslationTransform3D,
                                    AffineTransform3D)
 
 from dipy.align.imwarp import SymmetricDiffeomorphicRegistration
-from dipy.align.imwarp import DiffeomorphicMap
 from dipy.align.metrics import CCMetric
 
 def inform(original_fn):
@@ -37,7 +36,7 @@ def inform(original_fn):
 
     return wrapper_fn
 
-class Registration:
+class Registrator:
 
     '''
     Look up https://bic-berkeley.github.io/psych-214-fall-2016/dipy_registration.html here
@@ -50,7 +49,6 @@ class Registration:
     def __init__(self, template=None, cfg=None, **kwargs):
         '''
         # TODO:
-        1. Average time, t-test, find out which is weird
         2. Add Explanation
         '''
         self.set_template(template)
@@ -90,7 +88,7 @@ class Registration:
         self.sdr_cfg['metric'] = eval(nonlin_metric_cfg['name'])(nonlin_metric_cfg['dim'])
 
         # MISC
-        self.opt_res = dict() # OPTIMIZATION RESLUTS(LOSS)
+        self.all_res = dict() # OPTIMIZATION RESLUTS(LOSS) FOR SINGLE
         self.steps = dict()   # TRANSFORMATION INSTANCES ABLES TO TRANSFORM BRAINS
         self.debug = cfg['Misc']['debug']
         self.verbose = cfg['Misc']['verbose']
@@ -119,6 +117,7 @@ class Registration:
         
         moving_img = nib.load(moving)
         self.moving_data, self.moving_affine = moving_img.get_fdata(), moving_img.affine
+        self.organize_cfg()
         self.optimize(**kwargs)
 
     def set_template(self, template):
@@ -165,7 +164,7 @@ class Registration:
             'moving_grid2world': self.moving_affine,
         }
         self.starting_affine = None
-
+        self.opt_res, self.time_res = dict(), dict()
         for pipename in pipeline:
 
             if pipename == 'transform_centers_of_mass': # FIRST TO BE RUN
@@ -173,28 +172,53 @@ class Registration:
                 self.starting_affine = self.c_of_mass.affine
 
             elif pipename == 'SymmetricDiffeomorphicRegistration': # AFTER AFFINE
+                self._sdr(pipename)
                 
-                del self.opt_cfg['params0'], self.opt_cfg['transform'], self.opt_cfg['ret_metric']
-                self.opt_cfg['prealign'] = self.opt_cfg['starting_affine']
-                del self.opt_cfg['starting_affine']
-                
-                sdr = SymmetricDiffeomorphicRegistration(**self.sdr_cfg)
-                self.steps[pipename] = sdr.optimize(**self.opt_cfg)
-
             else:
                 self._linear_by_parts(pipename)
+            
+        self.opt_res['loss_sum'] = sum(self.opt_res.values())
+        self.time_res['total_elapsed'] = sum(self.time_res.values())
+        self.opt_res.update(self.time_res)
+        self.all_res[self.fname] = self.opt_res
+
+    def _sdr(self, pipename):
+
+        _start_time = time.time()
+
+        # SET PARAMETERS
+        del self.opt_cfg['params0'], self.opt_cfg['transform'], self.opt_cfg['ret_metric']
+        self.opt_cfg['prealign'] = self.opt_cfg['starting_affine']
+        del self.opt_cfg['starting_affine']
+        
+        # OPTIMIZE
+        sdr = SymmetricDiffeomorphicRegistration(**self.sdr_cfg)
+        self.steps[pipename] = sdr.optimize(**self.opt_cfg)
+
+        # FINISH RESULTS
+        elapsed = time.time() - _start_time
+        self.time_res[pipename+'_elapsed'] = elapsed
+        print(f'[{pipename}] {elapsed:.1f} sec')        
 
     def _linear_by_parts(self, pipename, ret_metric=True):
 
         _start_time = time.time()
+
+        # SET PARAMETERS
         self.opt_cfg['params0'] = self.params0
         self.opt_cfg['transform'] = eval(pipename)()
         self.opt_cfg['starting_affine'] = self.starting_affine
         self.opt_cfg['ret_metric'] = ret_metric
         self.set_params(**self.lin_cfgs_dict[pipename])
+
+        # OPTIMIZE
         self.steps[pipename], _, self.opt_res[pipename] = self.affreg.optimize(**self.opt_cfg)
         self.starting_affine = self.steps[pipename].affine
-        print(f'[{pipename}] {time.time() - _start_time:.1f} sec',
+
+        # FINISH RESLUTS
+        elapsed = time.time() - _start_time
+        self.time_res[pipename+'_elapsed'] = elapsed
+        print(f'[{pipename}] {elapsed:.1f} sec',
                 end=f':: LOSS {self.opt_res[pipename]:.5f}\n' if self.verbose['loss'] else '\n')
 
     def visual_warped(self, step_name=None):
@@ -261,6 +285,17 @@ class Registration:
         elif step_name is None:
             return 'SymmetricDiffeomorphicRegistration'
 
+    def organize_cfg(self, path=False):
+
+        self.reg_cfg = self.lin_cfgs_dict
+        self.reg_cfg['SymmetricDiffeomorphicRegistration'] = self.nonlin_cfg['symmetricdr']
+
+        if path:
+            with open(path, 'w') as y:
+                yaml.dump(self.reg_cfg, y)
+
+        return self.reg_cfg
+
 
 def compare_brains(left, right, left_title="A", right_title="B"):
     '''
@@ -271,6 +306,13 @@ def compare_brains(left, right, left_title="A", right_title="B"):
     regtools.overlay_slices(left, right, None, 1, left_title, right_title)
     regtools.overlay_slices(left, right, None, 2, left_title, right_title)
 
+def load_config(path=None):
+
+    if path is None:
+        path = 'utils/registration.yml'
+
+    with open(path, 'r') as y:
+        return yaml.load(y)
 
 if __name__=="__main__":
     
