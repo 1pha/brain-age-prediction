@@ -57,6 +57,10 @@ class Registrator:
         if cfg is None:
             with open('utils/registration.yml', 'r') as y:
                 cfg = yaml.load(y)
+        
+        elif isinstance(cfg, str):
+            with open(cfg, 'r') as y:
+                cfg = yaml.load(y)
 
         # CONFIGURE PIPELINE
         self.pipeline = cfg['Pipeline']
@@ -100,7 +104,7 @@ class Registrator:
             'sdr': 'SymmetricDiffeomorphicRegistration'
         }
 
-    def __call__(self, moving, template=None, **kwargs):
+    def __call__(self, moving, template=None, save=False, **kwargs):
 
         '''
         By putting 'moving' brains, a brain that has to being moved,
@@ -119,6 +123,8 @@ class Registrator:
         self.moving_data, self.moving_affine = moving_img.get_fdata(), moving_img.affine
         self.organize_cfg()
         self.optimize(**kwargs)
+        if save:
+            self.save(**kwargs)
 
     def set_template(self, template):
 

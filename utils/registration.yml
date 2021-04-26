@@ -30,7 +30,7 @@ Linear:
     params0: ~
 
   affine:
-    level_iters: [1000, 1000, 100]
+    level_iters: [2000, 2000, 200] # DEFAULT [1000, 1000, 100]
     sigmas: [3.0, 1.0, 0.0]
     factors: [4, 2, 1]
     params0: ~
@@ -41,7 +41,7 @@ NonLinear:
     dim: 3
 
   symmetricdr:
-    level_iters: [10, 10, 5] # DEFAULT [100, 100, 25]
+    level_iters: [100, 100, 25] # DEFAULT [10, 10, 5]
 
 Misc:
   debug: True

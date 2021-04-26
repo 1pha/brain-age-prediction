@@ -1,5 +1,7 @@
 from glob import glob
 import argparse
+from datetime import datetime
+import time
 
 from registration import *
 
@@ -19,13 +21,12 @@ if __name__=="__main__":
     data_files = glob('../../../brainmask_nii/*.nii')
     data_files.sort()
 
-    template = data_files.pop(args.template) if args.template else data_files.pop()
-    print(f'Using {template} as a template.')
-
+    registrator = Registrator(cfg='registration.yml')
+    start_time = time.time()
+    dt_string = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    print(f'Initiated at {dt_string}.')
     for i, moving in enumerate(data_files[args.start:args.end]):
 
-        fname = moving.split('\\')[-1].split('.')[0]
-        print(f"{fname}")
-        affreg = Registration(template=template, moving=moving).optimize()
-        warped = affreg.transform(nib.load(moving).get_fdata())
-        np.save(f'../../../brainmask_tlrc/{fname}_tlrc.npy', warped)
+        print(f'{i}th brain | start={args.start} & end={args.end} | Progress {i / (args.end - args.start) * 100:.2f}%')
+        registrator(moving, save=True)
+        print(f'Elapsed {time.time() - start_time:.1f} sec | Initiated at {dt_string}.')
