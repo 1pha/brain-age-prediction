@@ -1,0 +1,54 @@
+# MISC
+seed: 42
+folds: 20
+
+# DEBUG
+debug: False
+rot90: False
+return_path: False
+
+# MODEL
+model_name: resnet
+lamb: 0.0005
+learning_rate: 0.0001
+scheduler: false
+loss: MSE
+metrics:
+  - RMSE
+  - MAE
+resize: [96, 96, 96]
+layers: [4, 8, 16, 32]
+batchnorm: True # Vres
+double: False # Vres
+dropout: True # SFCN
+channel_number: [32, 64, 128, 256, 64] # SFCN
+start_channels: 16 # RESNET
+
+# DATA
+test_size: 0.2
+batch_size: 16
+augmentation:
+  affine: 0.33
+  flip: 0.33
+  elastic_deform: 0.33
+aug_intensity:
+  affine: [0.1, 10]
+  elastic_deform: [7, .5]
+preprocess:
+  scaler: minmax
+  brain_edge: 
+    - [8, 82]
+    - [5, 104]
+    - [0, 78]
+path_root: ../../brainmask_mni/
+suffix: -brainmask
+extension: npy
+label_path: ../rsc/age_ixidlbsoas13.csv
+verbose_loader: False
+unused_src: ~
+
+
+# TRAIN
+epochs: 100
+best_mae: 8.0
+verbose_period: 5

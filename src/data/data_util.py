@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from functools import partial
 from glob import glob
 
 from scipy.ndimage import shift
@@ -16,6 +17,24 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
 import torchio as tio
+
+def load_by_ext(fname, extension='npy'):
+
+    return {
+        'npy': np.load(fname),
+        'nii': np.load(fname),
+    }[extension]
+
+def path_maker(_id, path_root, suffix, extension):
+    
+    fname1 = f"{path_root}/{_id}{suffix}.{extension}"
+    fname2 = f"{path_root}/{_id}.{extension}"
+    if os.path.exists(fname1):
+        return fname1
+    
+    elif os.path.exists(fname2):
+        return fname2
+
 
 class MyDataset(Dataset):
     def __init__(self, CFG, fold=None, augment=None):
@@ -253,6 +272,113 @@ class DatasetPlus(Dataset):
 
         elif REG == 'raw_cropped':
             return crop_img(fname).get_fdata()
+
+    def __len__(self):
+        return len(self.data_files)
+
+class MNIDataset(Dataset):
+
+    def __init__(self, cfg=None, augment=False, test=False):
+
+        self.cfg = cfg
+        self.augment = augment
+        self.test = test
+
+        if test: assert augment == False
+
+        # SEED
+        RANDOM_STATE = cfg.seed
+        np.random.seed(RANDOM_STATE)
+
+        # .CSV CONTAINING AGE INFO
+        label_file = pd.read_csv(cfg.label_path, index_col=0)
+        # IF THERE IS AN UNUSED DATASET
+        if cfg.unused_src is not None:
+            unused = label_file['src'].apply(lambda row: row.lower() in map(str.lower, cfg.unused_src))
+            label_file.drop(label_file[unused].index, inplace=True)
+        
+        else:
+            pass
+
+        self.load = partial(load_by_ext, extension=cfg.extension)
+
+        _path_maker = partial(path_maker, path_root=cfg.path_root, suffix=cfg.suffix, extension=cfg.extension)
+        data_path = label_file.id.apply(_path_maker)
+        train_idx, test_idx, train_age, test_age = train_test_split(data_path,
+                                                            label_file.age,
+                                                            test_size=cfg.test_size,
+                                                            random_state=RANDOM_STATE)
+        if augment:
+            # aug_idx = np.array(list(map(lambda x: x+'*', train_idx)))
+            aug_idx = train_idx.apply(lambda x: x+'*') 
+            aug_age = train_age   
+
+        if not test: # Training set
+            self.data_files  = shuffle(pd.concat([train_idx, aug_idx]), random_state=RANDOM_STATE) if augment else train_idx
+            self.data_labels = shuffle(pd.concat([train_age, aug_age]), random_state=RANDOM_STATE) if augment else train_age
+
+        else: # Test set
+            self.data_files  = test_idx
+            self.data_labels = test_age
+
+        self.data_files  = self.data_files.to_list()
+        self.data_labels = self.data_labels.to_list()
+
+    def __getitem__(self, idx):
+
+        (w, W), (h, H), (d, D) = self.cfg.preprocess['brain_edge']
+        # ORIGINAL DATA
+        if os.path.exists(self.data_files[idx]):
+            x = self.load(self.data_files[idx])[w:W, h:H, d:D]
+
+        else:
+            x = self.load(self.data_files[idx][:-1])[w:W, h:H, d:D]
+            x = self.augmentation(x)
+
+        size = x.shape
+        # SCALING - EITHER MINMAX/ZNORM (DEPENDS ON CONF)
+        if self.cfg.preprocess['scaler']:
+            
+            if self.cfg.preprocess['scaler'] == 'minmax':
+                x = MinMaxScaler().fit_transform(x.reshape(-1, 1)).reshape(*size)
+
+            elif self.cfg.preprocess['scaler'] == 'znorm':
+                x = StandardScaler().fit_transform(x.reshape(-1, 1)).reshape(*size)
+
+        else:
+            x = np.reshape(-1, 1).reshape(*size)
+
+        # ADD AXIS (TO 3D -> 4D, SINCE GRAYSCALE)
+        x = torch.tensor(x)[None, ...].float()
+
+        if self.cfg.return_path:
+            return x, torch.tensor(self.data_labels[idx]).float(), self.data_files[idx]
+        
+        else:
+            return x, torch.tensor(self.data_labels[idx]).float()
+
+
+    def augmentation(self, x):
+
+        self.transform = {
+            'affine': tio.RandomAffine(),
+            'flip':   tio.RandomFlip(axes=['left-right']),
+            'elastic_deform': tio.RandomElasticDeformation()
+        }
+
+        p = list(self.cfg['augmentation'].values())
+        norm = sum(p)
+        p = list(map(lambda x: x / norm, p))
+        aug_choice = np.random.choice(list(self.transform.keys()), p=p)
+
+        if self.cfg['verbose_loader']:
+            print(aug_choice)
+
+        else: pass
+
+        x = self.transform[aug_choice](x[None, ...])
+        
+        return x.squeeze()
 
     def __len__(self):
         return len(self.data_files)

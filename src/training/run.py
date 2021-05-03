@@ -111,7 +111,8 @@ def run(cfg, fold, db=None, mlflow=None):
 def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 
     # dset = MyDataset(CFG, augment=augment, fold=fold)
-    dset = DatasetPlus(CFG, augment=augment, test=False)
+    # dset = DatasetPlus(CFG, augment=augment, test=False)    
+    dset = MNIDataset(CFG, augment=augment, test=False)
     dataloader = DataLoader(dset, batch_size=CFG.batch_size)
 
     device = CFG.device
@@ -174,7 +175,8 @@ def train(model, optimizer, loss_fns, DP, CFG, fold=None, augment=False):
 def valid(model, loss_fns, DP, CFG, fold=None):
 
     # dset = MyDataset(CFG, augment=False, fold=fold)
-    dset = DatasetPlus(CFG, augment=False, test=True)
+    # dset = DatasetPlus(CFG, augment=False, test=True)
+    dset = MNIDataset(CFG, augment=False, test=True)
     dataloader = DataLoader(dset, batch_size=CFG.batch_size)
 
     device = CFG.device

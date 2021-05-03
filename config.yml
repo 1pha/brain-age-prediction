@@ -40,12 +40,12 @@ task_type: age
 preprocess:
   scaler: minmax
   resize: [96, 96, 96]
-npy_path: ../../brainmask_tlrc/*.npy
+npy_path: ../../brainmask_mni/
 label_path: ../rsc/age_ixidlbsoas13.csv
 registration: tlrc
 verbose_loader: False
 unused_src:
-  - Oasis3
+  - ~
 
 # TRAIN
 epochs: 100
