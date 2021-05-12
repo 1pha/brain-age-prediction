@@ -6,8 +6,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from .losses import get_metric
-from ..data.data_util import get_dataloader 
 from ..models.model_util import load_model, save_checkpoint
+from ..data.data_util import get_dataloader
 
 def logging_time(original_fn):
 
