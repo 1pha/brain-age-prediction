@@ -1,126 +1,52 @@
 # MISC
 seed: 42
 folds: 20
+root: ../../brainmask_tlrc/
 
 # DEBUG
 debug: False
-rot90: False
-return_path: False
+_debug:
+  rot90: False
+  return_path: False
+  aug_verbose: False
+
 
 # MODEL
 model_name: resnet
 lamb: 0.0005
 learning_rate: 0.0001
 scheduler: false
-loss: MSE
+loss: mse
 metrics:
-  - RMSE
-  - MAE
+  - rmse
+  - mae
+  - r2
 resize: [96, 96, 96]
 layers: [4, 8, 16, 32]
+
 batchnorm: True # Vres
 double: False # Vres
 dropout: True # SFCN
 channel_number: [32, 64, 128, 256, 64] # SFCN
 start_channels: 16 # RESNET
 
-# DATA
+# DATALOADER
 test_size: 0.2
-test: false
-fold: null
 batch_size: 16
-augmentation:
+aug_proba:
   affine: 0.33
   flip: 0.33
   elastic_deform: 0.33
 aug_intensity:
   affine: [0.1, 10]
   elastic_deform: [7, .5]
-task_type: age
 preprocess:
   scaler: minmax
   resize: [96, 96, 96]
-npy_path: ../../brainmask_mni/
-label_path: ../rsc/age_ixidlbsoas13.csv
-registration: tlrc
-verbose_loader: False
 unused_src:
   - ~
 
 # TRAIN
 epochs: 100
-best_mae: 8.0
+mae_threshold: 8.0
 verbose_period: 5
-
-# NOTION
-notion:
-  use: false
-  token_v2: 246da72b5feada0be4e9f747a5ecea90c49a0c0d80c00f9d65974676c5019bb89125b19bf65c8476036f5e0c78bb74450a5b6687126ce114091ea10c8af580cb092b9cb1b994d3ceb3a7ba2147df
-  url: https://www.notion.so/Database-for-3dCNN-cd08db2ce51d4ccaa48ffc4d32d6e43f
-  schema: {
-    "title" : {"name" : "Fold", "type" : "text"},
-    "Epoch" : {"name" : "Epoch", "type": "number"},
-
-    'Train MAE' : {'name': 'Train MAE', "type": "number"},
-    'Train LOSS': {'name': 'Train LOSS', "type": "number"},
-    'Train RMSE': {'name': 'Train RMSE', "type": "number"},
-    'Train CORR': {'name': 'Train CORR', "type": "number"},
-
-    'Valid MAE' : {'name': 'Valid MAE', "type": "number"},
-    'Valid LOSS': {'name': 'Valid LOSS', "type": "number"},
-    'Valid RMSE': {'name': 'Valid RMSE', "type": "number"},
-    'Valid CORR': {'name': 'Valid CORR', "type": "number"},
-
-    'Aug MAE' : {'name': 'Aug MAE', "type": "number"},
-    'Aug LOSS': {'name': 'Aug LOSS', "type": "number"},
-    'Aug RMSE': {'name': 'Aug RMSE', "type": "number"},
-
-    'Learning Rate': {'name': 'Learning Rate', "type": "number"},
-    'Elapsed Time': {'name': 'Elapsed Time', "type": "number"},
-  }
-  no_fold_aug_schema: {
-    "title": {"name": "Epoch", "type": "text"},
-
-    'Train MAE' : {'name': 'Train MAE', "type": "number"},
-    'Train LOSS': {'name': 'Train LOSS', "type": "number"},
-    'Train RMSE': {'name': 'Train RMSE', "type": "number"},
-    'Train CORR': {'name': 'Train CORR', "type": "number"},
-
-    'Valid MAE' : {'name': 'Valid MAE', "type": "number"},
-    'Valid LOSS': {'name': 'Valid LOSS', "type": "number"},
-    'Valid RMSE': {'name': 'Valid RMSE', "type": "number"},
-    'Valid CORR': {'name': 'Valid CORR', "type": "number"},
-
-    'Learning Rate': {'name': 'Learning Rate', "type": "number"},
-    'Elapsed Time': {'name': 'Elapsed Time', "type": "number"},
-  }
-
-  no_fold_aug_schema: {
-    "title": {"name": "Epoch", "type": "text"},
-
-    'Train MAE' : {'name': 'Train MAE', "type": "number"},
-    'Train LOSS': {'name': 'Train LOSS', "type": "number"},
-    'Train RMSE': {'name': 'Train RMSE', "type": "number"},
-    'Train CORR': {'name': 'Train CORR', "type": "number"},
-
-    'Valid MAE' : {'name': 'Valid MAE', "type": "number"},
-    'Valid LOSS': {'name': 'Valid LOSS', "type": "number"},
-    'Valid RMSE': {'name': 'Valid RMSE', "type": "number"},
-    'Valid CORR': {'name': 'Valid CORR', "type": "number"},
-
-    'Aug MAE' : {'name': 'Aug MAE', "type": "number"},
-    'Aug LOSS': {'name': 'Aug LOSS', "type": "number"},
-    'Aug RMSE': {'name': 'Aug RMSE', "type": "number"},
-
-    'Learning Rate': {'name': 'Learning Rate', "type": "number"},
-    'Elapsed Time': {'name': 'Elapsed Time', "type": "number"},
-  }
-
-  test_schema: {
-    'title': {'name': 'Fold', "type": "text"},
-
-    'Test MAE' : {'name': 'Test MAE', "type": "number"},
-    'Test LOSS': {'name': 'Test LOSS', "type": "number"},
-    'Test RMSE': {'name': 'Test RMSE', "type": "number"},           
-    'Test CORR': {'name': 'Test CORR', "type": "number"},   
-  }
