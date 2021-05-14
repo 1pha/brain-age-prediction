@@ -35,9 +35,6 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
     elif model_name == 'levakov':
         model = Levakov(task_type='age')
 
-    elif model_name == 'inception':
-        model = Inception3()
-
     elif model_name == 'dinsdale':
         model = Dinsdale(1, 1, 2)
 

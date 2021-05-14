@@ -2,6 +2,7 @@
 seed: 42
 registration: mni
 
+
 # DEBUG
 debug: False
 _debug:
@@ -29,6 +30,7 @@ dropout: True # SFCN
 channel_number: [32, 64, 128, 256, 64] # SFCN
 start_channels: 16 # RESNET
 
+
 # DATALOADER
 test_size: 0.2
 batch_size: 16
@@ -41,8 +43,8 @@ aug_intensity:
   elastic_deform: [7, .5]
 unused_src:
   - ~
-resize: ~
 
+  
 # TRAIN
 epochs: 100
 mae_threshold: 8.0
