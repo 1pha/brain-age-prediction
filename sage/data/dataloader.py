@@ -37,7 +37,7 @@ class BrainAgeDataset(Dataset):
 
         # DEBUG SETUP
         self.debug = cfg.debug
-        for d in self._debug:
+        for d in cfg._debug:
             setattr(self, d, self._debug[d] if self.debug else False)
         if not cfg.debug: # FLUSHOUT DEBUG ATTRS
             cfg._debug = []
