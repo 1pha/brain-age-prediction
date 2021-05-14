@@ -40,9 +40,6 @@ aug_proba:
 aug_intensity:
   affine: [0.1, 10]
   elastic_deform: [7, .5]
-preprocess:
-  scaler: minmax
-  resize: [96, 96, 96]
 unused_src:
   - ~
 
