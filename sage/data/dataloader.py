@@ -24,12 +24,14 @@ from torch.utils.data import Dataset, DataLoader
 # AUGMENTATION
 import torchio as tio
 
+
 def get_loader(extension):
 
     return {
         'npy': np.load,
         'nii': lambda x: nib.load(x).get_fdata()
     }[extension]
+
 
 class BrainAgeDataset(Dataset):
 
@@ -40,7 +42,7 @@ class BrainAgeDataset(Dataset):
             that .csv file should contain 'path' columns that contains full absolute path of the file
 
             ROOT is the path of database.
-            In this folder, we need -
+            In this folder, we need - (**VERY IMPORTANT**)
                 - label.csv
                 - data_config.yml: should contain -
                     - data extension
@@ -91,6 +93,7 @@ class BrainAgeDataset(Dataset):
 
         # SETUP DATA_FILES
         if not test: # TRAIN SET
+            # TODO: AUGRATIO
             self.data_files = shuffle(pd.concat([trn_idx, aug_idx]), random_state=SEED) \
                 if augment else trn_idx
             self.data_ages = shuffle(pd.concat([trn_age, aug_age]), random_state=SEED) \
@@ -108,7 +111,7 @@ class BrainAgeDataset(Dataset):
         return len(self.data_files)
 
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx): # -> ((1, W', H', D'), age: torch.tensor.float)
 
         '''
         PIPELINE
@@ -128,18 +131,34 @@ class BrainAgeDataset(Dataset):
         if aug:
             fpath = fpath[:-3]
 
-        x = self.load(fpath)
-        x = self.preprocess(x)
+        x = self.load(fpath)   # 3D (W, H, D)
+        x = self.maxcut(x)     # 3D (W, H, D)
+        x = self.preprocess(x) # 4D (1, W', H', D')
         if aug:
-            x = self.augmentation(x)
+            x = self.augmentation(x) # 4D (1, W', H', D')
 
         return x, torch.tensor(self.data_ages[idx]).float()
 
-    def preprocess(self, x):
+
+    def maxcut(self, x):
+        '''
+        For brains that has many blanks.
+        Should explicity give maxcut with tuples of tuples ((w, W), (h, H), (d, D))
+        '''
+        
+        maxcut = self.data_cfg.maxcut if self.data_cfg.maxcut else None
+        if maxcut is not None:
+            (w, W), (h, H), (d, D) = maxcut
+            return x[w:W, h:H, d:D]
+        else:
+            return x
+
+
+    def preprocess(self, x): # -> (1, W', H', D')
 
         '''
         Given with raw brain np.ndarray
-            -> return desired output shape (1, W', H', D')
+            -> return desired output 4D shape (1, W', H', D')
 
         MAY CONTAIN
             1. SCALING
@@ -152,18 +171,15 @@ class BrainAgeDataset(Dataset):
         x = get_scaler(self.data_cfg.scaler).fit_transform(x.reshape(-1, 1)).reshape(*size)
 
         # 2. RESIZING
+        # PRIORITY: cfg > data_cfg <- cfg is set later than data_cfg
         resize = self.data_cfg.resize if self.cfg.resize is None else self.cfg.resize
         if not resize is None:
-
-            # (1, 1, *resize) -> because F.interpolate requires 5D tensor for 3D tensor to be torted
+            # (1, 1, *resize) (5D) -> because F.interpolate requires 5D tensor for 3D tensor to be torted
             x = F.interpolate(torch.tensor(x)[None, None, ...], size=resize) 
-            x = x.squeeze(0).float() # -> (1, *resize)
+            x = x.squeeze(0).float() # -> (1, *resize) (4D)
 
         else:
             x = torch.tensor(x)[None, ...].float()
-
-        # 3. CUT MAXIMUM VOLUME
-        # TODO
 
         return x
 
@@ -192,8 +208,15 @@ class BrainAgeDataset(Dataset):
         
         return x
 
+    def configuration(self):
 
-def get_dataloader(cfg, augment, test):
+        return self.cfg, self.data_cfg
+
+
+def get_dataloader(cfg, augment=False, test=False, dataset=False):
+    '''
+    Just giving cfg.registration will find a proper path
+    '''
 
     cfg.root = {
         'tlrc': 'G:/My Drive/brain_data/brainmask_tlrc',
@@ -203,7 +226,7 @@ def get_dataloader(cfg, augment, test):
 
     dataset = BrainAgeDataset(cfg, augment=augment, test=test)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size)
-    return dataloader
+    return dataloader if not dataset else dataset
 
 
 if __name__ == "__main__":
