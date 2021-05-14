@@ -2,12 +2,16 @@
 import os
 import numpy as np
 import pandas as pd
-from functools import partial
 
 # SCIKIT-LEARN
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
+
+# PREPROCESS
+from .preprocess import *
+
+# CONFIG
+from ..config import load_config
 
 # MRI RELATED
 import nibabel as nib
@@ -20,6 +24,13 @@ from torch.utils.data import Dataset, DataLoader
 # AUGMENTATION
 import torchio as tio
 
+def get_loader(extension):
+
+    return {
+        'npy': np.load,
+        'nii': lambda x: nib.load(x).get_fdata()
+    }[extension]
+
 class BrainAgeDataset(Dataset):
 
     def __init__(self, cfg, augment=False, test=False):
@@ -27,18 +38,30 @@ class BrainAgeDataset(Dataset):
         '''
             CONFIG file should contain .csv file and -
             that .csv file should contain 'path' columns that contains full absolute path of the file
+
+            ROOT is the path of database.
+            In this folder, we need -
+                - label.csv
+                - data_config.yml: should contain -
+                    - data extension
+                    - preprocessing method
+                    - maximum volume (for mni)
+                - data
         '''
 
         # INITIAL SETUP
         self.cfg = cfg
+        ROOT = cfg.root
+        SEED = cfg.seed
+        self.data_cfg = load_config(os.path.join(ROOT, 'data_config.yml')) # -> Edict
+        self.load = get_loader(extension=self.data_cfg.extension)
         self.augment = augment
         self.test = test
-        SEED = cfg.seed
 
         # DEBUG SETUP
         self.debug = cfg.debug
         for d in cfg._debug:
-            setattr(self, d, self._debug[d] if self.debug else False)
+            setattr(self, d, cfg._debug[d] if self.debug else False)
         if not cfg.debug: # FLUSHOUT DEBUG ATTRS
             cfg._debug = []
 
@@ -46,13 +69,12 @@ class BrainAgeDataset(Dataset):
         if test: assert augment == False
 
         # LABEL FILE
-        ROOT = cfg.root
         self.label_file = pd.read_csv(os.path.join(ROOT, 'label.csv'))
 
         # SPLIT DATA
-        trn_idx, val_idx, trn_age, val_age = train_test_split(\
-            X=self.label_file['abs_path'],
-            y=self.label_file['age'],
+        trn_idx, val_idx, trn_age, val_age = train_test_split(
+            self.label_file['abs_path'],
+            self.label_file['age'],
             test_size=cfg.test_size,
             random_state=SEED
         )
@@ -104,24 +126,14 @@ class BrainAgeDataset(Dataset):
         fpath = self.data_files[idx]
         aug = True if fpath[-3:] == 'aug' else False
         if aug:
-            fpath = fpath[-3:]
+            fpath = fpath[:-3]
 
         x = self.load(fpath)
         x = self.preprocess(x)
         if aug:
             x = self.augmentation(x)
 
-        return x, torch.Tensor(self.data_ages[idx]).float()
-
-    def load(self, fpath):
-
-        '''
-        only 2 extensions available
-            .nii: nib.load().get_fdata()
-            .npy: np.load()
-        '''
-
-        return nib.load(fpath).get_fdata()
+        return x, torch.tensor(self.data_ages[idx]).float()
 
     def preprocess(self, x):
 
@@ -134,6 +146,24 @@ class BrainAgeDataset(Dataset):
             2. RESIZING
             3. ROTATION (IF NEEDED)
         '''
+
+        # 1. SCALING
+        size = x.shape
+        x = get_scaler(self.data_cfg.scaler).fit_transform(x.reshape(-1, 1)).reshape(*size)
+
+        # 2. RESIZING
+        resize = self.data_cfg.resize if self.cfg.resize is None else self.cfg.resize
+        if not resize is None:
+
+            # (1, 1, *resize) -> because F.interpolate requires 5D tensor for 3D tensor to be torted
+            x = F.interpolate(torch.tensor(x)[None, None, ...], size=resize) 
+            x = x.squeeze(0).float() # -> (1, *resize)
+
+        else:
+            x = torch.tensor(x)[None, ...].float()
+
+        # 3. CUT MAXIMUM VOLUME
+        # TODO
 
         return x
 
@@ -150,55 +180,31 @@ class BrainAgeDataset(Dataset):
             'elastic_deform': tio.RandomElasticDeformation()
         }
 
-        p = list(map(lambda x: x / sum(self.aug_proba), self.aug_proba))
+        # TODO: Normalize probability but order of probabilities should be handled!
+        # e.g. if probability order is [flip, ela, affine], then it will not give the expected output
+        p = list(map(lambda x: x / sum(self.cfg.aug_proba.values()), self.cfg.aug_proba.values()))
         aug_choice = np.random.choice(list(transform.keys()), p=p)
 
         if self.aug_verbose:
-            print(f'Augmentation Choice {aug_choice}')
+            print(f'Augmentation Choice: {aug_choice.capitalize()}')
 
-        x = aug_choice(x)
+        x = transform[aug_choice](x)
         
         return x
 
 
-class TLRCDataset(BrainAgeDataset):
-
-    def __init__(self, cfg=None, augment=False, test=False):
-        super().__init__(cfg, augment, test)
-
-
-class MNIDataset(BrainAgeDataset):
-
-    def __init__(self, cfg=None, augment=False, test=False):
-        super().__init__(cfg, augment, test)
-        
-
-    def __getitem__(self, idx):
-
-        pass
-
-class RAWDataset(BrainAgeDataset):
-
-    def __init__(self, cfg=None, augment=False, test=False):
-        super().__init__(cfg, augment, test)
-
-
-
 def get_dataloader(cfg, augment, test):
 
-    if cfg.registration == 'mni':
-        dataset = MNIDataset(cfg, augment=augment, test=test)
+    cfg.root = {
+        'tlrc': 'G:/My Drive/brain_data/brainmask_tlrc',
+        'mni': 'G:/My Drive/brain_data/brainmask_mni',
+        'raw': 'G:/My Drive/brain_data/brainmask_nii',
+    }[cfg.registration]
 
-    elif cfg.registration == 'tlrc':
-        dataset = TLRCDataset(cfg, augment=augment, test=test)
+    dataset = BrainAgeDataset(cfg, augment=augment, test=test)
+    dataloader = DataLoader(dataset, batch_size=cfg.batch_size)
+    return dataloader
 
-    elif cfg.registration == 'raw':
-        dataset = RAWDataset(cfg, augment=augment, test=test)
-    
-    else: # DEPRECATED
-        dataset = BrainAgeDataset(cfg, augment=augment, test=test)
-
-    return DataLoader(dataset, batch_size=cfg.batch_size)
 
 if __name__ == "__main__":
 

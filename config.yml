@@ -1,7 +1,6 @@
 # MISC
 seed: 42
-folds: 20
-root: ../../brainmask_tlrc/
+registration: mni
 
 # DEBUG
 debug: False
@@ -42,6 +41,7 @@ aug_intensity:
   elastic_deform: [7, .5]
 unused_src:
   - ~
+resize: ~
 
 # TRAIN
 epochs: 100
