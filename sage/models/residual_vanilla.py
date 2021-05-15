@@ -102,7 +102,7 @@ class ResidualPast(nn.Module):
         super().__init__()
 
         layers = cfg.layers if cfg is not None else [4, 8, 16, 32]
-        batchnorm = cfg.batchnorm
+        batchnorm = True
         self.feature_extractor = nn.Sequential(
             BasicBlock(1, layers[0], batchnorm=batchnorm),
             BasicBlock(layers[0], layers[0], stride=2, batchnorm=batchnorm),

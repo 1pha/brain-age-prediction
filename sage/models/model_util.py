@@ -1,6 +1,9 @@
 import os
+import easydict
+from ..config import edict2dict
 import torch
 from torchsummary import summary
+
 from .dinsdale import *
 from .levakov_64 import *
 from .levakov_96 import *
@@ -11,8 +14,9 @@ from .vanilla import *
 from .residual_vanilla import *
 from .res_sfcn import *
 
-def load_model(model_name, cfg=None, gpu=True, verbose=True):
+def load_model(cfg=None, gpu=True, verbose=True):
     
+    model_name = cfg.model_name
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'Model {model_name.capitalize()} is selected.')
 
@@ -63,16 +67,21 @@ def load_model(model_name, cfg=None, gpu=True, verbose=True):
     
     return model, device
 
-def save_checkpoint(state, model_filename, model_dir='./models/', is_best=False):
+def save_checkpoint(cfg, model_filename, model_dir='./models/', is_best=False):
+
     print('Saving ...')
+    if isinstance(cfg, easydict.EasyDict):
+        cfg = edict2dict(cfg)
+
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)    
-    # torch.save(state, os.path.join(model_dir, model_filename))    
+
+    # torch.save(cfg, os.path.join(model_dir, model_filename))    
     if is_best:
-        torch.save(state, os.path.join(model_dir, 'best_' + model_filename))
+        torch.save(cfg, os.path.join(model_dir,model_filename + f'_{is_best}'))
 
     else:
-        torch.save(state, os.path.join(model_dir, model_filename))
+        torch.save(cfg, os.path.join(model_dir, model_filename))
 
 if __name__ == "__main__":
 

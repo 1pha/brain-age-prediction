@@ -35,7 +35,7 @@ def get_loader(extension):
 
 class BrainAgeDataset(Dataset):
 
-    def __init__(self, cfg, augment=False, test=False):
+    def __init__(self, cfg, test=False):
 
         '''
             CONFIG file should contain .csv file and -
@@ -57,18 +57,18 @@ class BrainAgeDataset(Dataset):
         SEED = cfg.seed
         self.data_cfg = load_config(os.path.join(ROOT, 'data_config.yml')) # -> Edict
         self.load = get_loader(extension=self.data_cfg.extension)
-        self.augment = augment
+        self.augment = cfg.augment
         self.test = test
 
         # DEBUG SETUP
         self.debug = cfg.debug
-        for d in cfg._debug:
-            setattr(self, d, cfg._debug[d] if self.debug else False)
+        for d in cfg.data_debug:
+            setattr(self, d, cfg.data_debug[d] if self.debug else False)
         if not cfg.debug: # FLUSHOUT DEBUG ATTRS
-            cfg._debug = []
+            cfg.data_debug = []
 
         # VALIDATION SET SHOULD NOT DO AUGMENTATION
-        if test: assert augment == False
+        if test: self.augment = False
 
         # LABEL FILE
         self.label_file = pd.read_csv(os.path.join(ROOT, 'label.csv'))
@@ -82,7 +82,7 @@ class BrainAgeDataset(Dataset):
         )
 
         # AUGMENTATION
-        if augment:
+        if self.augment:
             aug_idx = trn_idx.apply(lambda x: x + 'aug')
             aug_age = trn_age
 
@@ -95,9 +95,9 @@ class BrainAgeDataset(Dataset):
         if not test: # TRAIN SET
             # TODO: AUGRATIO
             self.data_files = shuffle(pd.concat([trn_idx, aug_idx]), random_state=SEED) \
-                if augment else trn_idx
+                if self.augment else trn_idx
             self.data_ages = shuffle(pd.concat([trn_age, aug_age]), random_state=SEED) \
-                if augment else trn_age
+                if self.augment else trn_age
 
         else: # VALIDATION SET
             self.data_files = val_idx
@@ -213,7 +213,7 @@ class BrainAgeDataset(Dataset):
         return self.cfg, self.data_cfg
 
 
-def get_dataloader(cfg, augment=False, test=False, dataset=False):
+def get_dataloader(cfg, test=False, return_dataset=False):
     '''
     Just giving cfg.registration will find a proper path
     '''
@@ -224,9 +224,9 @@ def get_dataloader(cfg, augment=False, test=False, dataset=False):
         'raw': 'G:/My Drive/brain_data/brainmask_nii',
     }[cfg.registration]
 
-    dataset = BrainAgeDataset(cfg, augment=augment, test=test)
+    dataset = BrainAgeDataset(cfg, test=test)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size)
-    return dataloader if not dataset else dataset
+    return dataloader if not return_dataset else dataset
 
 
 if __name__ == "__main__":

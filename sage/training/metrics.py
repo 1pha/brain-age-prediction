@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from sklearn.metrics import r2_score
+from scipy.stats import pearsonr
 
 class RMSELoss(nn.Module):
     def __init__(self):
@@ -12,14 +13,19 @@ class RMSELoss(nn.Module):
 
 def get_metric(y_pred, y, metric: str):
 
+    '''
+    y_pred, y: given with CPU, gradient DETACHED TORCH TENSOR
+    '''
+
     metric = metric.lower()
     if metric == 'r2':
-        return r2_score(y, y_pred)
+        return r2_score(y.numpy(), y_pred.numpy())
     return {
         'mse': nn.MSELoss(),
         'rmse': RMSELoss(),
-        'mae': nn.L1Loss()
-    }[metric](y_pred, y).item()
+        'mae': nn.L1Loss(),
+        'corr': lambda _p, _t: pearsonr(_p, _t)[0]
+    }[metric](y_pred, y)
 
 
 if __name__=="__main__":

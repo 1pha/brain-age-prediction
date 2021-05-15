@@ -1,5 +1,19 @@
 import os
+import random
+
 import pandas as pd
+import numpy as np
+
+import torch
+
+def seed_everything(seed=42):
+    
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)    
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 def stratified_sample_df(df, col, n_samples):
     '''

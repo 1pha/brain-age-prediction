@@ -5,11 +5,12 @@ registration: mni
 
 # DEBUG
 debug: False
-_debug:
+data_debug:
   rot90: False
   return_path: False
   aug_verbose: False
-
+run_debug:
+  return_all: False
 
 # MODEL
 model_name: resnet
@@ -21,6 +22,7 @@ metrics:
   - rmse
   - mae
   - r2
+  - corr
 resize: [96, 96, 96]
 layers: [4, 8, 16, 32]
 
@@ -34,6 +36,7 @@ start_channels: 16 # RESNET
 # DATALOADER
 test_size: 0.2
 batch_size: 16
+augment: False
 aug_proba:
   affine: 0.33
   flip: 0.33
@@ -49,3 +52,4 @@ unused_src:
 epochs: 100
 mae_threshold: 8.0
 verbose_period: 5
+early_patience: 20
