@@ -73,6 +73,9 @@ class BrainAgeDataset(Dataset):
         # LABEL FILE
         self.label_file = pd.read_csv(os.path.join(ROOT, 'label.csv'))
 
+        # EXCLUDE UNUSED SOURCE DATABASES
+        self.label_file = self.label_file[self.label_file['src'].apply(lambda x: x not in cfg.unused_src)]
+
         # SPLIT DATA
         trn_idx, val_idx, trn_age, val_age = train_test_split(
             self.label_file['abs_path'],

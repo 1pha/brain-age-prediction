@@ -33,10 +33,13 @@ def disp_metrics(trn_loss, trn_metrics,
 def run(cfg, checkpoint: dict=None):
 
     model, cfg.device = load_model(cfg, verbose=True)
+    train_dataloader = get_dataloader(cfg, test=False)
+    valid_dataloader = get_dataloader(cfg, test=True)
+    print(f"TOTAL TRAIN {len(train_dataloader.dataset)} | VALID {len(valid_dataloader.dataset)}")
 
     if checkpoint is not None:
         
-        # CHECKPOINT VARIALBE SHOULD CONTAIN
+        # CHECKPOINT DICT SHOULD CONTAIN
         #   + path: weight saved pth
         #   + resume_epoch: epoch that user wants to start with
         model_path = checkpoint['path']
@@ -49,8 +52,9 @@ def run(cfg, checkpoint: dict=None):
     # TODO add optimizer config
     optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
 
-    best_mae = cfg.mae_threshold
+    best_mae = float('inf')
     stop_count = 0
+    wandb.watch(model)
     for e in range(start, cfg.epochs):
         
         print(f'Epoch {e + 1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
@@ -69,7 +73,7 @@ def run(cfg, checkpoint: dict=None):
             
             stop_count = 0
             best_mae = val_metrics['valid_mae']
-            save_checkpoint(cfg, model_name, is_best=best_mae)
+            save_checkpoint(model.state_dict(), model_name, is_best=best_mae)
 
         elif stop_count >= cfg.early_patience:
 
@@ -78,8 +82,11 @@ def run(cfg, checkpoint: dict=None):
 
         else:
             if cfg.verbose_period % (e + 1) == 0:
-                save_checkpoint(cfg, model_name, is_best=False)
-            stop_count += 1
+                save_checkpoint(model.state_dict(), model_name, is_best=False)
+
+            # To prevent training being stopped even before expected performance
+            if best_mae < cfg.mae_threshold:
+                stop_count += 1
 
         torch.cuda.empty_cache()
 
@@ -87,13 +94,17 @@ def run(cfg, checkpoint: dict=None):
         if cfg.run_debug.return_all:
             return model, (trn_loss, trn_metrics, trn_pred), (val_loss, val_metrics, tst_pred)
 
+    wandb.config.update(cfg)
+    wandb.finish()
+
     return model
 
 
 @logging_time
-def train(model, optimizer, cfg):
+def train(model, optimizer, cfg, dataloader=None):
 
-    dataloader = get_dataloader(cfg, test=False)
+    if dataloader is None:
+        dataloader = get_dataloader(cfg, test=False)
     trues = torch.tensor(dataloader.dataset.data_ages)
 
     device = cfg.device
@@ -144,9 +155,10 @@ def train(model, optimizer, cfg):
 
 
 @logging_time
-def valid(model, cfg):
+def valid(model, cfg, dataloader=None):
 
-    dataloader = get_dataloader(cfg, test=True)
+    if dataloader is None:
+        dataloader = get_dataloader(cfg, test=True)
     trues = torch.tensor(dataloader.dataset.data_ages)
 
     device = cfg.device

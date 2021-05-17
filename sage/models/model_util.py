@@ -67,21 +67,19 @@ def load_model(cfg=None, gpu=True, verbose=True):
     
     return model, device
 
-def save_checkpoint(cfg, model_filename, model_dir='./models/', is_best=False):
+def save_checkpoint(state, model_filename, model_dir='./models/', is_best=False):
 
     print('Saving ...')
-    if isinstance(cfg, easydict.EasyDict):
-        cfg = edict2dict(cfg)
 
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)    
 
-    # torch.save(cfg, os.path.join(model_dir, model_filename))    
+    # torch.save(state, os.path.join(model_dir, model_filename))    
     if is_best:
-        torch.save(cfg, os.path.join(model_dir,model_filename + f'_{is_best}'))
+        torch.save(state, os.path.join(model_dir, model_filename + f'_{is_best}'))
 
     else:
-        torch.save(cfg, os.path.join(model_dir, model_filename))
+        torch.save(state, os.path.join(model_dir, model_filename))
 
 if __name__ == "__main__":
 
