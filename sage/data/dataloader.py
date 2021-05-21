@@ -58,6 +58,7 @@ class BrainAgeDataset(Dataset):
         self.data_cfg = load_config(os.path.join(ROOT, 'data_config.yml')) # -> Edict
         self.load = get_loader(extension=self.data_cfg.extension)
         self.augment = cfg.augment
+        self.unlearn = cfg.unlearn
         self.test = test
 
         # DEBUG SETUP
@@ -75,19 +76,22 @@ class BrainAgeDataset(Dataset):
 
         # EXCLUDE UNUSED SOURCE DATABASES
         self.label_file = self.label_file[self.label_file['src'].apply(lambda x: x not in cfg.unused_src)]
+        self.src_map = {src: i for i, src in enumerate(self.label_file.src.unique())}
 
         # SPLIT DATA
-        trn_idx, val_idx, trn_age, val_age = train_test_split(
-            self.label_file['abs_path'],
-            self.label_file['age'],
+        trn, val = train_test_split(
+            self.label_file,
             test_size=cfg.test_size,
             random_state=SEED
         )
+        trn_idx, trn_age, trn_src = trn['abs_path'], trn['age'], trn['src']
+        val_idx, val_age, val_src = val['abs_path'], val['age'], val['src']
 
         # AUGMENTATION
         if self.augment:
             aug_idx = trn_idx.apply(lambda x: x + 'aug')
             aug_age = trn_age
+            aug_src = trn_src
 
         else: # NO AUGMENTATION
             cfg.aug_proba = []
@@ -96,18 +100,23 @@ class BrainAgeDataset(Dataset):
 
         # SETUP DATA_FILES
         if not test: # TRAIN SET
+
             # TODO: AUGRATIO
             self.data_files = shuffle(pd.concat([trn_idx, aug_idx]), random_state=SEED) \
                 if self.augment else trn_idx
             self.data_ages = shuffle(pd.concat([trn_age, aug_age]), random_state=SEED) \
                 if self.augment else trn_age
+            self.data_src = shuffle(pd.concat([trn_src, aug_src]), random_state=SEED) \
+                if self.augment else trn_src
 
         else: # VALIDATION SET
             self.data_files = val_idx
             self.data_ages = val_age
+            self.data_src = val_src
 
         self.data_files = self.data_files.to_list()
         self.data_ages = self.data_ages.to_list()
+        self.data_src = self.data_src.to_list()
 
 
     def __len__(self):
@@ -140,7 +149,12 @@ class BrainAgeDataset(Dataset):
         if aug:
             x = self.augmentation(x) # 4D (1, W', H', D')
 
-        return x, torch.tensor(self.data_ages[idx]).float()
+        if not self.unlearn:
+            return x, torch.tensor(self.data_ages[idx]).float()
+
+        else: # RETURN DATABASE AS WELL
+            return x, torch.tensor(self.data_ages[idx]).float(), \
+                      torch.tensor(self.src_map(self.data_src[idx])).int()
 
 
     def maxcut(self, x):
@@ -213,7 +227,7 @@ class BrainAgeDataset(Dataset):
 
     def configuration(self):
 
-        return self.cfg, self.data_cfg
+        return self.cfg, self.data_cfg    
 
 
 def get_dataloader(cfg, test=False, return_dataset=False):

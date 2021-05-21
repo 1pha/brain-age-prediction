@@ -4,15 +4,17 @@ from ..config import edict2dict
 import torch
 from torchsummary import summary
 
-from .dinsdale import *
-from .levakov_64 import *
-from .levakov_96 import *
-from .resnet import *
-from .sequential import *
-from .sfcn import *
-from .vanilla import *
-from .residual_vanilla import *
-from .res_sfcn import *
+from .naive_models.dinsdale import *
+from .naive_models.levakov_96 import *
+from .naive_models.resnet import *
+from .naive_models.sequential import *
+from .naive_models.sfcn import *
+from .naive_models.vanilla import *
+from .naive_models.residual_vanilla import *
+from .naive_models.res_sfcn import *
+
+from .unlearning import encoders, predictors
+
 
 def load_model(cfg=None, gpu=True, verbose=True):
     
@@ -66,6 +68,19 @@ def load_model(cfg=None, gpu=True, verbose=True):
         print(summary(model, input_size=(1, 96, 96, 96)))
     
     return model, device
+
+
+def load_unlearn_models(cfg):
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(f'Use {device} as a device.')
+
+    encoder = encoders.load_encoders[cfg.encoder.name](cfg).to(device)
+    regressor = predictors.load_predictors[cfg.regressor.name](cfg).to(device)
+    domainer = predictors.load_predictors[cfg.domainer.name](cfg).to(device)
+
+    return (encoder, regressor, domainer), device
+
 
 def save_checkpoint(state, model_filename, model_dir='./models/', is_best=False):
 
