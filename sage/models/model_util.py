@@ -75,9 +75,14 @@ def load_unlearn_models(cfg):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'Use {device} as a device.')
 
-    encoder = encoders.load_encoders[cfg.encoder.name](cfg).to(device)
-    regressor = predictors.load_predictors[cfg.regressor.name](cfg).to(device)
-    domainer = predictors.load_predictors[cfg.domainer.name](cfg).to(device)
+    encoder = encoders.load_encoders[cfg.encoder.name](cfg.encoder).to(device)
+    vector_size = encoder(torch.zeros((2, 1, 96, 96, 96)).to(device)).shape
+    assert len(vector_size) == 2 # It should be 1-dim vector with batch (=2-dim)
+    print(f"Output from encoder is {vector_size[1]}.")
+    cfg.regressor.init_node = vector_size[1]
+    cfg.domainer.init_node  = vector_size[1]
+    regressor = predictors.load_predictors[cfg.regressor.name](cfg.regressor).to(device)
+    domainer  = predictors.load_predictors[cfg.domainer.name](cfg.domainer).to(device)
 
     return (encoder, regressor, domainer), device
 

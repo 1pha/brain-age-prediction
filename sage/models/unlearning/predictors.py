@@ -11,14 +11,17 @@ class NKRegressor(nn.Module):
             self.cfg = cfg
             init_node = self.cfg.init_node
 
-        self.regressor = nn.Sequential()
-        self.regressor.add_module('r_fc2', nn.Linear(init_node, 32))
-        self.regressor.add_module('r_relu2', nn.ReLU(True))
-        self.regressor.add_module('r_pred', nn.Linear(32, 1))
+        self.regressor = nn.Sequential(
+            nn.Linear(init_node, init_node // 2),
+            nn.ReLU(),
+            nn.Linear(init_node // 2, init_node // 4),
+            nn.ReLU(),
+            nn.Linear(init_node // 4, 1)
+        )
 
     def forward(self, x):
-        regression = self.regressor(x)
-        return regression
+        x = self.regressor(x)
+        return x
 
 
 class NKDomainPredictor(nn.Module):
@@ -27,21 +30,25 @@ class NKDomainPredictor(nn.Module):
         super(NKDomainPredictor, self).__init__()
 
         if cfg is None:
-            num_dbs = 96
+            num_dbs = 2
         else:
             self.cfg = cfg
+            init_node = self.cfg.init_node
             num_dbs = self.cfg.num_dbs
-        self.num_dbs = num_dbs
-        self.domain = nn.Sequential()
-        self.domain.add_module('d_fc2', nn.Linear(96, 32))
-        self.domain.add_module('d_relu2', nn.ReLU(True))
-        self.domain.add_module('r_dropout', nn.Dropout3d(p=0.2))
-        self.domain.add_module('d_fc3', nn.Linear(32, num_dbs))
-        self.domain.add_module('d_pred', nn.Softmax(dim=1))
+
+        self.domain = nn.Sequential(
+            nn.Linear(init_node, init_node // 2),
+            nn.ReLU(),
+            nn.Dropout3d(p=.2),
+            nn.Linear(init_node // 2, init_node // 4),
+            nn.ReLU(),
+            nn.Linear(init_node // 4, num_dbs),
+            nn.Softmax(dim=1)
+        )
 
     def forward(self, x):
-        domain_pred = self.domain(x)
-        return domain_pred
+        x = self.domain(x)
+        return x
 
 
 load_predictors = {

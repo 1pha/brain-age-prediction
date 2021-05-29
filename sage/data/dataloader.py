@@ -76,7 +76,7 @@ class BrainAgeDataset(Dataset):
 
         # EXCLUDE UNUSED SOURCE DATABASES
         self.label_file = self.label_file[self.label_file['src'].apply(lambda x: x not in cfg.unused_src)]
-        self.src_map = {src: i for i, src in enumerate(self.label_file.src.unique())}
+        self.src_map = {src: i for i, src in enumerate(sorted(self.label_file.src.unique()))}
 
         # SPLIT DATA
         trn, val = train_test_split(
@@ -89,13 +89,16 @@ class BrainAgeDataset(Dataset):
 
         # AUGMENTATION
         if self.augment:
+            self.aug_proba = cfg.aug_proba
+            self.aug_intensity = cfg.aug_intensity
+
             aug_idx = trn_idx.apply(lambda x: x + 'aug')
             aug_age = trn_age
             aug_src = trn_src
 
         else: # NO AUGMENTATION
-            cfg.aug_proba = []
-            cfg.aug_intensity = []
+            self.aug_proba = []
+            self.aug_intensity = []
             self.augmentation = lambda x: x
 
         # SETUP DATA_FILES
@@ -116,7 +119,7 @@ class BrainAgeDataset(Dataset):
 
         self.data_files = self.data_files.to_list()
         self.data_ages = self.data_ages.to_list()
-        self.data_src = self.data_src.to_list()
+        self.data_src = list(map(lambda s: self.src_map[s], self.data_src.to_list())) # RETURN MAPPER
 
 
     def __len__(self):
@@ -154,7 +157,7 @@ class BrainAgeDataset(Dataset):
 
         else: # RETURN DATABASE AS WELL
             return x, torch.tensor(self.data_ages[idx]).float(), \
-                      torch.tensor(self.src_map(self.data_src[idx])).int()
+                      torch.tensor(self.data_src[idx]).long()
 
 
     def maxcut(self, x):

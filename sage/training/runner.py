@@ -1,12 +1,17 @@
 import time
 import wandb
+import pandas as pd
+import seaborn as sns; sns.set_theme()
+import matplotlib.pyplot as plt
 
 import torch
-import torch.optim as optim
+
+from .optimizer import get_optimizer
 
 from .metrics import get_metric
 from ..models.model_util import load_model, save_checkpoint
 from ..data.dataloader import get_dataloader
+
 
 def logging_time(original_fn):
 
@@ -35,6 +40,10 @@ def run(cfg, checkpoint: dict=None):
     model, cfg.device = load_model(cfg, verbose=True)
     train_dataloader = get_dataloader(cfg, test=False)
     valid_dataloader = get_dataloader(cfg, test=True)
+    
+    trn_gt , val_gt  = map(lambda x: x.dataset.data_ages, [train_dataloader, valid_dataloader])
+    trn_src, val_src = map(lambda x: x.dataset.data_src,  [train_dataloader, valid_dataloader])
+    idx2src = {v: k for k, v in train_dataloader.dataset.src_map.items()}
     print(f"TOTAL TRAIN {len(train_dataloader.dataset)} | VALID {len(valid_dataloader.dataset)}")
 
     if checkpoint is not None:
@@ -50,7 +59,8 @@ def run(cfg, checkpoint: dict=None):
         start = 0
         
     # TODO add optimizer config
-    optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    # optimizer = get_optimizer(model, cfg)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
 
     best_mae = float('inf')
     stop_count = 0
@@ -58,15 +68,36 @@ def run(cfg, checkpoint: dict=None):
     for e in range(start, cfg.epochs):
         
         print(f'Epoch {e + 1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
-        trn_loss, trn_metrics, trn_pred = train(model, optimizer, cfg)
-        val_loss, val_metrics, tst_pred = valid(model, cfg)
+        trn_loss, trn_metrics, trn_pred = train(model, optimizer, cfg, train_dataloader)
+        val_loss, val_metrics, tst_pred = valid(model, cfg, valid_dataloader)
         disp_metrics(trn_loss, trn_metrics, val_loss, val_metrics)
-        wandb.log(dict(
-            trn_metrics,
-            train_loss=trn_loss,
-            valid_loss=val_loss,
-            **val_metrics
-         ))
+
+        # PLOT
+        if cfg.plot:
+            df = pd.DataFrame({
+                'Ground Truth': trn_gt + val_gt,
+                'Predicted Age': torch.cat([trn_pred, tst_pred]),
+                'Source': list(map(lambda x: idx2src[x], trn_src + val_src)),
+                'Phase': ['Train'] * len(trn_src) + ['Valid'] * len(val_src),
+            })
+            source_plot = reg_plot(df, 'Source', cfg.model_name)
+            phase_plot  = reg_plot(df, 'Phase',  cfg.model_name)
+            wandb.log(dict(
+                trn_metrics,
+                train_loss=trn_loss,
+                valid_loss=val_loss,
+                source_plot=source_plot,
+                phase_plot=phase_plot,
+                **val_metrics
+            ))
+
+        else: # WITHOUT PLOT
+            wandb.log(dict(
+                trn_metrics,
+                train_loss=trn_loss,
+                valid_loss=val_loss,
+                **val_metrics
+            ))
         
         model_name = f'{cfg.model_name}_ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{val_metrics["valid_mae"]:.2f}.pt'
         if best_mae > val_metrics['valid_mae']:
@@ -202,3 +233,20 @@ def valid(model, cfg, dataloader=None):
     loss = sum(losses) / len(losses)
     
     return loss, _metrics, preds
+
+
+def reg_plot(df, hue, model_name, filter:list =None):
+
+    fig, ax = plt.subplots(figsize=(9, 9))
+    ax.set_title(f'True-Prediction plot - {hue}\n{model_name}', size=14)
+
+    iteration = df[hue].unique() if filter is None else filter
+    for it in iteration:
+        sns.regplot(
+            data=df[df[hue] == it],
+            x='Ground Truth',
+            y='Predicted Age',
+            ax=ax, label=it, fit_reg=True
+        )
+    ax.legend(title=hue)
+    return ax

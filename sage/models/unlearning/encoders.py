@@ -1,3 +1,5 @@
+from functools import reduce
+
 import torch
 import torch.nn as nn
 
@@ -49,7 +51,7 @@ class StrideBlock(nn.Module):
         self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, stride=stride, padding=1)
         self.bn2   = nn.BatchNorm3d(num_features=out_channels)
 
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
         
@@ -71,17 +73,25 @@ class VanillaConv(nn.Module):
 
         self.cfg = cfg
 
-        layers = [8, 16, 32, 64]
+        layers = [8, 16, 32, 64, 128]
+        self.layers = layers
         self.feature_extractor = nn.Sequential(
             StrideBlock(1, layers[0]),
             StrideBlock(layers[0], layers[1]),
             StrideBlock(layers[1], layers[2]),
             StrideBlock(layers[2], layers[3]),
+            StrideBlock(layers[3], layers[4]),
         )    
+        self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
     def forward(self, x):
 
-        return self.feature_extractor(x)
+        x = self.feature_extractor(x)
+        if reduce(lambda x, y: x * y, x.shape[1:]) // self.layers[-1] > 2**3:
+            x = self.avgpool(x)
+        x = x.reshape(x.size(0), -1)
+
+        return x
 
 load_encoders = {
     'vanillaconv': VanillaConv,
@@ -91,8 +101,8 @@ if __name__=="__main__":
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = VanillaConv().to(device)
-    # print(model)
-    # print(summary(model, input_size=(1, 96, 96, 96)))
+    print(model)
+    print(summary(model, input_size=(1, 96, 96, 96)))
 
-    sample = torch.zeros((2, 1, 96, 96, 96)).to(device)
-    print(model(sample).shape)
+    # sample = torch.zeros((2, 1, 96, 96, 96)).to(device)
+    # print(model(sample).shape)

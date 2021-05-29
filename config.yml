@@ -1,6 +1,7 @@
 # MISC
 seed: 42
 registration: mni
+plot: False
 
 
 # DEBUG
@@ -11,6 +12,7 @@ data_debug:
   aug_verbose: False
 run_debug:
   return_all: False
+  verbose_all: False
 
 
 # MODEL
@@ -58,9 +60,10 @@ metrics:
 # UNLEARNING
 unlearn: False
 unlearn_cfg:
-
   metrics:
     - acc
+  alpha: 1  # DOMAINER WEIGHT
+  beta : 10 # CONFUSION WEIGHT
   
   # MODEL SETUP
   encoder:
@@ -68,22 +71,25 @@ unlearn_cfg:
 
   regressor:
     name: nkregressor
+    init_node: 128
 
   domainer:
     name: nkdomainpredictor
+    init_node: 128
+    num_dbs: 2
     
   # OPTIMIZER SETTINGS
-  regression:
+  opt_age:
     optimizer: adam
     lr: .0001
     weight_decay: 0
     
-  domain:
+  opt_dom:
     optimizer: adam
     lr: .0001
     weight_decay: 0
 
-  confusion:
+  opt_conf:
     optimizer: adam
     lr: .0001
     weight_decay: 0
