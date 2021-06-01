@@ -178,6 +178,9 @@ def train(models, optimizers, cfg, dataloader=None):
                 loss.backward()
                 opt_reg.step()
 
+                reg_loss.append(loss.item())
+                age_preds.append(y_pred.cpu())
+
             # STEP 2. DOMAIN PREDICT
             if cfg.unlearn_cfg.opt_dom.use:
                 opt_dom.zero_grad()
@@ -185,6 +188,9 @@ def train(models, optimizers, cfg, dataloader=None):
                 loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
                 loss_dm.backward()
                 opt_dom.step()
+
+                dom_loss.append(loss_dm.item())
+                src_preds.append(d_pred.cpu())
 
             # STEP 3. CONFUSION LOSS
             if cfg.unlearn_cfg.opt_conf.use:
@@ -197,13 +203,7 @@ def train(models, optimizers, cfg, dataloader=None):
                 loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred_conf, d, 'confusion')
                 loss_conf.backward()
                 opt_conf.step()
-
-            age_preds.append(y_pred.cpu())
-            src_preds.append(d_pred.cpu())
-
-            reg_loss.append(loss.item())
-            dom_loss.append(loss_dm.item())
-            conf_loss.append(loss_conf.item())
+                conf_loss.append(loss_conf.item())
 
             del x, y, y_pred, d_pred
             torch.cuda.empty_cache()
@@ -215,8 +215,7 @@ def train(models, optimizers, cfg, dataloader=None):
     # Gather all metrics
     age_metrics = {f'train_{metric}': get_metric(ages, gt_age, metric) for metric in cfg.metrics}
     src_metrics = {f'train_{metric}': get_metric(srcs, gt_src, metric) for metric in cfg.unlearn_cfg.metrics}
-    # TODO: add ACCURACY
-    reg_loss, dom_loss, conf_loss = map(lambda x: sum(x) / len(x), [reg_loss, dom_loss, conf_loss])
+    reg_loss, dom_loss, conf_loss = map(agg_loss, [reg_loss, dom_loss, conf_loss])
 
     return (reg_loss, dom_loss, conf_loss), (age_metrics, src_metrics), (ages, srcs)
 
@@ -255,22 +254,21 @@ def valid(models, cfg, dataloader=None):
                 y_pred = regressor(embedded)
                 loss = get_metric(y_pred.squeeze(), y, cfg.loss)
 
+                reg_loss.append(loss.item())
+                age_preds.append(y_pred.cpu())
+
             # STEP 2. DOMAIN PREDICT
             if cfg.unlearn_cfg.opt_dom.use:
                 d_pred = domainer(embedded)
                 loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
+                dom_loss.append(loss_dm.item())
+                src_preds.append(d_pred.cpu())
 
             # STEP 3. CONFUSION LOSS
             if cfg.unlearn_cfg.opt_conf.use:
                 d_pred = domainer(embedded)
                 loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred, d, 'confusion')
-
-            age_preds.append(y_pred.cpu())
-            src_preds.append(d_pred.cpu())
-            
-            reg_loss.append(loss.item())
-            dom_loss.append(loss_dm.item())
-            conf_loss.append(loss_conf.item())
+                conf_loss.append(loss_conf.item())
 
             del x, y, y_pred
 
@@ -283,6 +281,15 @@ def valid(models, cfg, dataloader=None):
     # Gather all metrics
     age_metrics = {f'valid_{metric}': get_metric(ages, gt_age, metric) for metric in cfg.metrics}
     src_metrics = {f'valid_{metric}': get_metric(srcs, gt_src, metric) for metric in cfg.unlearn_cfg.metrics}
-    reg_loss, dom_loss, conf_loss = map(lambda x: sum(x) / len(x), [reg_loss, dom_loss, conf_loss])
+    reg_loss, dom_loss, conf_loss = map(agg_loss, [reg_loss, dom_loss, conf_loss]) 
     
     return (reg_loss, dom_loss, conf_loss), (age_metrics, src_metrics), (ages, srcs)
+
+
+def agg_loss(loss: list):
+
+    if loss: # IF THERE IS SOMETHING ...
+        return sum(loss) / len(loss)
+    
+    else: # NO, THEN RETURN 0 FOR LOSS
+        return 0
