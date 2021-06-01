@@ -154,7 +154,7 @@ def train(model, optimizer, cfg, dataloader=None):
 
         optimizer.zero_grad()
 
-        y_pred = model.forward(x).to(device).squeeze()
+        y_pred = model.forward(x).squeeze()
         preds.append(y_pred.cpu())
 
         loss = get_metric(y_pred, y, cfg.loss)

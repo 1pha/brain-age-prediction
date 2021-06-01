@@ -27,12 +27,19 @@ class confusion_loss(nn.Module):
         return loss
 
 
-class accuracy(nn.Module):
-    def __init__(self):
-        super().__init__()
+def accuracy(y, y_pred):
 
-    def forward(self, y_pred, y):
-        return torch.sum(y_pred == y) / len(y_pred)
+    y_pred = y_pred.argmax(axis=1)
+    return sum(y == y_pred) / len(y)
+
+def auc(y, y_pred):
+
+    if y_pred.shape[1] == 2:
+        y_pred = y_pred.argmax(axis=1)
+        return roc_auc_score(y, y_pred)
+
+    else:
+        return roc_auc_score(y, y_pred, multi_class='ovr')
 
 
 def get_metric(y_pred, y, metric: str):
@@ -40,28 +47,36 @@ def get_metric(y_pred, y, metric: str):
     '''
     y_pred, y: given with CPU, gradient DETACHED TORCH TENSOR
     '''
+    NUMPY_METRICS = {
+        'r2': r2_score,
+        'acc': accuracy,
+        'auc': auc,
+    }
 
-    metric = metric.lower()
-    if metric in  ['r2', 'auc']:
-        return {
-            'r2': r2_score,
-            'auc': roc_auc_score,
-        }[metric](y.numpy(), y_pred.numpy())
-
-    return {
+    TORCH_METRICS = {
         'mse': nn.MSELoss(),
         'rmse': RMSELoss(),
         'mae': nn.L1Loss(),
         'corr': lambda _p, _t: pearsonr(_p, _t)[0],
         'ce': nn.CrossEntropyLoss(),
         'confusion': confusion_loss(),
-        'acc': accuracy(),
-    }[metric](y_pred, y)
+    }
+
+    metric = metric.lower()
+    if metric in NUMPY_METRICS.keys():
+        return NUMPY_METRICS[metric](y.numpy(), y_pred.numpy())
+
+    elif metric in TORCH_METRICS.keys():
+        return TORCH_METRICS[metric](y_pred, y)
 
 
 if __name__=="__main__":
 
-    y_pred = torch.tensor([1, 2, 3], dtype=torch.float16)
-    y_true = torch.tensor([4, 5, 6], dtype=torch.float16)
+    y_pred = torch.tensor([
+        [.1, .9, .8],
+        [.2, .3, .7],
+        [.4, .5, .1],
+    ], dtype=torch.float16)
+    y_true = torch.tensor([1, 2, 1], dtype=torch.float16)
 
-    print(get_metric(y_pred, y_true, 'auc'))
+    print(get_metric(y_pred, y_true, 'acc'))

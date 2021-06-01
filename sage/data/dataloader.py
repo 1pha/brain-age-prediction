@@ -233,7 +233,7 @@ class BrainAgeDataset(Dataset):
         return self.cfg, self.data_cfg    
 
 
-def get_dataloader(cfg, test=False, return_dataset=False):
+def get_dataloader(cfg, test=False, return_dataset=False, pin_memory=True):
     '''
     Just giving cfg.registration will find a proper path
     '''
@@ -245,7 +245,7 @@ def get_dataloader(cfg, test=False, return_dataset=False):
     }[cfg.registration]
 
     dataset = BrainAgeDataset(cfg, test=test)
-    dataloader = DataLoader(dataset, batch_size=cfg.batch_size)
+    dataloader = DataLoader(dataset, batch_size=cfg.batch_size, pin_memory=pin_memory)
     return dataloader if not return_dataset else dataset
 
 

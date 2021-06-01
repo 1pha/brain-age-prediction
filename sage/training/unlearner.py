@@ -24,22 +24,38 @@ def logging_time(original_fn):
 
 
 def disp_metrics(trn_loss, trn_metrics,
-                 val_loss, val_metrics):
+                 val_loss, val_metrics,
+                 trn_dom,  val_dom):
+
+    LOSS = ['REG', 'DOM', 'CONF']
+    def _format(key, value, option=None):
+
+        if option == 'split':
+            _f = lambda k, v: f'{k.split("_")[1].upper():5} {v:7.2f}'
+
+        elif option is None:
+            _f = lambda k, v: f'{k:5}{v:7.2f}'
+
+        return ' | '.join(map(_f, key, value))
 
     # TRAIN
-    metrics = ' | '.join(map(lambda k: f'{k[0].split("_")[1].upper()} {k[1]:.2f}', list(trn_metrics.items())))
+    metrics = _format(trn_metrics.keys(), trn_metrics.values(), option='split')
     if isinstance(trn_loss, tuple): # PRINT OPTION WHEN UNLEARNING
-        print(f'TRAIN :: REG {trn_loss[0]:.3f} DOM {trn_loss[1]:.3f} CONF {trn_loss[2]:.3f} \n{metrics}')
+        loss = _format(LOSS, trn_loss)
+        dom  = _format(trn_dom.keys(), trn_dom.values(), option='split')
+        print(f'\tTRAIN :: \n\t{loss}\n\t{dom}\n\t{metrics}')
 
     else:
-        print(f'TRAIN :: LOSS {trn_loss:.3f} | {metrics}')
+        print(f'\tTRAIN :: LOSS {trn_loss:.3f} | {metrics}')
 
     # VALID
-    metrics = ' | '.join(map(lambda k: f'{k[0].split("_")[1].upper()} {k[1]:.2f}', list(val_metrics.items())))
-    if isinstance(val_loss, tuple):
-        print(f'TRAIN :: REG {val_loss[0]:.3f} DOM {val_loss[1]:.3f} CONF {val_loss[2]:.3f} \n{metrics}')
+    metrics = _format(val_metrics.keys(), val_metrics.values(), option='split')
+    if isinstance(val_loss, tuple): # PRINT OPTION WHEN UNLEARNING
+        loss = _format(LOSS, val_loss)
+        dom  = _format(val_dom.keys(), val_dom.values(), option='split')
+        print(f'\tVALID :: \n\t{loss}\n\t{dom}\n\t{metrics}')
     else:
-        print(f'VALID :: LOSS {val_loss:.3f} | {metrics}')
+        print(f'\tVALID :: LOSS {val_loss:.3f} | {metrics}')
 
 
 def run(cfg, checkpoint: dict=None):
@@ -73,11 +89,13 @@ def run(cfg, checkpoint: dict=None):
     for e in range(start, cfg.epochs):
         
         print(f'Epoch {e + 1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
-        trn_loss, trn_metrics, trn_pred = train(models, optimizers, cfg)
-        val_loss, val_metrics, tst_pred = valid(models, cfg)
-        disp_metrics(trn_loss, trn_metrics, val_loss, val_metrics)
+        trn_loss, (trn_metrics, trn_dom), trn_pred = train(models, optimizers, cfg)
+        val_loss, (val_metrics, val_dom), tst_pred = valid(models, cfg)
+        disp_metrics(trn_loss, trn_metrics, val_loss, val_metrics, trn_dom, val_dom)
         wandb.log(dict(
-            trn_metrics,
+            {**trn_metrics, **val_metrics,
+             **trn_dom,     **val_dom,},
+            
             train_reg_loss=trn_loss[0],
             valid_reg_loss=val_loss[0],
 
@@ -86,8 +104,6 @@ def run(cfg, checkpoint: dict=None):
 
             train_conf_loss=trn_loss[2],
             valid_conf_loss=val_loss[2],
-
-            **val_metrics
          ))
         
         model_name = f'{cfg.model_name}_ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{val_metrics["valid_mae"]:.2f}.pt'
@@ -95,7 +111,7 @@ def run(cfg, checkpoint: dict=None):
             
             stop_count = 0
             best_mae = val_metrics['valid_mae']
-            # save_checkpoint(model.state_dict(), model_name, is_best=best_mae)
+            save_checkpoint(states=models, model_dir=cfg.RESULT_PATH, model_name=model_name)
 
         elif stop_count >= cfg.early_patience:
 
@@ -104,19 +120,17 @@ def run(cfg, checkpoint: dict=None):
 
         else:
             if cfg.verbose_period % (e + 1) == 0:
-                # save_checkpoint(model.state_dict(), model_name, is_best=False)
-                pass
+                save_checkpoint(states=models, model_dir=cfg.RESULT_PATH, model_name=model_name)
 
             # To prevent training being stopped even before expected performance
             if best_mae < cfg.mae_threshold:
                 stop_count += 1
 
-        torch.cuda.empty_cache()
-
     if cfg.debug:
         if cfg.run_debug.return_all:
             return models, (trn_loss, trn_metrics, trn_pred), (val_loss, val_metrics, tst_pred)
 
+    cfg.best_mae = best_mae
     wandb.config.update(cfg)
     wandb.finish()
 
@@ -141,64 +155,70 @@ def train(models, optimizers, cfg, dataloader=None):
     domainer.train()
     age_preds, src_preds = [], []
     reg_loss, dom_loss, conf_loss = [], [], []
-    for i, (x, y, d) in enumerate(dataloader):
+    with torch.autograd.set_detect_anomaly(True):
+        for i, (x, y, d) in enumerate(dataloader):
 
-        if cfg.debug and cfg.run_debug.verbose_all:
-            print(f'{i}th Batch.')
+            if cfg.debug and cfg.run_debug.verbose_all:
+                print(f'{i}th Batch.')
 
-        try: 
-            x, y, d = x.to(device), y.to(device), d.to(device)
+            try: 
+                x, y, d = x.to(device), y.to(device), d.to(device)
 
-        except FileNotFoundError as e:
-            print(e)
-            time.sleep(20)
-            continue
+            except FileNotFoundError as e:
+                print(e)
+                time.sleep(20)
+                continue
 
-        # STEP 1. FEATURE EXTRACT
-        opt_reg.zero_grad()
-        embedded = encoder.forward(x).to(device)
-        y_pred = regressor(embedded)
-        loss = get_metric(y_pred.squeeze(), y, cfg.loss)
-        loss.backward(retain_graph=False)
-        opt_reg.step()
+            # STEP 1. FEATURE EXTRACT
+            if cfg.unlearn_cfg.opt_age.use:
+                opt_reg.zero_grad()
+                embedded = encoder.forward(x)
+                y_pred = regressor(embedded)
+                loss = get_metric(y_pred.squeeze(), y, cfg.loss)
+                loss.backward()
+                opt_reg.step()
 
-        # STEP 2. DOMAIN PREDICT
-        opt_dom.zero_grad()
-        d_pred = domainer(embedded.detach())
-        loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
-        loss_dm.backward(retain_graph=False)
-        opt_dom.step()
+            # STEP 2. DOMAIN PREDICT
+            if cfg.unlearn_cfg.opt_dom.use:
+                opt_dom.zero_grad()
+                d_pred = domainer(embedded.detach())
+                loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
+                loss_dm.backward()
+                opt_dom.step()
 
-        # STEP 3. CONFUSION LOSS
-        # del embedded
-        # embedded = encoder.forward(x).to(device)
+            # STEP 3. CONFUSION LOSS
+            if cfg.unlearn_cfg.opt_conf.use:
+                del embedded
+                torch.cuda.empty_cache()
+                embedded = encoder.forward(x)
 
-        opt_conf.zero_grad()
-        d_pred = domainer(embedded.detach())
-        loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred, d, 'confusion')
-        loss_conf.backward()
-        opt_conf.step()
+                opt_conf.zero_grad()
+                d_pred_conf = domainer(embedded)
+                loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred_conf, d, 'confusion')
+                loss_conf.backward()
+                opt_conf.step()
 
-        age_preds.append(y_pred.cpu())
-        src_preds.append(d_pred.cpu())
+            age_preds.append(y_pred.cpu())
+            src_preds.append(d_pred.cpu())
 
-        reg_loss.append(loss.item())
-        dom_loss.append(loss_dm.item())
-        conf_loss.append(loss_conf.item())
+            reg_loss.append(loss.item())
+            dom_loss.append(loss_dm.item())
+            conf_loss.append(loss_conf.item())
 
-        del x, y, y_pred, d_pred
-        torch.cuda.empty_cache()
+            del x, y, y_pred, d_pred
+            torch.cuda.empty_cache()
 
     # Gather Prediction results
     ages = torch.cat(age_preds).detach().squeeze()
     srcs = torch.cat(src_preds).detach()
 
     # Gather all metrics
-    _metrics = {f'train_{metric}': get_metric(ages, gt_age, metric) for metric in cfg.metrics}
+    age_metrics = {f'train_{metric}': get_metric(ages, gt_age, metric) for metric in cfg.metrics}
+    src_metrics = {f'train_{metric}': get_metric(srcs, gt_src, metric) for metric in cfg.unlearn_cfg.metrics}
     # TODO: add ACCURACY
     reg_loss, dom_loss, conf_loss = map(lambda x: sum(x) / len(x), [reg_loss, dom_loss, conf_loss])
 
-    return (reg_loss, dom_loss, conf_loss), _metrics, ages
+    return (reg_loss, dom_loss, conf_loss), (age_metrics, src_metrics), (ages, srcs)
 
 
 @logging_time
@@ -206,7 +226,8 @@ def valid(models, cfg, dataloader=None):
 
     if dataloader is None:
         dataloader = get_dataloader(cfg, test=True)
-    trues = torch.tensor(dataloader.dataset.data_ages)
+    gt_age = torch.tensor(dataloader.dataset.data_ages)
+    gt_src = torch.tensor(dataloader.dataset.data_src)
 
     device = cfg.device
 
@@ -229,17 +250,20 @@ def valid(models, cfg, dataloader=None):
                 continue
 
             # STEP 1. FEATURE EXTRACT
-            embedded = encoder.forward(x).to(device)
-            y_pred = regressor(embedded)
-            loss = get_metric(y_pred.squeeze(), y, cfg.loss)
+            if cfg.unlearn_cfg.opt_age.use:
+                embedded = encoder.forward(x).to(device)
+                y_pred = regressor(embedded)
+                loss = get_metric(y_pred.squeeze(), y, cfg.loss)
 
             # STEP 2. DOMAIN PREDICT
-            d_pred = domainer(embedded)
-            loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
+            if cfg.unlearn_cfg.opt_dom.use:
+                d_pred = domainer(embedded)
+                loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
 
             # STEP 3. CONFUSION LOSS
-            d_pred = domainer(embedded)
-            loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred, d, 'confusion')
+            if cfg.unlearn_cfg.opt_conf.use:
+                d_pred = domainer(embedded)
+                loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred, d, 'confusion')
 
             age_preds.append(y_pred.cpu())
             src_preds.append(d_pred.cpu())
@@ -257,7 +281,8 @@ def valid(models, cfg, dataloader=None):
     srcs = torch.cat(src_preds).detach()
 
     # Gather all metrics
-    _metrics = {f'valid_{metric}': get_metric(ages, trues, metric) for metric in cfg.metrics}
+    age_metrics = {f'valid_{metric}': get_metric(ages, gt_age, metric) for metric in cfg.metrics}
+    src_metrics = {f'valid_{metric}': get_metric(srcs, gt_src, metric) for metric in cfg.unlearn_cfg.metrics}
     reg_loss, dom_loss, conf_loss = map(lambda x: sum(x) / len(x), [reg_loss, dom_loss, conf_loss])
     
-    return (reg_loss, dom_loss, conf_loss), _metrics, ages
+    return (reg_loss, dom_loss, conf_loss), (age_metrics, src_metrics), (ages, srcs)

@@ -89,13 +89,9 @@ class VanillaConv(nn.Module):
         x = self.feature_extractor(x)
         if reduce(lambda x, y: x * y, x.shape[1:]) // self.layers[-1] > 2**3:
             x = self.avgpool(x)
-        x = x.reshape(x.size(0), -1)
+        x = x.reshape(x.size(0), -1).contiguous()
 
         return x
-
-load_encoders = {
-    'vanillaconv': VanillaConv,
-}
 
 if __name__=="__main__":
 
