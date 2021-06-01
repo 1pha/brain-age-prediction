@@ -85,12 +85,16 @@ def run(cfg, checkpoint: dict=None):
 
     best_mae = float('inf')
     stop_count = 0
-    models = (encoder, regressor, domainer)
+    models = {
+        'encoder': encoder,
+        'regressor': regressor,
+        'domainer': domainer,
+    }
     for e in range(start, cfg.epochs):
         
         print(f'Epoch {e + 1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
-        trn_loss, (trn_metrics, trn_dom), trn_pred = train(models, optimizers, cfg)
-        val_loss, (val_metrics, val_dom), tst_pred = valid(models, cfg)
+        trn_loss, (trn_metrics, trn_dom), trn_pred = train(models.values(), optimizers, cfg)
+        val_loss, (val_metrics, val_dom), tst_pred = valid(models.values(), cfg)
         disp_metrics(trn_loss, trn_metrics, val_loss, val_metrics, trn_dom, val_dom)
         wandb.log(dict(
             {**trn_metrics, **val_metrics,
@@ -106,7 +110,7 @@ def run(cfg, checkpoint: dict=None):
             valid_conf_loss=val_loss[2],
          ))
         
-        model_name = f'{cfg.model_name}_ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{val_metrics["valid_mae"]:.2f}.pt'
+        model_name = f'_ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{val_metrics["valid_mae"]:.2f}.pt'
         if best_mae > val_metrics['valid_mae']:
             
             stop_count = 0

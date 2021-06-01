@@ -1,5 +1,5 @@
 import os
-import easydict
+import collections
 from ..config import edict2dict
 import torch
 from torchsummary import summary
@@ -103,6 +103,7 @@ def load_unlearn_models(cfg):
     cfg.encoder.num_params = num_params(encoder)
     cfg.regressor.num_params = num_params(regressor)
     cfg.domainer.num_params = num_params(domainer)
+    cfg.num_params = sum(cfg.encoder.num_params + cfg.regressor.num_params + cfg.domainer.num_params)
 
     return (encoder, regressor, domainer), device
 
@@ -111,18 +112,33 @@ def save_checkpoint(states, model_name, model_dir='./models/'):
 
     print('Saving ...')
 
-    if not isinstance(states, list):
-        states = [states]
-
-    assert isinstance(states, list)
+    # MAKE DIRECTORY
     if not os.path.exists(model_dir):
-        os.makedirs(model_dir)    
+        os.makedirs(model_dir)  
 
-    for s in states:
-        if isinstance(s, nn.Module):
-            s = s.state_dict()
+    # STATES - SINGLE
+    if not isinstance(states, dict):
 
-        torch.save(s, os.path.join(model_dir, model_name))
+        # MODEL IS ALONE and NOT STATE_DICT
+        if isinstance(states, nn.Module):
+            states = states.state_dict()
+
+        # MODEL IS ALONE and STATE_DICT
+        elif isinstance(states, collections.OrderedDict):
+            pass # THEN ITS STATE_DICT
+
+        torch.save(states, os.path.join(model_dir, model_name))
+
+    # STATES - PLURAL
+    elif isinstance(states, dict):
+
+        for name, s in states.items():
+
+            if isinstance(s, nn.Module):
+                s = s.state_dict()
+            
+            _model_dir = os.path.join(model_dir, name)
+            torch.save(s, os.path.join(_model_dir, model_name))
 
 
 if __name__ == "__main__":
