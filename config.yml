@@ -87,16 +87,19 @@ unlearn_cfg:
     lr: .0001
     weight_decay: 0
     use: True
+    point: 0
     
   opt_dom:
     optimizer: adam
     lr: .0001
     weight_decay: 0
     use: True
+    point: 0
 
   opt_conf:
     optimizer: adam
     lr: .0001
     weight_decay: 0
     use: True
+    point: 0
 

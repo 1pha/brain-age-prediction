@@ -103,7 +103,7 @@ def load_unlearn_models(cfg):
     cfg.encoder.num_params = num_params(encoder)
     cfg.regressor.num_params = num_params(regressor)
     cfg.domainer.num_params = num_params(domainer)
-    cfg.num_params = sum(cfg.encoder.num_params + cfg.regressor.num_params + cfg.domainer.num_params)
+    cfg.num_params = sum([cfg.encoder.num_params, cfg.regressor.num_params, cfg.domainer.num_params])
 
     return (encoder, regressor, domainer), device
 

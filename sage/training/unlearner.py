@@ -61,6 +61,11 @@ def disp_metrics(trn_loss, trn_metrics,
 def run(cfg, checkpoint: dict=None):
 
     (encoder, regressor, domainer), cfg.device = load_unlearn_models(cfg.unlearn_cfg)
+    models = {
+        'encoder': encoder,
+        'regressor': regressor,
+        'domainer': domainer,
+    }
     train_dataloader = get_dataloader(cfg, test=False)
     valid_dataloader = get_dataloader(cfg, test=True)
     print(f"TOTAL TRAIN {len(train_dataloader.dataset)} | VALID {len(valid_dataloader.dataset)}")
@@ -72,6 +77,8 @@ def run(cfg, checkpoint: dict=None):
         # TODO
         #   + make path loading ...
         start = checkpoint['resume_epoch']
+        for pipe, pth in checkpoint:
+            models[pipe].load_state_dict(torch.load(pth))
 
     else:
         start = 0
@@ -85,14 +92,10 @@ def run(cfg, checkpoint: dict=None):
 
     best_mae = float('inf')
     stop_count = 0
-    models = {
-        'encoder': encoder,
-        'regressor': regressor,
-        'domainer': domainer,
-    }
     for e in range(start, cfg.epochs):
         
         print(f'Epoch {e + 1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
+        cfg.unlearn_cfg = set_point(cfg.unlearn_cfg, e)
         trn_loss, (trn_metrics, trn_dom), trn_pred = train(models.values(), optimizers, cfg)
         val_loss, (val_metrics, val_dom), tst_pred = valid(models.values(), cfg)
         disp_metrics(trn_loss, trn_metrics, val_loss, val_metrics, trn_dom, val_dom)
@@ -297,3 +300,14 @@ def agg_loss(loss: list):
     
     else: # NO, THEN RETURN 0 FOR LOSS
         return 0
+
+
+def set_point(cfg, e): # UNLEARN CFG
+
+    TASKS = {'opt_age', 'opt_dom', 'opt_conf'}
+    print(e, end='')
+    for t in TASKS:
+        cfg[t].use = cfg[t].point >= e
+        print(f'{t}: {cfg[t].use}')
+
+    return cfg
