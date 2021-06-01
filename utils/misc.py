@@ -1,10 +1,18 @@
 import os
 import random
+from datetime import datetime as dt
 
 import pandas as pd
 import numpy as np
 
 import torch
+
+def get_today():
+
+    td = dt.today()
+
+    return str(td.year) + str(td.month).zfill(2) + str(td.day).zfill(2) + '-' \
+        + str(td.hour).zfill(2) + str(td.minute).zfill(2)
 
 def seed_everything(seed=42):
     

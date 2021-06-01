@@ -114,7 +114,7 @@ def save_checkpoint(states, model_name, model_dir='./models/'):
 
     # MAKE DIRECTORY
     if not os.path.exists(model_dir):
-        os.makedirs(model_dir)  
+        os.makedirs(model_dir, exist_ok=True)  
 
     # STATES - SINGLE
     if not isinstance(states, dict):
@@ -138,7 +138,8 @@ def save_checkpoint(states, model_name, model_dir='./models/'):
                 s = s.state_dict()
             
             _model_dir = os.path.join(model_dir, name)
-            torch.save(s, os.path.join(_model_dir, model_name))
+            os.makedirs(_model_dir, exist_ok=True) 
+        torch.save(s, os.path.join(_model_dir, model_name))
 
 
 if __name__ == "__main__":

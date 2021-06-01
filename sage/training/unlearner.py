@@ -113,7 +113,7 @@ def run(cfg, checkpoint: dict=None):
             valid_conf_loss=val_loss[2],
          ))
         
-        model_name = f'_ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{val_metrics["valid_mae"]:.2f}.pt'
+        model_name = f'ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{val_metrics["valid_mae"]:.2f}.pt'
         if best_mae > val_metrics['valid_mae']:
             
             stop_count = 0
@@ -304,10 +304,10 @@ def agg_loss(loss: list):
 
 def set_point(cfg, e): # UNLEARN CFG
 
-    TASKS = {'opt_age', 'opt_dom', 'opt_conf'}
-    print(e, end='')
+    TASKS = ['opt_age', 'opt_dom', 'opt_conf']
     for t in TASKS:
-        cfg[t].use = cfg[t].point >= e
-        print(f'{t}: {cfg[t].use}')
+        cfg[t].use = e >= cfg[t].point
+        print(f' {t}: {cfg[t].use} ', end='')
+    print()
 
     return cfg
