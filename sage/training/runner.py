@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import torch
 
 from .optimizer import get_optimizer
-
 from .metrics import get_metric
 from ..models.model_util import load_model, save_checkpoint
 from ..data.dataloader import get_dataloader
@@ -37,7 +36,7 @@ def disp_metrics(trn_loss, trn_metrics,
 
 def run(cfg, checkpoint: dict=None):
 
-    model, cfg.device = load_model(cfg, verbose=True)
+    model, cfg.device = load_model(cfg, verbose=False)
     train_dataloader = get_dataloader(cfg, test=False)
     valid_dataloader = get_dataloader(cfg, test=True)
     
@@ -52,15 +51,13 @@ def run(cfg, checkpoint: dict=None):
         #   + path: weight saved pth
         #   + resume_epoch: epoch that user wants to start with
         model_path = checkpoint['path']
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path)) 
         start = checkpoint['resume_epoch']
 
     else:
         start = 0
         
-    # TODO add optimizer config
-    # optimizer = get_optimizer(model, cfg)
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    optimizer = get_optimizer(model, cfg) # AGE PREDICTOR
 
     best_mae = float('inf')
     stop_count = 0
@@ -104,7 +101,7 @@ def run(cfg, checkpoint: dict=None):
             
             stop_count = 0
             best_mae = val_metrics['valid_mae']
-            save_checkpoint(model.state_dict(), model_name, is_best=best_mae)
+            save_checkpoint(model.state_dict(), model_name, model_dir=cfg.RESULT_PATH)
 
         elif stop_count >= cfg.early_patience:
 
@@ -113,7 +110,7 @@ def run(cfg, checkpoint: dict=None):
 
         else:
             if cfg.verbose_period % (e + 1) == 0:
-                save_checkpoint(model.state_dict(), model_name, is_best=False)
+                save_checkpoint(model.state_dict(), model_name, model_dir=cfg.RESULT_PATH)
 
             # To prevent training being stopped even before expected performance
             if best_mae < cfg.mae_threshold:
@@ -125,6 +122,7 @@ def run(cfg, checkpoint: dict=None):
         if cfg.run_debug.return_all:
             return model, (trn_loss, trn_metrics, trn_pred), (val_loss, val_metrics, tst_pred)
 
+    cfg.best_mae = best_mae
     wandb.config.update(cfg)
     wandb.finish()
 
