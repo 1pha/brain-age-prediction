@@ -1,3 +1,4 @@
+import os
 import time
 import wandb
 import pandas as pd
@@ -8,6 +9,7 @@ import torch
 
 from .optimizer import get_optimizer
 from .metrics import get_metric
+from ..config import save_config
 from ..models.model_util import load_model, save_checkpoint
 from ..data.dataloader import get_dataloader
 
@@ -96,7 +98,7 @@ def run(cfg, checkpoint: dict=None):
                 **val_metrics
             ))
         
-        model_name = f'{cfg.model_name}_ep{e}-{cfg.epochs}_sd{cfg.seed}_mae{val_metrics["valid_mae"]:.2f}.pt'
+        model_name = f'{cfg.model_name}_ep{e+1}_mae{val_metrics["valid_mae"]:.2f}.pth'
         if best_mae > val_metrics['valid_mae']:
             
             stop_count = 0
@@ -104,12 +106,12 @@ def run(cfg, checkpoint: dict=None):
             save_checkpoint(model.state_dict(), model_name, model_dir=cfg.RESULT_PATH)
 
         elif stop_count >= cfg.early_patience:
-
+ 
             print(f'Early stopped with {stop_count} / {cfg.early_patience} at EPOCH {e}')
             break
 
         else:
-            if cfg.verbose_period % (e + 1) == 0:
+            if (e + 1) % cfg.verbose_period == 0:
                 save_checkpoint(model.state_dict(), model_name, model_dir=cfg.RESULT_PATH)
 
             # To prevent training being stopped even before expected performance
@@ -123,6 +125,7 @@ def run(cfg, checkpoint: dict=None):
             return model, (trn_loss, trn_metrics, trn_pred), (val_loss, val_metrics, tst_pred)
 
     cfg.best_mae = best_mae
+    save_config(cfg, os.path.join(cfg.RESULT_PATH, 'config.yml'))
     wandb.config.update(cfg)
     wandb.finish()
 

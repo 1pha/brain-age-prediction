@@ -116,30 +116,27 @@ def save_checkpoint(states, model_name, model_dir='./models/'):
     if not os.path.exists(model_dir):
         os.makedirs(model_dir, exist_ok=True)  
 
-    # STATES - SINGLE
-    if not isinstance(states, dict):
+    # MODEL NOT STATE_DICT
+    if isinstance(states, nn.Module):
+        states = states.state_dict()
 
-        # MODEL IS ALONE and NOT STATE_DICT
-        if isinstance(states, nn.Module):
-            states = states.state_dict()
+    torch.save(states, os.path.join(model_dir, model_name))
 
-        # MODEL IS ALONE and STATE_DICT
-        elif isinstance(states, collections.OrderedDict):
-            pass # THEN ITS STATE_DICT
 
-        torch.save(states, os.path.join(model_dir, model_name))
+def multimodel_save_checkpoint(states, model_name, model_dir='./models/'):
 
-    # STATES - PLURAL
-    elif isinstance(states, dict):
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir, exist_ok=True)  
 
-        for name, s in states.items():
+    
+    for name, s in states.items():
 
-            if isinstance(s, nn.Module):
-                s = s.state_dict()
-            
-            _model_dir = os.path.join(model_dir, name)
-            os.makedirs(_model_dir, exist_ok=True) 
-        torch.save(s, os.path.join(_model_dir, model_name))
+        if isinstance(s, nn.Module):
+            s = s.state_dict()
+        
+        _model_dir = os.path.join(model_dir, name)
+        os.makedirs(_model_dir, exist_ok=True) 
+    torch.save(s, os.path.join(_model_dir, model_name))
 
 
 if __name__ == "__main__":
