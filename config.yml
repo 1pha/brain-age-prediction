@@ -3,6 +3,7 @@ seed: 42
 registration: mni
 plot: False
 RESULT_PATH: ../result/models/
+use_amp: True
 
 
 # DEBUG

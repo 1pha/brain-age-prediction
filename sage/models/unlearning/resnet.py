@@ -175,9 +175,9 @@ class ResNet(nn.Module):
         out = F.avg_pool3d(x, kernel_size=1, stride=stride)
         zero_pads = torch.zeros(out.size(0), planes - out.size(1), out.size(2),
                                 out.size(3), out.size(4))
-        if isinstance(out.data, torch.cuda.FloatTensor):
-            zero_pads = zero_pads.cuda()
-
+        # if isinstance(out.data, torch.cuda.FloatTensor):
+        #     zero_pads = zero_pads.cuda()
+        zero_pads = zero_pads.to(out.device)
         out = torch.cat([out.data, zero_pads], dim=1)
 
         return out
