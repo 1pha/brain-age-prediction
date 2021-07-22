@@ -12,6 +12,7 @@ from .naive_models.sfcn import *
 from .naive_models.vanilla import *
 from .naive_models.residual_vanilla import *
 from .naive_models.res_sfcn import *
+from .naive_models.efficientnet import EfficientNet3D
 
 from .unlearning.vanilla_dinsdale import VanillaConv
 from .unlearning.resnet import load_resnet
@@ -60,6 +61,9 @@ def load_model(cfg=None, gpu=True, verbose=True):
 
     elif model_name == 'res_sfcn':
         model = ResSFCN(cfg)
+
+    elif model_name == 'efficientnet-b0':
+        model = EfficientNet3D.from_name("efficientnet-b0", override_params={'num_classes': 1}, in_channels=1)
 
     else: return None
 

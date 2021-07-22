@@ -122,8 +122,11 @@ def run(cfg, checkpoint: dict=None):
 
         elif stop_count >= cfg.early_patience:
 
-            print(f'Early stopped with {stop_count} / {cfg.early_patience} at EPOCH {e}')
-            break
+            # print(f'Early stopped with {stop_count} / {cfg.early_patience} at EPOCH {e}')
+            print(f'Fully pretrained {stop_count} / {cfg.early_patience} at EPOCH {e}')
+            cfg.unlearn_cfg.opt_conf.use = True
+            
+            # break
 
         else:
             if cfg.verbose_period % (e + 1) == 0:
@@ -149,7 +152,7 @@ def train(models, optimizers, cfg, dataloader=None):
 
     if dataloader is None:
         dataloader = get_dataloader(cfg, test=False)
-    gt_age = torch.tensor(dataloader.dataset.data_ages)
+    gt_age = torch.tensor(dataloader.dataset.data_ages, dtype=torch.float)
     gt_src = torch.tensor(dataloader.dataset.data_src)
 
     device = cfg.device
@@ -182,8 +185,9 @@ def train(models, optimizers, cfg, dataloader=None):
                 embedded = encoder.forward(x)
                 y_pred = regressor(embedded)
                 loss = get_metric(y_pred.squeeze(), y, cfg.loss)
-                loss.backward()
+                loss.backward(retain_graph=True)
                 opt_reg.step()
+                torch.cuda.empty_cache()
 
                 reg_loss.append(loss.item())
                 age_preds.append(y_pred.cpu())
@@ -195,21 +199,27 @@ def train(models, optimizers, cfg, dataloader=None):
                 loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
                 loss_dm.backward()
                 opt_dom.step()
+                torch.cuda.empty_cache()
 
                 dom_loss.append(loss_dm.item())
                 src_preds.append(d_pred.cpu())
 
             # STEP 3. CONFUSION LOSS
             if cfg.unlearn_cfg.opt_conf.use:
-                del embedded
-                torch.cuda.empty_cache()
-                embedded = encoder.forward(x)
+                
+                # del embedded
+                # embedded = encoder.forward(x)
+                # embedded.grad.zero_()
+                # for param in encoder.parameters():
+                #     param.detach()
 
                 opt_conf.zero_grad()
                 d_pred_conf = domainer(embedded)
                 loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred_conf, d, 'confusion')
-                loss_conf.backward()
+                loss_conf.backward(retain_graph=False)
                 opt_conf.step()
+                torch.cuda.empty_cache()   
+
                 conf_loss.append(loss_conf.item())
 
             del x, y, y_pred, d_pred
@@ -232,7 +242,7 @@ def valid(models, cfg, dataloader=None):
 
     if dataloader is None:
         dataloader = get_dataloader(cfg, test=True)
-    gt_age = torch.tensor(dataloader.dataset.data_ages)
+    gt_age = torch.tensor(dataloader.dataset.data_ages, dtype=torch.float)
     gt_src = torch.tensor(dataloader.dataset.data_src)
 
     device = cfg.device

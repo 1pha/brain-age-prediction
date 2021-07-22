@@ -22,7 +22,10 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
 # AUGMENTATION
-import torchio as tio
+try:
+    import torchio as tio
+except:
+    pass
 
 
 def get_loader(extension):
@@ -76,6 +79,11 @@ class BrainAgeDataset(Dataset):
 
         # EXCLUDE UNUSED SOURCE DATABASES
         self.label_file = self.label_file[self.label_file['src'].apply(lambda x: x not in cfg.unused_src)]
+
+        if not os.path.exists('G:/My Drive'):
+            self.label_file['abs_path'] = self.label_file['abs_path'].apply(lambda x: x.replace('G:\My Drive', 'G:\내 드라이브'))
+            assert sum(self.label_file['abs_path'].apply(os.path.exists)) == self.label_file.shape[0]
+
         self.src_map = {src: i for i, src in enumerate(sorted(self.label_file.src.unique()))}
 
         # SPLIT DATA
@@ -158,6 +166,7 @@ class BrainAgeDataset(Dataset):
         else: # RETURN DATABASE AS WELL
             return x, torch.tensor(self.data_ages[idx]).float(), \
                       torch.tensor(self.data_src[idx]).long()
+                    #   torch.tensor(self.data_src[idx]).float()
 
 
     def maxcut(self, x):
@@ -210,10 +219,11 @@ class BrainAgeDataset(Dataset):
         x must be given with torch.tensor with (1, W', H', D')
         '''
 
+        # WIPED OUT FOR NOW (IN PY3.6)
         transform = {
-            'affine': tio.RandomAffine(),
-            'flip':   tio.RandomFlip(axes=['left-right']),
-            'elastic_deform': tio.RandomElasticDeformation()
+            # 'affine': tio.RandomAffine(),
+            # 'flip':   tio.RandomFlip(axes=['left-right']),
+            # 'elastic_deform': tio.RandomElasticDeformation()
         }
 
         # TODO: Normalize probability but order of probabilities should be handled!

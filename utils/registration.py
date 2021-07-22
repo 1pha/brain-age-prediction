@@ -146,7 +146,7 @@ class Registrator:
             setattr(self.affreg, key, value)
 
     @inform
-    def optimize(self, pipeline=None):
+    def optimize(self, pipeline=None, **kwargs):
 
         '''
         # STEPS

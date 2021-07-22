@@ -44,7 +44,7 @@ unused_src:
 # TRAIN
 epochs: 100
 mae_threshold: 8.0
-verbose_period: 5
+verbose_period: 1
 early_patience: 20
 optimizer: adam
 lr: 0.0001
