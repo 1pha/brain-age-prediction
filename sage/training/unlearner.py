@@ -89,6 +89,7 @@ def run(cfg, checkpoint: dict=None):
         get_optimizer([domainer], unlearn_cfg.opt_dom), # DOMAIN PREDICTOR
         get_optimizer([encoder], unlearn_cfg.opt_conf), # CONFUSION
     )
+    scaler = torch.cuda.amp.GradScaler(enabled=cfg.use_amp)
 
     best_mae = float('inf')
     stop_count = 0
@@ -96,7 +97,7 @@ def run(cfg, checkpoint: dict=None):
         
         print(f'Epoch {e + 1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
         cfg.unlearn_cfg = set_point(cfg.unlearn_cfg, e)
-        trn_loss, (trn_metrics, trn_dom), trn_pred = train(models.values(), optimizers, cfg)
+        trn_loss, (trn_metrics, trn_dom), trn_pred = train(models.values(), optimizers, scaler, cfg)
         val_loss, (val_metrics, val_dom), tst_pred = valid(models.values(), cfg)
         disp_metrics(trn_loss, trn_metrics, val_loss, val_metrics, trn_dom, val_dom)
         wandb.log(dict(
@@ -123,10 +124,14 @@ def run(cfg, checkpoint: dict=None):
         elif stop_count >= cfg.early_patience:
 
             # print(f'Early stopped with {stop_count} / {cfg.early_patience} at EPOCH {e}')
-            print(f'Fully pretrained {stop_count} / {cfg.early_patience} at EPOCH {e}')
-            cfg.unlearn_cfg.opt_conf.use = True
-            
-            # break
+            if cfg.unlearn_cfg.opt_conf.use == False:
+                print(f'Fully pretrained {stop_count} / {cfg.early_patience} at EPOCH {e}')
+                cfg.unlearn_cfg.opt_conf.use = True
+                cfg.unlearn_cfg.opt_conf.point = e
+
+            else:
+                print(f'Early stopped at {stop_count} / {cfg.early_patience} at EPOCH {e}')
+                break
 
         else:
             if cfg.verbose_period % (e + 1) == 0:
@@ -148,7 +153,7 @@ def run(cfg, checkpoint: dict=None):
 
 
 @logging_time
-def train(models, optimizers, cfg, dataloader=None):
+def train(models, optimizers, scaler, cfg, dataloader=None):
 
     if dataloader is None:
         dataloader = get_dataloader(cfg, test=False)
@@ -172,55 +177,73 @@ def train(models, optimizers, cfg, dataloader=None):
                 print(f'{i}th Batch.')
 
             try: 
-                x, y, d = x.to(device), y.to(device), d.to(device)
+                x, y, d = map(lambda x: x.to(device), (x, y, d))
 
             except FileNotFoundError as e:
                 print(e)
                 time.sleep(20)
                 continue
-
+            
             # STEP 1. FEATURE EXTRACT
             if cfg.unlearn_cfg.opt_age.use:
+
+                with torch.cuda.amp.autocast(cfg.use_amp):
+                    embedded = encoder.forward(x)
+                    y_pred = regressor(embedded)
+                    loss = get_metric(y_pred.squeeze(), y, cfg.loss)
+                
+                retain_graph = cfg.unlearn_cfg.opt_conf.use
+                # loss.backward(retain_graph=retain_graph)
+                scaler.scale(loss).backward(retain_graph=retain_graph)
+                scaler.step(opt_reg)
+                scaler.update()
                 opt_reg.zero_grad()
-                embedded = encoder.forward(x)
-                y_pred = regressor(embedded)
-                loss = get_metric(y_pred.squeeze(), y, cfg.loss)
-                loss.backward(retain_graph=True)
-                opt_reg.step()
-                torch.cuda.empty_cache()
 
                 reg_loss.append(loss.item())
                 age_preds.append(y_pred.cpu())
 
+
             # STEP 2. DOMAIN PREDICT
             if cfg.unlearn_cfg.opt_dom.use:
+
+                with torch.cuda.amp.autocast(cfg.use_amp):
+                    d_pred = domainer(embedded.detach())
+                    loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
+
+                # loss_dm.backward()
+                scaler.scale(loss_dm).backward()
+                scaler.step(opt_dom)
+                scaler.update()
                 opt_dom.zero_grad()
-                d_pred = domainer(embedded.detach())
-                loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
-                loss_dm.backward()
-                opt_dom.step()
-                torch.cuda.empty_cache()
 
                 dom_loss.append(loss_dm.item())
                 src_preds.append(d_pred.cpu())
 
+
             # STEP 3. CONFUSION LOSS
             if cfg.unlearn_cfg.opt_conf.use:
-                
+
                 # del embedded
                 # embedded = encoder.forward(x)
                 # embedded.grad.zero_()
                 # for param in encoder.parameters():
                 #     param.detach()
+                
+                with torch.cuda.amp.autocast(cfg.use_amp):
+                    d_pred_conf = domainer(embedded.clone())
+                    loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred_conf, d, 'confusion')
 
+                # loss_conf.backward(retain_graph=False)
+                scaler.scale(loss_conf).backward()
+                scaler.step(opt_conf)
+                scaler.update()
                 opt_conf.zero_grad()
-                d_pred_conf = domainer(embedded)
-                loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred_conf, d, 'confusion')
-                loss_conf.backward(retain_graph=False)
-                opt_conf.step()
-                torch.cuda.empty_cache()   
 
+                del loss, loss_conf
                 conf_loss.append(loss_conf.item())
+
+            else:
+                del loss
 
             del x, y, y_pred, d_pred
             torch.cuda.empty_cache()
@@ -254,40 +277,41 @@ def valid(models, cfg, dataloader=None):
     domainer.eval()
     age_preds, src_preds = [], []
     reg_loss, dom_loss, conf_loss = [], [], []
-    with torch.no_grad(): # to not give loads on GPU... :(
-        for i, (x, y, d) in enumerate(dataloader):
+    with torch.no_grad():
+        with torch.cuda.amp.autocast():
+            for i, (x, y, d) in enumerate(dataloader):
 
-            try:
-                x, y, d = x.to(device), y.to(device), d.to(device)
+                try:
+                    x, y, d = x.to(device), y.to(device), d.to(device)
 
-            except FileNotFoundError as e:
-                print(e)
-                time.sleep(20)
-                continue
+                except FileNotFoundError as e:
+                    print(e)
+                    time.sleep(20)
+                    continue
 
-            # STEP 1. FEATURE EXTRACT
-            if cfg.unlearn_cfg.opt_age.use:
-                embedded = encoder.forward(x).to(device)
-                y_pred = regressor(embedded)
-                loss = get_metric(y_pred.squeeze(), y, cfg.loss)
+                # STEP 1. FEATURE EXTRACT
+                if cfg.unlearn_cfg.opt_age.use:
+                    embedded = encoder.forward(x).to(device)
+                    y_pred = regressor(embedded)
+                    loss = get_metric(y_pred.squeeze(), y, cfg.loss)
 
-                reg_loss.append(loss.item())
-                age_preds.append(y_pred.cpu())
+                    reg_loss.append(loss.item())
+                    age_preds.append(y_pred.cpu())
 
-            # STEP 2. DOMAIN PREDICT
-            if cfg.unlearn_cfg.opt_dom.use:
-                d_pred = domainer(embedded)
-                loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
-                dom_loss.append(loss_dm.item())
-                src_preds.append(d_pred.cpu())
+                # STEP 2. DOMAIN PREDICT
+                if cfg.unlearn_cfg.opt_dom.use:
+                    d_pred = domainer(embedded)
+                    loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
+                    dom_loss.append(loss_dm.item())
+                    src_preds.append(d_pred.cpu())
 
-            # STEP 3. CONFUSION LOSS
-            if cfg.unlearn_cfg.opt_conf.use:
-                d_pred = domainer(embedded)
-                loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred, d, 'confusion')
-                conf_loss.append(loss_conf.item())
+                # STEP 3. CONFUSION LOSS
+                if cfg.unlearn_cfg.opt_conf.use:
+                    d_pred = domainer(embedded)
+                    loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred, d, 'confusion')
+                    conf_loss.append(loss_conf.item())
 
-            del x, y, y_pred
+                del x, y, y_pred
 
     torch.cuda.empty_cache()
 
