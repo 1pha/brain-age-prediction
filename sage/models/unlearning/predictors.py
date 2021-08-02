@@ -20,8 +20,8 @@ class NKRegressor(nn.Module):
         )
 
     def forward(self, x):
-        x = self.regressor(x)
-        return x
+        out = self.regressor(x)
+        return out
 
 
 class NKDomainPredictor(nn.Module):
@@ -47,8 +47,8 @@ class NKDomainPredictor(nn.Module):
         )
 
     def forward(self, x):
-        x = self.domain(x)
-        return x
+        out = self.domain(x)
+        return out
 
 
 load_predictors = {

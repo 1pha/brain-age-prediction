@@ -193,7 +193,6 @@ def train(models, optimizers, scaler, cfg, dataloader=None):
                     loss = get_metric(y_pred.squeeze(), y, cfg.loss)
                 
                 retain_graph = cfg.unlearn_cfg.opt_conf.use
-                # loss.backward(retain_graph=retain_graph)
                 scaler.scale(loss).backward(retain_graph=retain_graph)
                 scaler.step(opt_reg)
                 scaler.update()
@@ -210,7 +209,6 @@ def train(models, optimizers, scaler, cfg, dataloader=None):
                     d_pred = domainer(embedded.detach())
                     loss_dm = cfg.unlearn_cfg.alpha * get_metric(d_pred, d, 'ce')
 
-                # loss_dm.backward()
                 scaler.scale(loss_dm).backward()
                 scaler.step(opt_dom)
                 scaler.update()
@@ -233,7 +231,6 @@ def train(models, optimizers, scaler, cfg, dataloader=None):
                     d_pred_conf = domainer(embedded.clone())
                     loss_conf = cfg.unlearn_cfg.beta * get_metric(d_pred_conf, d, 'confusion')
 
-                # loss_conf.backward(retain_graph=False)
                 scaler.scale(loss_conf).backward()
                 scaler.step(opt_conf)
                 scaler.update()
