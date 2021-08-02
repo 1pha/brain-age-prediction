@@ -2,7 +2,6 @@ import time
 import wandb
 
 import torch
-import torch.optim as optim
 
 from .metrics import get_metric
 from .optimizer import get_optimizer

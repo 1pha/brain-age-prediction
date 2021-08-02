@@ -86,9 +86,11 @@ PREDICTORS = {
     'nkdomainpredictor': NKDomainPredictor,
 }
 
+
 def num_params(model):
 
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 
 def load_unlearn_models(cfg):
 
@@ -110,6 +112,44 @@ def load_unlearn_models(cfg):
     cfg.num_params = sum([cfg.encoder.num_params, cfg.regressor.num_params, cfg.domainer.num_params])
 
     return (encoder, regressor, domainer), device
+
+
+def load_models(*cfg):
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(f'Use {device} as a device.')
+
+    models = []
+    for i, config in enumerate(cfg):
+
+        if i == 0: # ENCODER
+
+            encoder = ENCODERS[config.name](config).to(device)
+            vector_size = encoder(torch.zeros((2, 1, 96, 96, 96)).to(device)).shape
+            assert len(vector_size) == 2 # It should be 1-dim vector with batch (=2dim)
+            print(f"Output from encoder is {vector_size[1]}.")
+            config.num_params = num_params(encoder)
+            models.append(encoder)
+            
+
+        elif i == 1:
+
+            config.regressor.init_node = vector_size[1]
+            regressor = PREDICTORS[cfg.regressor.name](cfg.regressor).to(device)
+            config.num_params = num_params(regressor)
+            models.append(regressor)
+
+
+        elif i == 2:
+            config.domainer.init_node  = vector_size[1]
+            domainer  = PREDICTORS[cfg.domainer.name](cfg.domainer).to(device)
+            config.num_params = num_params(domainer)
+            models.append(domainer)
+
+
+    cfg.num_params = sum([cfg.encoder.num_params, cfg.regressor.num_params, cfg.domainer.num_params])
+
+    return models, device
 
 
 def save_checkpoint(states, model_name, model_dir='./models/'):

@@ -1,3 +1,4 @@
+import contextlib
 import yaml
 import easydict
 
@@ -33,3 +34,15 @@ def load_config(path=CONFIG_FILE_PATH):
 
     with open(path, 'r') as y:
         return easydict.EasyDict(yaml.load(y, Loader=yaml.FullLoader))
+
+
+import contextlib
+
+@contextlib.contextmanager
+def using_config(name, value, cfg=None):
+    old_value = getattr(cfg, name)
+    setattr(cfg, name, value)
+    try:
+        yield
+    finally:
+        setattr(cfg, name, old_value)
