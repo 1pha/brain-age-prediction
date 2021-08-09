@@ -1,12 +1,14 @@
 import time
 import wandb
 
+from easydict import EasyDict as edict
+
 import torch
 import torch.nn as nn
 
 from .metrics import get_metric
 from .optimizer import get_optimizer
-from ..models.model_util import load_models, save_checkpoint
+from ..models.model_util import load_models, multimodel_save_checkpoint
 from ..data.dataloader import get_dataloader
 import sys; sys.path.append('../../');
 from utils.misc import seed_everything, logging_time
@@ -107,14 +109,35 @@ class MRITrainer:
 
             phase = self.check_which_phase(e)
             print(f'Epoch {e + 1} / {cfg.epochs} ({phase}) BEST MAE {best_mae:.3f}')
-            train_loss, train_pred = self.train(e)
-            valid_loss, valid_pred = self.valid(e)
-            wandb.log(dict(
+            train_loss, train_age, train_domain = self.train(e)
+            valid_loss, valid_age, valid_domain = self.valid(e)
+
+            results = edict(
                 **train_loss.average,
+                **self.gather_result(train_age, 'age', train=True),
+                **self.gather_result(train_domain, 'domain', train=True),
                 **valid_loss.average,
-                **self.gather_result(train_pred.batch, phase, train=True),
-                **self.gather_result(valid_pred.batch, phase, train=False),
-            ))
+                **self.gather_result(valid_age, 'age', train=False),
+                **self.gather_result(valid_domain, 'domain', train=False),
+            )
+            print(results)
+
+            if results.valid_mae < best_mae:
+
+                stop_count = 0
+                best_mae = results.valid_mae
+
+            else:
+                if best_mae < cfg.mae_threshold:
+
+                    stop_count += 1
+                    if cfg.checkpoint_period % (e + 1) == 0:
+                        model_name = f'ep{e}_mae{results.valid_mae:.2f}.pt'
+                        multimodel_save_checkpoint(
+                            states=self.models, model_dir=cfg.RESULT_PATH, model_name=model_name
+                        )
+
+            wandb.log({**results})
 
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
@@ -140,7 +163,7 @@ class MRITrainer:
             model.train()
 
         phase = self.check_which_phase(e)
-        losses, preds = AverageMeter(phase=phase, train=True), AverageMeter(phase=phase, train=True)
+        losses, ages, domains = AverageMeter(phase=phase, train=True), [], []
         with torch.autograd.set_detect_anomaly(True):
             for i, (x, y, d) in enumerate(self.train_dataloader):
 
@@ -156,24 +179,24 @@ class MRITrainer:
                     continue
 
                 with torch.cuda.amp.autocast(self.cfg.use_amp):
-                    loss, pred = {
+                    loss, _ = {
                         'phase1': self.update_age_reg,
                         'phase2': self.update_domain_clf,
                         'phase3': self.update_domain_conf,
                     }[phase](x, y, d, update=True)
 
-                    if phase == 'phase3':
-                        with torch.no_grad():
-                            for _, model in self.models.items():
-                                model.eval()
-                            self.update_age_reg(x, y, d, update=False)
-                            self.update_domain_clf(x, y, d, update=False)
+                with torch.no_grad():
+                    for _, model in self.models.items():
+                        model.eval()
+                    _, age = self.update_age_reg(x, y, d, update=False)
+                    _, domain = self.update_domain_clf(x, y, d, update=False)
 
                 torch.cuda.empty_cache()
-                losses.append(loss)
-                preds.extend(pred.cpu().detach().tolist())
+                losses.append(float(loss.cpu().detach()))
+                ages.extend(age.cpu().detach().tolist())
+                domains.extend(domain.cpu().detach().tolist())
     
-        return losses, preds
+        return losses, ages, domains
 
 
     @logging_time
@@ -183,7 +206,7 @@ class MRITrainer:
             model.eval()
 
         phase = self.check_which_phase(e)
-        losses, preds = AverageMeter(phase=phase, train=False), AverageMeter(phase=phase, train=False)
+        losses, ages, domains = AverageMeter(phase=phase, train=False), [], []
         with torch.no_grad():
             for i, (x, y, d) in enumerate(self.valid_dataloader):
 
@@ -198,17 +221,20 @@ class MRITrainer:
                     time.sleep(20)
                     continue
 
-                loss, pred = {
+                loss, _ = {
                     'phase1': self.update_age_reg,
                     'phase2': self.update_domain_clf,
                     'phase3': self.update_domain_conf,
                 }[phase](x, y, d, update=False)
+                _, age = self.update_age_reg(x, y, d, update=False)
+                _, domain = self.update_domain_clf(x, y, d, update=False)
 
                 torch.cuda.empty_cache()
-                losses.append(loss)
-                preds.extend(pred.cpu().detach().tolist())
+                losses.append(float(loss.cpu().detach()))
+                ages.extend(age.cpu().detach().tolist())
+                domains.extend(domain.cpu().detach().tolist())
 
-        return losses, preds
+        return losses, ages, domains
 
 
     def update_age_reg(self, x, y, d, update=True):
@@ -290,14 +316,14 @@ class MRITrainer:
         return f'phase{where_e[0][0] + 1}'
 
 
-    def gather_result(self, preds, phase, train=True):
+    def gather_result(self, preds, datatype='age', train=True):
 
         prefix = 'train' if train else 'valid'
 
         if isinstance(preds, list):
             preds = torch.tensor(preds, dtype=torch.float).squeeze()
 
-        if phase == 'phase1':
+        if datatype == 'age':
 
             '''
             Calculate
@@ -311,7 +337,7 @@ class MRITrainer:
             return {f'{prefix}_{metric}': get_metric(preds, gt, metric) for metric in metrics}
 
 
-        elif phase == 'phase2':
+        elif datatype == 'domain':
 
             '''
             Receive Domain predictor
@@ -325,8 +351,3 @@ class MRITrainer:
             gt = self.gt_src_train if train else self.gt_src_valid
 
             return {f'{prefix}_{metric}': get_metric(preds, gt, metric) for metric in metrics}
-
-
-        elif phase == 'phase3':
-
-            return {}

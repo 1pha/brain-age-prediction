@@ -5,7 +5,7 @@ class AverageMeter:
     def __init__(self, name=None, phase=None, train=True):
         
         self.phase_loss_mapper = {
-            'phase1': 'mse',
+            'phase1': 'rmse',
             'phase2': 'ce',
             'phase3': 'conf',
         }

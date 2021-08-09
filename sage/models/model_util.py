@@ -182,6 +182,7 @@ def multimodel_save_checkpoint(states, model_name, model_dir='./models/'):
         _model_dir = os.path.join(model_dir, name)
         os.makedirs(_model_dir, exist_ok=True) 
     torch.save(s, os.path.join(_model_dir, model_name))
+    print("Saved Models")
 
 
 if __name__ == "__main__":
