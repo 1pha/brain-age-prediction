@@ -61,7 +61,6 @@ class BrainAgeDataset(Dataset):
         self.data_cfg = load_config(os.path.join(ROOT, 'data_config.yml')) # -> Edict
         self.load = get_loader(extension=self.data_cfg.extension)
         self.augment = cfg.augment
-        self.unlearn = cfg.unlearn
         self.test = test
 
         # DEBUG SETUP
@@ -79,6 +78,10 @@ class BrainAgeDataset(Dataset):
 
         # EXCLUDE UNUSED SOURCE DATABASES
         self.label_file = self.label_file[self.label_file['src'].apply(lambda x: x not in cfg.unused_src)]
+
+        # IF PARTIAL (TO UES ONLY SOME DATA WHEN DEBUG)
+        if cfg.partial < 1:
+            self.label_file = self.label_file[:int(len(self.label_file) * cfg.partial)]
 
         if not os.path.exists('G:/My Drive'):
             self.label_file['abs_path'] = self.label_file['abs_path'].apply(lambda x: x.replace('G:\My Drive', 'G:\내 드라이브'))
@@ -160,13 +163,8 @@ class BrainAgeDataset(Dataset):
         if aug:
             x = self.augmentation(x) # 4D (1, W', H', D')
 
-        if not self.unlearn:
-            return x, torch.tensor(self.data_ages[idx]).float()
-
-        else: # RETURN DATABASE AS WELL
-            return x, torch.tensor(self.data_ages[idx]).float(), \
-                      torch.tensor(self.data_src[idx]).long()
-                    #   torch.tensor(self.data_src[idx]).float()
+        return x, torch.tensor(self.data_ages[idx]).float(), \
+                    torch.tensor(self.data_src[idx]).long()
 
 
     def maxcut(self, x):
@@ -219,11 +217,10 @@ class BrainAgeDataset(Dataset):
         x must be given with torch.tensor with (1, W', H', D')
         '''
 
-        # WIPED OUT FOR NOW (IN PY3.6)
         transform = {
-            # 'affine': tio.RandomAffine(),
-            # 'flip':   tio.RandomFlip(axes=['left-right']),
-            # 'elastic_deform': tio.RandomElasticDeformation()
+            'affine': tio.RandomAffine(),
+            'flip':   tio.RandomFlip(axes=['left-right']),
+            'elastic_deform': tio.RandomElasticDeformation()
         }
 
         # TODO: Normalize probability but order of probabilities should be handled!

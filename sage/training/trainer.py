@@ -8,8 +8,9 @@ from .metrics import get_metric
 from .optimizer import get_optimizer
 from ..models.model_util import load_models, save_checkpoint
 from ..data.dataloader import get_dataloader
-import sys; sys.path.append('../../')
-from utils import seed_everything, logging_time
+import sys; sys.path.append('../../');
+from utils.misc import seed_everything, logging_time
+from utils.average_meter import AverageMeter
 
 
 class MRITrainer:
@@ -28,8 +29,8 @@ class MRITrainer:
     def __init__(self, cfg):
 
         self.cfg = cfg
-        self.phaes_dict = self.get_phase_dict()
-        self.cfg.epochs = sum(self.phase_dict.values())
+        self.phase_dict = self.get_phase_dict()
+        self.cfg.epochs = sum(len(_range) for _range in self.phase_dict.values())
         self.setup(cfg=cfg)
 
 
@@ -53,7 +54,7 @@ class MRITrainer:
         seed_everything(seed=cfg.seed)
 
         # 2. SETUP MODEL & OPTIMIZER
-        (encoder, regressor, domainer), cfg.device = load_models(cfg.unlearn_cfg)
+        (encoder, regressor, domainer), cfg.device = load_models(cfg.encoder, cfg.regressor, cfg.domainer)
         self.models = {
             'encoder': encoder,
             'regressor': regressor,
@@ -78,9 +79,10 @@ class MRITrainer:
 
         # 4. AMP Scaler
         self.scaler = torch.cuda.amp.GradScaler(enabled=cfg.use_amp)
+        print(f"MIXED PRECISION:: {cfg.use_amp}")
 
 
-    def run(self, cfg, checkpoint=None):
+    def run(self, cfg=None, checkpoint=None):
 
         if cfg is None:
             cfg = self.cfg
@@ -103,10 +105,16 @@ class MRITrainer:
         stop_count = 0
         for e in range(start, cfg.epochs):
 
-            print(f'Epoch {e + 1} / {cfg.epochs}, BEST MAE {best_mae:.3f}')
-            self.train(e)
-            self.valid(e)
-            wandb.log()
+            phase = self.check_which_phase(e)
+            print(f'Epoch {e + 1} / {cfg.epochs} ({phase}) BEST MAE {best_mae:.3f}')
+            train_loss, train_pred = self.train(e)
+            valid_loss, valid_pred = self.valid(e)
+            wandb.log(dict(
+                **train_loss.average,
+                **valid_loss.average,
+                **self.gather_result(train_pred.batch, phase, train=True),
+                **self.gather_result(valid_pred.batch, phase, train=False),
+            ))
 
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
@@ -131,7 +139,8 @@ class MRITrainer:
         for _, model in self.models.items():
             model.train()
 
-        losses, preds = [], []
+        phase = self.check_which_phase(e)
+        losses, preds = AverageMeter(phase=phase, train=True), AverageMeter(phase=phase, train=True)
         with torch.autograd.set_detect_anomaly(True):
             for i, (x, y, d) in enumerate(self.train_dataloader):
 
@@ -146,25 +155,26 @@ class MRITrainer:
                     time.sleep(20)
                     continue
 
-                phase = self.check_which_phase(e)
                 with torch.cuda.amp.autocast(self.cfg.use_amp):
                     loss, pred = {
                         'phase1': self.update_age_reg,
                         'phase2': self.update_domain_clf,
                         'phase3': self.update_domain_conf,
-                    }[phase](x, y, d, train=True)
+                    }[phase](x, y, d, update=True)
 
                     if phase == 'phase3':
                         with torch.no_grad():
                             for _, model in self.models.items():
                                 model.eval()
-                            self.update_age_reg(x, y, d, train=False)
-                            self.update_domain_clf(x, y, d, train=False)
+                            self.update_age_reg(x, y, d, update=False)
+                            self.update_domain_clf(x, y, d, update=False)
 
                 torch.cuda.empty_cache()
                 losses.append(loss)
-                preds.append(pred)
+                preds.extend(pred.cpu().detach().tolist())
     
+        return losses, preds
+
 
     @logging_time
     def valid(self, e):
@@ -172,6 +182,8 @@ class MRITrainer:
         for _, model in self.models.items():
             model.eval()
 
+        phase = self.check_which_phase(e)
+        losses, preds = AverageMeter(phase=phase, train=False), AverageMeter(phase=phase, train=False)
         with torch.no_grad():
             for i, (x, y, d) in enumerate(self.valid_dataloader):
 
@@ -186,49 +198,50 @@ class MRITrainer:
                     time.sleep(20)
                     continue
 
-                phase = self.check_which_phase(e)
                 loss, pred = {
                     'phase1': self.update_age_reg,
                     'phase2': self.update_domain_clf,
                     'phase3': self.update_domain_conf,
-                }[phase](x, y, d, train=False)
+                }[phase](x, y, d, update=False)
 
                 torch.cuda.empty_cache()
+                losses.append(loss)
+                preds.extend(pred.cpu().detach().tolist())
+
+        return losses, preds
 
 
-
-
-    def update_age_reg(self, x, y, d, train=True):
+    def update_age_reg(self, x, y, d, update=True):
 
         embed  = self.models['encoder'](x)
         y_pred = self.models['regressor'](embed)
         loss = get_metric(y_pred.squeeze(), y, 'rmse')
 
-        if train:
+        if update:
             self.update_loss(loss, self.optimizers['regression'])
         
         return loss, y_pred
 
 
-    def update_domain_clf(self, x, y, d, train=True):
+    def update_domain_clf(self, x, y, d, update=True):
 
         embed  = self.models['encoder'](x)
         d_pred = self.models['domainer'](embed)
         loss = self.cfg.alpha * get_metric(d_pred, d, 'ce')
 
-        if train:
+        if update:
             self.update_loss(loss, self.optimizers['domain'])
 
         return loss, d_pred
 
 
-    def update_domain_conf(self, x, y, d, train=True):
+    def update_domain_conf(self, x, y, d, update=True):
 
         embed  = self.models['encoder'](x)
         d_pred = self.models['domainer'](embed)
         loss = self.cfg.beta * get_metric(d_pred, d, 'confusion')
 
-        if train:
+        if update:
             self.update_loss(loss, self.optimizers['confusion'])
 
         return loss, d_pred
@@ -254,7 +267,7 @@ class MRITrainer:
             param.grad = None
 
 
-    def get_phase_dict(self, e):
+    def get_phase_dict(self):
 
         phase1 = range(0, self.cfg.phase1.epoch)
         phase2 = range(phase1.stop, phase1.stop + self.cfg.phase2.epoch)
@@ -272,14 +285,17 @@ class MRITrainer:
             self.phase_dict = self.get_phase_dict()
 
         # WILL CONTAIN [('phase_n'), range(n1, n2)]
-        where_e = list(filter(lambda _range: e in _range, self.phase_dict.items()))
+        where_e = list(filter(lambda args: e in args[1], enumerate(self.phase_dict.values())))
         assert len(where_e) == 1
-        return where_e[0][0]
+        return f'phase{where_e[0][0] + 1}'
 
 
     def gather_result(self, preds, phase, train=True):
 
         prefix = 'train' if train else 'valid'
+
+        if isinstance(preds, list):
+            preds = torch.tensor(preds, dtype=torch.float).squeeze()
 
         if phase == 'phase1':
 
@@ -304,7 +320,8 @@ class MRITrainer:
             - Accuracy
             '''
 
-            metrics = ['auc', 'acc']
+            # metrics = ['auc', 'acc']
+            metrics = ['acc']
             gt = self.gt_src_train if train else self.gt_src_valid
 
             return {f'{prefix}_{metric}': get_metric(preds, gt, metric) for metric in metrics}
@@ -312,4 +329,4 @@ class MRITrainer:
 
         elif phase == 'phase3':
 
-            return None
+            return {}

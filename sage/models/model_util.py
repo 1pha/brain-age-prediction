@@ -122,6 +122,10 @@ def load_models(*cfg):
     models = []
     for i, config in enumerate(cfg):
 
+        if config is None:
+            models.append(None)
+            continue
+
         if i == 0: # ENCODER
 
             encoder = ENCODERS[config.name](config).to(device)
@@ -134,20 +138,17 @@ def load_models(*cfg):
 
         elif i == 1:
 
-            config.regressor.init_node = vector_size[1]
-            regressor = PREDICTORS[cfg.regressor.name](cfg.regressor).to(device)
+            config.init_node = vector_size[1]
+            regressor = PREDICTORS[config.name](config).to(device)
             config.num_params = num_params(regressor)
             models.append(regressor)
 
 
         elif i == 2:
-            config.domainer.init_node  = vector_size[1]
-            domainer  = PREDICTORS[cfg.domainer.name](cfg.domainer).to(device)
+            config.init_node  = vector_size[1]
+            domainer  = PREDICTORS[config.name](config).to(device)
             config.num_params = num_params(domainer)
             models.append(domainer)
-
-
-    cfg.num_params = sum([cfg.encoder.num_params, cfg.regressor.num_params, cfg.domainer.num_params])
 
     return models, device
 

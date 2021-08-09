@@ -6,6 +6,22 @@ RESULT_PATH: ../result/models/
 use_amp: True
 
 
+# DATALOADER
+test_size: 0.2
+batch_size: 16
+augment: False
+resize: [96, 96, 96]
+aug_proba:
+  affine: 0.33
+  flip: 0.33
+  elastic_deform: 0.33
+aug_intensity:
+  affine: [0.1, 10]
+  elastic_deform: [7, .5]
+unused_src:
+  - ~
+
+
 # DEBUG
 debug: False
 data_debug:
@@ -26,22 +42,6 @@ channel_number: [32, 64, 128, 256, 64] # SFCN
 start_channels: 16 # RESNET
 
 
-# DATALOADER
-test_size: 0.2
-batch_size: 16
-augment: False
-resize: [96, 96, 96]
-aug_proba:
-  affine: 0.33
-  flip: 0.33
-  elastic_deform: 0.33
-aug_intensity:
-  affine: [0.1, 10]
-  elastic_deform: [7, .5]
-unused_src:
-  - ~
-
-  
 # TRAIN
 epochs: 100
 mae_threshold: 8.0
@@ -62,48 +62,43 @@ metrics:
   - r2
   - corr
 
-# UNLEARNING
-unlearn: False
-unlearn_cfg:
-  metrics:
-    - acc
-    - auc
-  alpha: 1  # DOMAINER WEIGHT
-  beta : 10 # CONFUSION WEIGHT
+# MODEL SETUP
+encoder:
+  name: vanillaconv
+  # start_channel: 16 for Resnet
+
+regressor:
+  name: nkregressor
+  init_node: 128
+
+domainer:
+  name: nkdomainpredictor
+  init_node: 128
+  num_dbs: 2
+
+alpha: 1  # DOMAINER WEIGHT
+beta : 10 # CONFUSION WEIGHT
   
-  # MODEL SETUP
-  encoder:
-    name: vanillaconv
-    # start_channel: 16 for Resnet
-
-  regressor:
-    name: nkregressor
-    init_node: 128
-
-  domainer:
-    name: nkdomainpredictor
-    init_node: 128
-    num_dbs: 2
     
-  # OPTIMIZER SETTINGS
-  opt_age:
-    optimizer: adam
-    lr: .0001
-    weight_decay: 0
-    use: True
-    point: 0
-    
-  opt_dom:
-    optimizer: adam
-    lr: .0001
-    weight_decay: 0
-    use: True
-    point: 0
+# OPTIMIZER SETTINGS
+phase1:
+  optimizer: adam
+  lr: .0001
+  weight_decay: 0
+  use: True
+  epoch: 100
+  
+phase2:
+  optimizer: adam
+  lr: .0001
+  weight_decay: 0
+  use: True
+  epoch: 10
 
-  opt_conf:
-    optimizer: adam
-    lr: .0001
-    weight_decay: 0
-    use: True
-    point: 0
+phase3:
+  optimizer: adam
+  lr: .0001
+  weight_decay: 0
+  use: True
+  epoch: 50
 
