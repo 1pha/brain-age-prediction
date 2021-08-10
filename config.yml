@@ -20,6 +20,7 @@ aug_intensity:
   elastic_deform: [7, .5]
 unused_src:
   - ~
+partial: 1.0
 
 
 # DEBUG
@@ -45,6 +46,7 @@ start_channels: 16 # RESNET
 # TRAIN
 epochs: 100
 mae_threshold: 8.0
+checkpoint_period: 5
 verbose_period: 1
 early_patience: 20
 optimizer: adam

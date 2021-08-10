@@ -11,7 +11,7 @@ from .optimizer import get_optimizer
 from ..models.model_util import load_models, multimodel_save_checkpoint
 from ..data.dataloader import get_dataloader
 import sys; sys.path.append('../../');
-from utils.misc import seed_everything, logging_time
+from utils.misc import seed_everything, logging_time, get_today
 from utils.average_meter import AverageMeter
 
 
@@ -49,8 +49,7 @@ class MRITrainer:
                 - May not be able to use L2-Loss 
         '''
 
-        if cfg is None:
-            cfg = self.cfg
+        cfg = self.cfg if cfg is None else cfg
 
         # 1. Fixate Seed
         seed_everything(seed=cfg.seed)
@@ -83,11 +82,13 @@ class MRITrainer:
         self.scaler = torch.cuda.amp.GradScaler(enabled=cfg.use_amp)
         print(f"MIXED PRECISION:: {cfg.use_amp}")
 
+        # 5. SAVE Directory
+        self.save_dir = cfg.RESULT_PATH + get_today()
+
 
     def run(self, cfg=None, checkpoint=None):
 
-        if cfg is None:
-            cfg = self.cfg
+        cfg = self.cfg if cfg is None else cfg
 
         if checkpoint is not None:
 
@@ -108,34 +109,34 @@ class MRITrainer:
         for e in range(start, cfg.epochs):
 
             phase = self.check_which_phase(e)
+
             print(f'Epoch {e + 1} / {cfg.epochs} ({phase}) BEST MAE {best_mae:.3f}')
+
             train_loss, train_age, train_domain = self.train(e)
             valid_loss, valid_age, valid_domain = self.valid(e)
-
-            results = edict(
+            results = edict( # AGGREGATE RESLUTS
                 **train_loss.average,
                 **self.gather_result(train_age, 'age', train=True),
                 **self.gather_result(train_domain, 'domain', train=True),
+
                 **valid_loss.average,
                 **self.gather_result(valid_age, 'age', train=False),
                 **self.gather_result(valid_domain, 'domain', train=False),
             )
-            print(results)
 
+            model_name = f'ep{e}_mae{results.valid_mae:.2f}.pt'
             if results.valid_mae < best_mae:
 
                 stop_count = 0
                 best_mae = results.valid_mae
+                multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
             else:
                 if best_mae < cfg.mae_threshold:
 
                     stop_count += 1
-                    if cfg.checkpoint_period % (e + 1) == 0:
-                        model_name = f'ep{e}_mae{results.valid_mae:.2f}.pt'
-                        multimodel_save_checkpoint(
-                            states=self.models, model_dir=cfg.RESULT_PATH, model_name=model_name
-                        )
+                    if (e + 1) % cfg.checkpoint_period == 0:
+                        multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
             wandb.log({**results})
 
@@ -159,13 +160,14 @@ class MRITrainer:
                 - update encoder only
         '''
 
-        for _, model in self.models.items():
-            model.train()
 
         phase = self.check_which_phase(e)
         losses, ages, domains = AverageMeter(phase=phase, train=True), [], []
         with torch.autograd.set_detect_anomaly(True):
             for i, (x, y, d) in enumerate(self.train_dataloader):
+                
+                for _, model in self.models.items():
+                    model.train()
 
                 if self.cfg.debug and self.cfg.run_debug.verbose_all:
                     print(f'{i}th Batch.')
