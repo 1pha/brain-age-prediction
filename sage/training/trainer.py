@@ -54,8 +54,17 @@ class MRITrainer:
         # 1. Fixate Seed
         seed_everything(seed=cfg.seed)
 
+        # 2. Count Database
+        cfg.domainer.num_dbs = 4 if cfg.unused_src[0] is None else 4 - len(cfg.unused_src)
+
         # 2. SETUP MODEL & OPTIMIZER
         (encoder, regressor, domainer), cfg.device = load_models(cfg.encoder, cfg.regressor, cfg.domainer)
+
+        if cfg.force_cpu:
+            cfg.device = torch.device('cpu')
+            for model in (encoder, regressor, domainer):
+                model.to(cfg.device)
+
         self.models = {
             'encoder': encoder,
             'regressor': regressor,
@@ -193,10 +202,10 @@ class MRITrainer:
                     _, age = self.update_age_reg(x, y, d, update=False)
                     _, domain = self.update_domain_clf(x, y, d, update=False)
 
-                torch.cuda.empty_cache()
                 losses.append(float(loss.cpu().detach()))
                 ages.extend(age.cpu().detach().tolist())
                 domains.extend(domain.cpu().detach().tolist())
+            torch.cuda.empty_cache()
     
         return losses, ages, domains
 
@@ -231,10 +240,10 @@ class MRITrainer:
                 _, age = self.update_age_reg(x, y, d, update=False)
                 _, domain = self.update_domain_clf(x, y, d, update=False)
 
-                torch.cuda.empty_cache()
                 losses.append(float(loss.cpu().detach()))
                 ages.extend(age.cpu().detach().tolist())
                 domains.extend(domain.cpu().detach().tolist())
+            torch.cuda.empty_cache()
 
         return losses, ages, domains
 
@@ -351,5 +360,6 @@ class MRITrainer:
             # metrics = ['auc', 'acc']
             metrics = ['acc']
             gt = self.gt_src_train if train else self.gt_src_valid
+            print(preds.shape, gt.shape)
 
             return {f'{prefix}_{metric}': get_metric(preds, gt, metric) for metric in metrics}

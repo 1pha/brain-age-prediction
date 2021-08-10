@@ -25,6 +25,7 @@ partial: 1.0
 
 # DEBUG
 debug: False
+force_cpu: False
 data_debug:
   rot90: False
   return_path: False

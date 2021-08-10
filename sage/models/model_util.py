@@ -23,6 +23,8 @@ def load_model(cfg=None, gpu=True, verbose=True):
     
     model_name = cfg.model_name
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    if cfg.force_cpu:
+        device = torch.device('cpu')
     print(f'Model {model_name.capitalize()} is selected.')
 
     if model_name == 'resnet' or model_name == 'resnet_no_maxpool':
