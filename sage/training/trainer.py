@@ -360,6 +360,5 @@ class MRITrainer:
             # metrics = ['auc', 'acc']
             metrics = ['acc']
             gt = self.gt_src_train if train else self.gt_src_valid
-            print(preds.shape, gt.shape)
 
             return {f'{prefix}_{metric}': get_metric(preds, gt, metric) for metric in metrics}
