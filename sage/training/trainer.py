@@ -1,4 +1,5 @@
 import time
+import yaml
 import wandb
 
 from easydict import EasyDict as edict
@@ -34,6 +35,10 @@ class MRITrainer:
         self.phase_dict = self.get_phase_dict()
         self.cfg.epochs = sum(len(_range) for _range in self.phase_dict.values())
         self.setup(cfg=cfg)
+        self.failure_cases = {
+            'train': [],
+            'valid': [],
+        }
 
 
     def setup(self, cfg=None):
@@ -71,9 +76,9 @@ class MRITrainer:
             'domainer': domainer,
         }
         self.optimizers = {
-            'regression': get_optimizer([encoder, regressor], cfg.phase1), # AGE PREDICTOR
-            'domain': get_optimizer([domainer], cfg.phase2), # DOMAIN PREDICTOR
-            'confusion': get_optimizer([encoder], cfg.phase3), # CONFUSION
+            'regression': get_optimizer([encoder, regressor], cfg.reg_opt), # AGE PREDICTOR
+            'domain': get_optimizer([domainer], cfg.clf_opt), # DOMAIN PREDICTOR
+            'confusion': get_optimizer([encoder], cfg.unl_opt), # CONFUSION
         }
 
         # 3. Load Dataloader
@@ -118,44 +123,39 @@ class MRITrainer:
         for e in range(start, cfg.epochs):
 
             phase = self.check_which_phase(e)
+            actions = self.cfg.phase_config.update[phase]
 
-            print(f'Epoch {e + 1} / {cfg.epochs} ({phase}) BEST MAE {best_mae:.3f}')
+            print(f'Epoch {e + 1} / {cfg.epochs} (phase: {phase}) BEST MAE {best_mae:.3f}')
 
-            train_loss, train_age, train_domain = self.train(e)
-            valid_loss, valid_age, valid_domain = self.valid(e)
+            train_result = self.train(actions)
+            valid_result = self.valid(actions)
             results = edict( # AGGREGATE RESLUTS
-                **train_loss.average,
-                **self.gather_result(train_age, 'age', train=True),
-                **self.gather_result(train_domain, 'domain', train=True),
-
-                **valid_loss.average,
-                **self.gather_result(valid_age, 'age', train=False),
-                **self.gather_result(valid_domain, 'domain', train=False),
+                **train_result,
+                **valid_result,
             )
+            wandb.log({**results})
 
             model_name = f'ep{e}_mae{results.valid_mae:.2f}.pt'
             if results.valid_mae < best_mae:
-
                 stop_count = 0
                 best_mae = results.valid_mae
-                multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
             else:
                 if best_mae < cfg.mae_threshold:
-
                     stop_count += 1
-                    if (e + 1) % cfg.checkpoint_period == 0:
-                        multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
-            wandb.log({**results})
+            if best_mae < cfg.mae_threshold and (e + 1) % cfg.checkpoint_period == 0:
+                multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
         wandb.finish()
+        with open(f'{self.save_dir}/config.yml', 'w') as y:
+            yaml.dump(cfg, y)
 
 
     @logging_time
-    def train(self, e):
+    def train(self, actions):
 
         '''
         3 Phases of Training
@@ -169,9 +169,7 @@ class MRITrainer:
                 - update encoder only
         '''
 
-
-        phase = self.check_which_phase(e)
-        losses, ages, domains = AverageMeter(phase=phase, train=True), [], []
+        losses, ages, domains = [AverageMeter(tag=action, train=True) for action in actions], [], []
         with torch.autograd.set_detect_anomaly(True):
             for i, (x, y, d) in enumerate(self.train_dataloader):
                 
@@ -187,14 +185,17 @@ class MRITrainer:
                 except FileNotFoundError as e:
                     print(e)
                     time.sleep(20)
+                    self.failure_cases['train'].append(i)
                     continue
 
                 with torch.cuda.amp.autocast(self.cfg.use_amp):
-                    loss, _ = {
-                        'phase1': self.update_age_reg,
-                        'phase2': self.update_domain_clf,
-                        'phase3': self.update_domain_conf,
-                    }[phase](x, y, d, update=True)
+                    for j, action in enumerate(actions):
+                        loss, _ = {
+                            'reg': self.update_age_reg,
+                            'clf': self.update_domain_clf,
+                            'unl': self.update_domain_conf,
+                        }[action](x, y, d, update=True)
+                        losses[j].append(float(loss.cpu().detach()))
 
                 with torch.no_grad():
                     for _, model in self.models.items():
@@ -202,22 +203,26 @@ class MRITrainer:
                     _, age = self.update_age_reg(x, y, d, update=False)
                     _, domain = self.update_domain_clf(x, y, d, update=False)
 
-                losses.append(float(loss.cpu().detach()))
                 ages.extend(age.cpu().detach().tolist())
                 domains.extend(domain.cpu().detach().tolist())
             torch.cuda.empty_cache()
+
+        results = {
+            **self.agg_loss(losses),
+            **self.gather_result(ages, 'age', train=True),
+            **self.gather_result(domains, 'domain', train=True),
+        }
     
-        return losses, ages, domains
+        return results
 
 
     @logging_time
-    def valid(self, e):
+    def valid(self, actions):
 
         for _, model in self.models.items():
             model.eval()
 
-        phase = self.check_which_phase(e)
-        losses, ages, domains = AverageMeter(phase=phase, train=False), [], []
+        losses, ages, domains = [AverageMeter(tag=action, train=False) for action in actions], [], []
         with torch.no_grad():
             for i, (x, y, d) in enumerate(self.valid_dataloader):
 
@@ -230,22 +235,31 @@ class MRITrainer:
                 except FileNotFoundError as e:
                     print(e)
                     time.sleep(20)
+                    self.failure_cases['valid'].append(i)
                     continue
 
-                loss, _ = {
-                    'phase1': self.update_age_reg,
-                    'phase2': self.update_domain_clf,
-                    'phase3': self.update_domain_conf,
-                }[phase](x, y, d, update=False)
+                for j, action in enumerate(actions):
+                    loss, _ = {
+                            'reg': self.update_age_reg,
+                            'clf': self.update_domain_clf,
+                            'unl': self.update_domain_conf,
+                    }[action](x, y, d, update=False)
+                    losses[j].append(float(loss.cpu().detach()))
+
                 _, age = self.update_age_reg(x, y, d, update=False)
                 _, domain = self.update_domain_clf(x, y, d, update=False)
 
-                losses.append(float(loss.cpu().detach()))
                 ages.extend(age.cpu().detach().tolist())
                 domains.extend(domain.cpu().detach().tolist())
             torch.cuda.empty_cache()
 
-        return losses, ages, domains
+        results = {
+            **self.agg_loss(losses),
+            **self.gather_result(ages, 'age', train=False),
+            **self.gather_result(domains, 'domain', train=False),
+        }
+
+        return results
 
 
     def update_age_reg(self, x, y, d, update=True):
@@ -304,16 +318,25 @@ class MRITrainer:
             param.grad = None
 
 
-    def get_phase_dict(self):
+    def get_phase_dict(self): # DEPRECATED
 
-        phase1 = range(0, self.cfg.phase1.epoch)
-        phase2 = range(phase1.stop, phase1.stop + self.cfg.phase2.epoch)
-        phase3 = range(phase2.stop, phase2.stop + self.cfg.phase3.epoch)
-        return {
-            'phase1': phase1,
-            'phase2': phase2,
-            'phase3': phase3,
-        }
+        phase_dict = dict()
+        stop = 0
+        for i, e in enumerate(self.cfg.phase_config.epochs):
+
+            phase_dict[i] = range(stop, stop + e)
+            stop += e
+            
+        return phase_dict
+
+
+    def agg_loss(self, losses):
+
+        loss_dict = dict()
+        for l in losses:
+            k, v = list(l.average.items())[0]
+            loss_dict[k] = v
+        return loss_dict
 
 
     def check_which_phase(self, e):
@@ -324,7 +347,7 @@ class MRITrainer:
         # WILL CONTAIN [('phase_n'), range(n1, n2)]
         where_e = list(filter(lambda args: e in args[1], enumerate(self.phase_dict.values())))
         assert len(where_e) == 1
-        return f'phase{where_e[0][0] + 1}'
+        return where_e[0][0]
 
 
     def gather_result(self, preds, datatype='age', train=True):

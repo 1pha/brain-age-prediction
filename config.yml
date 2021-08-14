@@ -84,24 +84,25 @@ beta : 10 # CONFUSION WEIGHT
   
     
 # OPTIMIZER SETTINGS
-phase1:
+reg_opt:
   optimizer: adam
   lr: .0001
   weight_decay: 0
-  use: True
-  epoch: 100
   
-phase2:
+clf_opt:
   optimizer: adam
   lr: .0001
   weight_decay: 0
-  use: True
-  epoch: 10
 
-phase3:
+unl_opt:
   optimizer: adam
   lr: .0001
   weight_decay: 0
-  use: True
-  epoch: 50
 
+phase_config:
+  epochs: [100, 10, 50]
+  update: [
+    [reg],
+    [clf],
+    [unl, reg],
+  ]

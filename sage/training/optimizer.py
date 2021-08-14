@@ -14,8 +14,9 @@ def get_optimizer(models, cfg):
 
     if cfg.optimizer == 'adam':
         optimizer = Adam(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
-    # elif cfg.optimizer == 'adamW':
-    #     optimizer = AdamW(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+        
+    elif cfg.optimizer == 'adamW':
+        optimizer = AdamW(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     optimizer.zero_grad()
     

@@ -271,7 +271,7 @@ class HybridEmbed(nn.Module):
     def __init__(self, backbone, img_size=224, feature_size=None, in_chans=3, embed_dim=768):
         super().__init__()
         assert isinstance(backbone, nn.Module)
-        img_size = to_2tuple(img_size)
+        img_size = to_3tuple(img_size)
         self.img_size = img_size
         self.backbone = backbone
         if feature_size is None:
@@ -284,7 +284,7 @@ class HybridEmbed(nn.Module):
                 feature_dim = o.shape[1]
                 backbone.train(training)
         else:
-            feature_size = to_2tuple(feature_size)
+            feature_size = to_3tuple(feature_size)
             feature_dim = self.backbone.feature_info.channels()[-1]
         self.num_patches = feature_size[0] * feature_size[1]
         self.proj = nn.Linear(feature_dim, embed_dim)

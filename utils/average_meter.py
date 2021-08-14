@@ -2,17 +2,21 @@
 
 class AverageMeter:
 
-    def __init__(self, name=None, phase=None, train=True):
+    def __init__(self, name=None, tag=None, train=True):
         
-        self.phase_loss_mapper = {
+        self.tag_loss_mapper = {
             'phase1': 'rmse',
             'phase2': 'ce',
             'phase3': 'conf',
+
+            'reg': 'rmse',
+            'clf': 'ce',
+            'unl': 'conf'
         }
 
         train = 'train' if train else 'valid'
 
-        self.name = f'{train}_{self.phase_loss_mapper[phase]}' if name is None else name
+        self.name = f'{train}_{self.tag_loss_mapper[tag]}' if name is None else name
         self.batch = []
 
 
