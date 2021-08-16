@@ -429,7 +429,7 @@ class ConvitArguments:
             No longer be used if `return_embed` is set to True."}
     )
     embed_dim: int = field(
-        default=48, metadata={"help": "Number of embedding dimension."}
+        default=48, metadata={"help": "Number of embedding dimension. Should be a multiplier of n_heads."}
     )
     depth: int = field(
         default=12, metadata={"help": "Number of layers"}
@@ -463,8 +463,8 @@ class ConvitArguments:
     local_up_to_layer: int = field(
         default=10, metadata={"help": "How many local layers that uses Gated Positional Self-attention"}
     )
-    locality_strength: float = field( # TODO study ..
-        default=1., metadata={"help": ""}
+    locality_strength: float = field(
+        default=1., metadata={"help": "Larger the locality, will watch the pixels very nearby."}
     )
     use_pos_embed: bool = field(
         default=True, metadata={"help": "Whehter to use positional embedding. This is a learned positional embedding"}

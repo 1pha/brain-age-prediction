@@ -14,8 +14,7 @@ try:
     from models.model_util import load_model
     from data.data_util import DatasetPlus
 except:
-    from ..models.model_util import load_model
-    from ..data.data_util import DatasetPlus
+    pass
 
 from .cams import *
 from .smoothgrad import *
@@ -216,3 +215,44 @@ class Camsual:
             for files in sorted(glob('./result/att_tmp_plots/*.png')):
                 image = imageio.imread(files)
                 writer.append_data(image)
+
+
+class Assembled(nn.Module):
+
+
+    def __init__(self, encoder, regressor):
+
+        super().__init__()
+        self.encoder = encoder
+        self.regressor = regressor
+
+
+    def load_weight(self, weights: dict):
+
+        for model_name, path in weights.items():
+
+            if model_name == 'encoder':
+                self.encoder.load_state_dict(torch.load(path))
+
+            elif model_name == "regressor":
+                self.regressor.load_state_dict(torch.load(path))
+
+        print("Weights successfully loaded!")
+
+
+    def forward(self, x):
+
+        out = self.encoder(x)
+        out = self.regressor(out)
+
+        return out
+
+    @property
+    def conv_layers(self):
+
+        try:
+            return self.encoder.conv_layers
+
+        except:
+            print("No conv_layers supported for this model !")
+            return

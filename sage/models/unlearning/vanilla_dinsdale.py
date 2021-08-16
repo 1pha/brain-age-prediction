@@ -93,6 +93,16 @@ class VanillaConv(nn.Module):
 
         return x
 
+    @property
+    def conv_layers(self):
+
+        conv_layers = []
+        for block in self.feature_extractor:
+            conv_layers.append(block.conv1)
+            conv_layers.append(block.conv2)
+
+        return conv_layers
+
 if __name__=="__main__":
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"

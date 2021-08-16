@@ -1,12 +1,5 @@
 from IPython.display import clear_output
 import sys
-sys.path.append('../')
-try: 
-    from models.model_util import load_model
-    from data.data_util import DatasetPlus
-except:
-    from ..models.model_util import load_model
-    from ..data.data_util import DatasetPlus
 
 from .cams import *
 from .smoothgrad import *
@@ -60,7 +53,7 @@ class VisTool:
         vismap = self.vis_tool(x, y, **kwargs) # Should return (1, 96, 96, 96) visualization map
 
         if visualize:
-            plot_vismap(brain=x, vismap=vismap, title=title, **kwargs)
+            plot_vismap(brain=x, vismap=vismap, title=title, masked=False, **kwargs)
 
         return vismap
 
