@@ -9,6 +9,9 @@
 https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
 '''
 
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
 import torch
 import torch.nn as nn
 from functools import partial, reduce
@@ -310,10 +313,12 @@ class HybridEmbed(nn.Module):
 class VisionTransformer(nn.Module):
     """ Vision Transformer with support for patch or hybrid CNN input stage
     """
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=48, depth=12,
+    def __init__(self, img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=48, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., hybrid_backbone=None, norm_layer=nn.LayerNorm, global_pool=None,
-                 local_up_to_layer=10, locality_strength=1., use_pos_embed=True, return_embed=True):
+                 local_up_to_layer=10, locality_strength=1., use_pos_embed=True, return_embed=True,
+                 *args, **kwargs):
+
         super().__init__()
         self.num_classes = num_classes
         self.local_up_to_layer = local_up_to_layer
@@ -404,6 +409,75 @@ class VisionTransformer(nn.Module):
             x = self.head(x)
         return x
     
+@dataclass
+class ConvitArguments:
+    '''
+    Arguments for ConVit
+    '''
+    img_size: int = field(
+        default=96, metadata={"help": "Size of an image. Currently supports regular-square only"}
+    )
+    patch_size: int = field(
+        default=16, metadata={"help": "One side of the patch. With 96-cubic MRI image will give 216 patches in total."}
+    )
+    in_chans: int = field(
+        default=1, metadata={"help": "Number of channels of a given input. MRI uses grayscale image, it will be set to 1"}
+    )
+    num_classes: int = field(
+        default=1,
+        metadata={"help": "Number of output classes. Regression will use 1 for default.\
+            No longer be used if `return_embed` is set to True."}
+    )
+    embed_dim: int = field(
+        default=48, metadata={"help": "Number of embedding dimension."}
+    )
+    depth: int = field(
+        default=12, metadata={"help": "Number of layers"}
+    )
+    num_heads: int = field(
+        default=12, metadata={"help": "Number of attention heads."}
+    )
+    mlp_ratio: float = field( # TODO : add description
+        default=4., metadata={"help": "."}
+    )
+    qkv_bias: bool = field( # TODO : add description
+        default=None, metadata={"help": "."}
+    )
+    qk_scale: bool = field(
+        default=None, metadata={"help": "Scaling scalar multiplied to QK^T. If not given, inversed square root of number of heads be used."}
+    )
+    drop_rate: float = field(
+        default=0., metadata={"help": "Dropout ratio inside the attneion block used for linear projection."}
+    )
+    attn_drop_rate: float = field(
+        default=0., metadata={"help": "Dropout ratio inside the attneion block used for linear projection."}
+    )
+    drop_path_rate: float = field(
+        default=0., metadata={"help": "Dropout ratio for drop path used inside the attention block"}
+    )
+    hybrid_backbone=None # TODO: what is this ...
+    norm_layer: Any = field(
+        default=nn.LayerNorm, metadata={"help": "Type of normalization used inside the model. LayerNorm in default"}
+    )
+    global_pool=None # TODO : What is this ... 2
+    local_up_to_layer: int = field(
+        default=10, metadata={"help": "How many local layers that uses Gated Positional Self-attention"}
+    )
+    locality_strength: float = field( # TODO study ..
+        default=1., metadata={"help": ""}
+    )
+    use_pos_embed: bool = field(
+        default=True, metadata={"help": "Whehter to use positional embedding. This is a learned positional embedding"}
+    )
+    return_embed: bool = field(
+        default=True, metadata={"help": "Whether to return a vector embedding instead of probability of classes"}
+    )
+    
+    @property
+    def config(self):
+        return vars(self)
+
+
     
 if __name__=="__main__":
 

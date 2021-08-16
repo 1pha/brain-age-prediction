@@ -69,6 +69,7 @@ metrics:
 encoder:
   name: vanillaconv
   # start_channel: 16 for Resnet
+  config: ~
 
 regressor:
   name: nkregressor

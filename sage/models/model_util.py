@@ -16,6 +16,7 @@ from .naive_models.efficientnet import EfficientNet3D
 
 from .unlearning.vanilla_dinsdale import VanillaConv
 from .unlearning.resnet import load_resnet
+from .unlearning.convit import VisionTransformer, ConvitArguments
 from .unlearning.predictors import *
 
 
@@ -81,6 +82,7 @@ def load_model(cfg=None, gpu=True, verbose=True):
 ENCODERS = {
     'vanillaconv': VanillaConv,
     'resnet': load_resnet,
+    'convit': VisionTransformer,
 }
 
 PREDICTORS = {
@@ -89,8 +91,7 @@ PREDICTORS = {
 }
 
 
-def num_params(model):
-
+def count_num_params(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
@@ -108,9 +109,9 @@ def load_unlearn_models(cfg):
     regressor = PREDICTORS[cfg.regressor.name](cfg.regressor).to(device)
     domainer  = PREDICTORS[cfg.domainer.name](cfg.domainer).to(device)
 
-    cfg.encoder.num_params = num_params(encoder)
-    cfg.regressor.num_params = num_params(regressor)
-    cfg.domainer.num_params = num_params(domainer)
+    cfg.encoder.num_params = count_num_params(encoder)
+    cfg.regressor.num_params = count_num_params(regressor)
+    cfg.domainer.num_params = count_num_params(domainer)
     cfg.num_params = sum([cfg.encoder.num_params, cfg.regressor.num_params, cfg.domainer.num_params])
 
     return (encoder, regressor, domainer), device
@@ -131,11 +132,18 @@ def load_models(*cfg):
 
         if i == 0: # ENCODER
 
-            encoder = ENCODERS[config.name](config).to(device)
+            if config.name == 'convit':
+                arg_config = ConvitArguments(**config.config).config
+                encoder = ENCODERS[config.name](**arg_config).to(device)
+                
+            else:
+                arg_config = config
+                encoder = ENCODERS[config.name](arg_config).to(device)
+
             vector_size = encoder(torch.zeros((2, 1, 96, 96, 96)).to(device)).shape
             assert len(vector_size) == 2 # It should be 1-dim vector with batch (=2dim)
             print(f"Output from encoder is {vector_size[1]}.")
-            num_params = num_params(encoder)
+            num_params = count_num_params(encoder)
             config.num_params = num_params
             total_params += num_params
             models.append(encoder)
@@ -144,7 +152,7 @@ def load_models(*cfg):
 
             config.init_node = vector_size[1]
             regressor = PREDICTORS[config.name](config).to(device)
-            num_params = num_params(regressor)
+            num_params = count_num_params(regressor)
             config.num_params = num_params
             total_params += num_params
             models.append(regressor)
@@ -152,7 +160,7 @@ def load_models(*cfg):
         elif i == 2:
             config.init_node  = vector_size[1]
             domainer  = PREDICTORS[config.name](config).to(device)
-            num_params = num_params(domainer)
+            num_params = count_num_params(domainer)
             config.num_params = num_params
             total_params += num_params
             models.append(domainer)
