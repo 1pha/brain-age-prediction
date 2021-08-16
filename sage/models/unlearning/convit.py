@@ -65,7 +65,7 @@ class GPSA(nn.Module):
         
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
-        self.pos_proj = nn.Linear(3, num_heads)
+        self.pos_proj = nn.Linear(4, num_heads)
         self.proj_drop = nn.Dropout(proj_drop)
         self.locality_strength = locality_strength
         self.gating_param = nn.Parameter(torch.ones(self.num_heads))
@@ -121,6 +121,7 @@ class GPSA(nn.Module):
         else:
             return dist
     
+
     def local_init(self, locality_strength=1.):
         
         self.v.weight.data.copy_(torch.eye(self.dim))
@@ -136,18 +137,27 @@ class GPSA(nn.Module):
                 self.pos_proj.weight.data[position,0] = 2*(h2-center)*locality_distance
         self.pos_proj.weight.data *= locality_strength
 
+
     def get_rel_indices(self, num_patches):
-        img_size = int(num_patches**(1/3))
-        rel_indices   = torch.zeros(1, num_patches, num_patches, 3)
+
+        img_size = round(num_patches ** (1/3))
+        rel_indices   = torch.zeros(1, num_patches, num_patches, 4)
+
         ind = torch.arange(img_size).view(1,-1) - torch.arange(img_size).view(-1, 1)
-        indx = ind.repeat(img_size,img_size)
-        indy = ind.repeat_interleave(img_size,dim=0).repeat_interleave(img_size,dim=1)
-        indd = indx**2 + indy**2
-        rel_indices[:,:,:,2] = indd.unsqueeze(0)
-        rel_indices[:,:,:,1] = indy.unsqueeze(0)
-        rel_indices[:,:,:,0] = indx.unsqueeze(0)
+
+        indx = ind.repeat(img_size ** 2,img_size ** 2)
+        indy = ind.repeat_interleave(img_size,dim=0).repeat_interleave(img_size,dim=1).repeat(img_size, img_size)
+        indz = ind.repeat_interleave(img_size ** 2, dim=0).repeat_interleave(img_size ** 2, dim=1)
+        indd = indx**2 + indy**2 + indz**2
+
+        rel_indices[..., 3] = indd.unsqueeze(0)
+        rel_indices[..., 2] = indz.unsqueeze(0)
+        rel_indices[..., 1] = indy.unsqueeze(0)
+        rel_indices[..., 0] = indx.unsqueeze(0)
+
         device = self.qk.weight.device
         self.rel_indices = rel_indices.to(device)
+
 
  
 class MHSA(nn.Module):
@@ -303,13 +313,14 @@ class VisionTransformer(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=48, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., hybrid_backbone=None, norm_layer=nn.LayerNorm, global_pool=None,
-                 local_up_to_layer=10, locality_strength=1., use_pos_embed=True):
+                 local_up_to_layer=10, locality_strength=1., use_pos_embed=True, return_embed=True):
         super().__init__()
         self.num_classes = num_classes
         self.local_up_to_layer = local_up_to_layer
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.locality_strength = locality_strength
         self.use_pos_embed = use_pos_embed
+        self.return_embed = return_embed
 
         if hybrid_backbone is not None:
             self.patch_embed = HybridEmbed(
@@ -376,7 +387,6 @@ class VisionTransformer(nn.Module):
         cls_tokens = self.cls_token.expand(B, -1, -1)
 
         if self.use_pos_embed:
-            print(x.size(), self.pos_embed.size())
             x = x + self.pos_embed
         x = self.pos_drop(x)
 
@@ -390,7 +400,8 @@ class VisionTransformer(nn.Module):
 
     def forward(self, x):
         x = self.forward_features(x)
-        x = self.head(x)
+        if not self.return_embed:
+            x = self.head(x)
         return x
     
     
