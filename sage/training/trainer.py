@@ -109,11 +109,15 @@ class MRITrainer:
             '''
             checkpoint: dict = {
                 'resume_epoch': start, # NECESSARY
-                'encoder': .pth path, ...
+                'models': {
+                    'encoder': ~.pt,
+                    ..
+                }
             }
             '''
 
-            self.load_checkpoint(checkpoint)
+            self.load_checkpoint(checkpoint['models'])
+            start = checkpoint['resume_epoch'] if 'resume_epoch' in checkpoint.keys() else 0
 
         else:
             start = 0
@@ -310,7 +314,8 @@ class MRITrainer:
 
         for model_name, pth_path in checkpoint.items():
             self.models[model_name].load_state_dict(torch.load(pth_path))
-
+            print(f'{model_name.capitalize()} is successfully loaded')
+        
 
     def zero_grad(self, model):
 
@@ -380,8 +385,9 @@ class MRITrainer:
             - Accuracy
             '''
 
-            # metrics = ['auc', 'acc']
-            metrics = ['acc']
+            metrics = ['auc', 'acc']
+            if self.cfg.partial < 1:
+                metrics = ['acc']
             gt = self.gt_src_train if train else self.gt_src_valid
 
             return {f'{prefix}_{metric}': get_metric(preds, gt, metric) for metric in metrics}
