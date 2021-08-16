@@ -122,6 +122,7 @@ def load_models(*cfg):
     print(f'Use {device} as a device.')
 
     models = []
+    total_params = 0
     for i, config in enumerate(cfg):
 
         if config is None:
@@ -134,23 +135,30 @@ def load_models(*cfg):
             vector_size = encoder(torch.zeros((2, 1, 96, 96, 96)).to(device)).shape
             assert len(vector_size) == 2 # It should be 1-dim vector with batch (=2dim)
             print(f"Output from encoder is {vector_size[1]}.")
-            config.num_params = num_params(encoder)
+            num_params = num_params(encoder)
+            config.num_params = num_params
+            total_params += num_params
             models.append(encoder)
             
-
         elif i == 1:
 
             config.init_node = vector_size[1]
             regressor = PREDICTORS[config.name](config).to(device)
-            config.num_params = num_params(regressor)
+            num_params = num_params(regressor)
+            config.num_params = num_params
+            total_params += num_params
             models.append(regressor)
-
 
         elif i == 2:
             config.init_node  = vector_size[1]
             domainer  = PREDICTORS[config.name](config).to(device)
-            config.num_params = num_params(domainer)
+            num_params = num_params(domainer)
+            config.num_params = num_params
+            total_params += num_params
             models.append(domainer)
+
+
+    print(f"Total Number of parameters: {total_params}")
 
     return models, device
 
