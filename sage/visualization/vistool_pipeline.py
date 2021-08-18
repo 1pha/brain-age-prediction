@@ -1,6 +1,8 @@
 from IPython.display import clear_output
 import sys
 
+from numpy.lib.arraysetops import isin
+
 from .cams import *
 from .smoothgrad import *
 from .auggrad import *
@@ -8,7 +10,7 @@ from .visual_utils import plot_vismap, convert2nifti, exp_parser, brain_parser
 
 class VisTool:
 
-    __version = 'Apr 7. 2021'
+    __version__ = 'Aug 18. 2021'
     CAMS = {
         'gcam': CAM,
         'sgrad': SmoothGrad,
@@ -33,27 +35,133 @@ class VisTool:
         self.cam_type = cam_type
         self.vis_tool = VisTool.CAMS[self.cam_type](cfg, model, **kwargs)
 
+
     def load_weight(self, pth):
 
         '''
-        Load pretraind weights to model. Use .pth file to load
+        Load pretraind weights to model.
+        Either use
+            dict:
+                that contains {model_name: weight_path}
+            str:
+                directly .pth
         '''
 
         try:
-            self.model.load_state_dict(torch.load(pth))
+            if isinstance(pth, dict):
+                self.model.load_weight(pth)
+
+            elif isinstance(pth, str):
+                self.model.load_state_dict(torch.load(pth))
+
             print("Weights successfully loaded!")
 
         except:
-            print("Error occurred during loading weights.")
+            print("An error occurred during loading weights.")
+            raise
 
-    def run_vistool(self, x, y, visualize=False, title=None, **kwargs):
+
+    def __call__(self,
+        x=None,
+        y=None,
+        dataloader=None,
+        average=True,
+        visualize=False,
+        title=None,
+        slice_index=48,
+        weight=None,
+        path=None, # DEPRECATED
+        layer_index=None,
+    ):
+        '''
+        This method interacts with `trainer`.
+        Arguments:
+            x: torch.tensor
+                A single brain image with 5D (batch=1, channel=1, Height, Width, Depth)
+                If not 5D, function will automatically convert it to desired shape.
+            y: torch.tensor
+                A single age (or any target) in float contained in tensor
+
+            dataloader: torch.utils.data.DataLoader
+                Dataloader from torch that yields (x, y) pair.
+                If dataloader returns x, y, d, this will be processed internally.
+            average: bool, default=True
+                If dataloader is given, return an averaged visual map of all the brains
+                contained inside the dataloader.
+
+            !Note: One of (x, y) or dataloader should be given.
+
+            visualize: bool
+                Whehter to show saliency map on the prompt or not.
+                If True, `plot_vistool` will be executed.
+            title: str, default=None, optional
+                If given, this will be used as title during visualization
+            slice_index: int|list, default=48
+                Select which slice to visualize. Either integer or list of integers be given.
+
+            weight: dict, default=None, optional
+                Dictionary that constructed with {model_name: weight_path}.
+                Model of attribute would be set with a given weight.
+                Note that this should be a single checkpoint of a model.
+                To use multiple model, please use `path` instead.
+            path: dict, default=None <- DEPRECATED
+                directory of path that contains a total checkpoint of single run.
+                Directory must follow the next architecture
+                    path/
+                        -encoder
+                        -regressor
+                        -domainer (optional)
+            
+            layer_index: int|list default=None
+                Select a layer/layers to retrieve a saliency map.
+                If None is given, find all layers' visual map
+                
+        '''
+
+        # LOAD WEIGHT
+        if weight is not None:
+            self.load_weight(weight)
+
+        elif path is not None:
+            print("This argument is deprecated")
+
+        else:
+            pass
+
+        if x is not None and y is not None: # (x, y) pair given
+            if dataloader is not None:
+                print("Don't need to pass dataloader if x and y is given"\
+                    "This dataloader will be ignored.")
+                
+            vismap = self.run_vistool(x, y, layer_index=layer_index)
+            brain = x
+
+        elif dataloader is not None: # dataloader given.
+            if x is not None and y is not None:
+                print("(x, y) pair overpowers in priority against dataloader. "\
+                    "VisMap with a single (x, y) pair will be returned")
+
+            vismap = [np.zeros(self.cfg.resize) for l in range(len(self.vis_tool.conv_layers))]
+            brain = torch.zeros((1, 1, *self.cfg.resize))
+            for x, y, _ in dataloader:
+
+                _vismap = self.run_vistool(x, y, layer_index=layer_index)
+                brain += x
+                for i, v in enumerate(_vismap):
+                    vismap[i] += v
+
+        if visualize:
+            for idx, layer in enumerate(vismap):
+                plot_vismap(brain, layer, slc=slice_index, title=f"{idx}th layer.")
+
+        return vismap
+
+
+    def run_vistool(self, x, y, layer_index=None, **kwargs):
 
         self.model.to(self.cfg.device)
         x, y = x.to(self.cfg.device), y.to(self.cfg.device)
-        vismap = self.vis_tool(x, y, **kwargs) # Should return (1, 96, 96, 96) visualization map
-
-        if visualize:
-            plot_vismap(brain=x, vismap=vismap, title=title, masked=False, **kwargs)
+        vismap = self.vis_tool(x, y, layer_index=layer_index, **kwargs) # Should return (1, 96, 96, 96) visualization map
 
         return vismap
 

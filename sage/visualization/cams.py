@@ -7,6 +7,9 @@ import torch.nn.functional as F
 from torch.autograd import Function
 
 class CAM:
+
+    __date__ = 'Aug 18, 2021'
+
     def __init__(self, cfg, model):
         self.gradient = []
 
@@ -16,6 +19,7 @@ class CAM:
 
         self.resized_cams = None
         self.layer_index = None
+        self.make_conv_layers()
 
     def __call__(self, x, y, layer_index=None):
         
@@ -27,7 +31,6 @@ class CAM:
         self.register_hooks()
         x, y = x.to(self.cfg.device), y.to(self.cfg.device)
         output = self.model(x)
-        print(output)
         print(f'[true] {int(y.data.cpu())}', end=' ')
         print(f'[pred] {float(output.data.cpu()):.3f}')
         output.backward()
@@ -35,9 +38,20 @@ class CAM:
         self.cam_over_layers()
         vismap = self.resizing()
         self.remove_hook()
-        return vismap[layer_index] if layer_index else vismap
 
-    def register_hooks(self, model_name=None):
+        if layer_index is not None:
+            if isinstance(layer_index, int):
+                return [vismap[layer_index]]
+
+            if isinstance(layer_index, list):
+                return [vismap[idx] for idx in layer_index]
+                
+        else:
+            return vismap
+
+        return vismap
+
+    def make_conv_layers(self, model_name=None):
 
         if model_name is None:
             model_name = self.cfg.model_name
@@ -95,6 +109,7 @@ class CAM:
             else:
                 raise NotImplementedError
 
+    def register_hooks(self, model_name=None):
         for i, layer in enumerate(self.conv_layers):
             self.hooks[i] = layer.register_backward_hook(self.save_gradient)
         
@@ -112,9 +127,9 @@ class CAM:
             layer.remove()
             
     def normalize_cam(self, x):
-        x = 2*(x-torch.min(x))/(torch.max(x)-torch.min(x)+1e-8)-1
-        x[x<torch.max(x)]=-1
-        return x
+        x_norm = 2 * (x - torch.min(x)) / (torch.max(x) - torch.min(x) + 1e-8) - 1
+        x_norm[x_norm < torch.max(x_norm)] = -1
+        return x_norm
     
     def visualize(self, slc=48):
 
@@ -125,7 +140,7 @@ class CAM:
         self.resized_cams = self.resizing() if self.resized_cams is None else self.resized_cams
         if self.cfg.model_name == 'resnet' or self.cfg.model_name == 'resnet_no_maxpool':
 
-            fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(20, 20))
+            _, ax = plt.subplots(nrows=3, ncols=3, figsize=(20, 20))
             for idx, (cam_, layer) in enumerate(zip(self.resized_cams, self.conv_layers.keys())):
 
                 row, col = idx // 3, idx % 3
@@ -133,16 +148,18 @@ class CAM:
                 ax[row, col].set_title(layer)
 
         else:
-            fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(15, 15))
+            _, ax = plt.subplots(nrows=2, ncols=2, figsize=(15, 15))
             for idx, cam_ in enumerate(self.resized_cams):
 
                 row, col = idx // 2, idx % 2
                 ax[row, col].imshow(cam_)
                        
     def get_cam(self, idx):
+
         '''
         Get CAM = ReLU(sum(alpha*grad_cam))
         '''
+
         grad = self.gradient[idx]
         if self.cfg.model_name == 'resnet':
             alpha = torch.sum(grad,  dim=4, keepdim=True)
