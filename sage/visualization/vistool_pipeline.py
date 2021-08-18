@@ -1,16 +1,33 @@
+from glob import glob
 from IPython.display import clear_output
-import sys
-
-from numpy.lib.arraysetops import isin
 
 from .cams import *
 from .smoothgrad import *
 from .auggrad import *
-from .visual_utils import plot_vismap, convert2nifti, exp_parser, brain_parser
+from .visual_utils import plot_vismap
+
+
+def deprecate(func):
+    print(f'This {(func.__name__)} function is no longer supported since version=0.2')
+    def class_wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return class_wrapper
+
+
+def get_weight_dict(prefix):
+
+    return {
+        model_name: sorted(\
+            glob(f'{prefix}/{model_name}/*.pt'), \
+            key=lambda x: int(x.split('\\ep')[-1].split('_')[0]) \
+        ) for model_name in ['encoder', 'regressor']
+    }
+
 
 class VisTool:
 
-    __version__ = 'Aug 18. 2021'
+    __version__ = '0.2'
+    __date__ = 'Aug 18. 2021'
     CAMS = {
         'gcam': CAM,
         'sgrad': SmoothGrad,
@@ -61,16 +78,15 @@ class VisTool:
             raise
 
 
-    def __call__(self,
+    def __call__(
+        self,
         x=None,
         y=None,
         dataloader=None,
-        average=True,
         visualize=False,
-        title=None,
         slice_index=48,
         weight=None,
-        path=None, # DEPRECATED
+        prefix=None, # DEPRECATED
         layer_index=None,
     ):
         '''
@@ -85,16 +101,16 @@ class VisTool:
             dataloader: torch.utils.data.DataLoader
                 Dataloader from torch that yields (x, y) pair.
                 If dataloader returns x, y, d, this will be processed internally.
-            average: bool, default=True
+            average: bool, default=True # FURTHER IMPLEMENTED
                 If dataloader is given, return an averaged visual map of all the brains
                 contained inside the dataloader.
 
-            !Note: One of (x, y) or dataloader should be given.
+            *Note: One of (x, y) or dataloader should be given.
 
             visualize: bool
                 Whehter to show saliency map on the prompt or not.
                 If True, `plot_vistool` will be executed.
-            title: str, default=None, optional
+            title: str, default=None, optional # FURTHER IMPLEMENTED
                 If given, this will be used as title during visualization
             slice_index: int|list, default=48
                 Select which slice to visualize. Either integer or list of integers be given.
@@ -118,45 +134,70 @@ class VisTool:
                 
         '''
 
-        # LOAD WEIGHT
+        def run():
+
+            if x is not None and y is not None: # (x, y) pair given
+                if dataloader is not None:
+                    print("Don't need to pass dataloader if x and y is given. "\
+                        "This dataloader will be ignored.")
+                    
+                vismap = self.run_vistool(x, y, layer_index=layer_index)
+                brain = x
+
+            elif dataloader is not None: # dataloader given.
+                if x is not None and y is not None:
+                    print("(x, y) pair overpowers in priority against dataloader. "\
+                        "VisMap with a single (x, y) pair will be returned")
+
+                vismap = [np.zeros(self.cfg.resize) for l in range(len(self.vis_tool.conv_layers))]
+                brain = torch.zeros((1, 1, *self.cfg.resize))
+                for _x, _y, _ in dataloader:
+
+                    _vismap = self.run_vistool(_x, _y, layer_index=layer_index)
+                    brain += _x
+                    for i, v in enumerate(_vismap):
+                        vismap[i] += v
+
+            if visualize:
+                for idx, layer in enumerate(vismap):
+                    plot_vismap(brain, layer, slc=slice_index, title=f"{idx}th layer.")
+
+            return vismap
+
+        if prefix is not None:
+            weights = get_weight_dict(prefix)
+            vismaps = list()
+            for encoder_weight, regressor_weight in zip(weights['encoder'], weights['regressor']):
+        
+                self.load_weight({
+                    'encoder': encoder_weight,
+                    'regressor': regressor_weight,
+                })
+                vismaps.append(run())
+
         if weight is not None:
             self.load_weight(weight)
+            return run()
 
-        elif path is not None:
-            print("This argument is deprecated")
+        elif prefix is not None:
+
+            weights = get_weight_dict(prefix)
+            vismaps = list()
+            for encoder_weight, regressor_weight in zip(weights['encoder'], weights['regressor']):
+        
+                self.load_weight({
+                    'encoder': encoder_weight,
+                    'regressor': regressor_weight,
+                })
+                vismaps.append(run())
+
+            return vismaps # [VISMAP_EP1(=[LAYER1, LAYER2, ...]), VISMAP_EP2, ...]
 
         else:
-            pass
+            print("None of weight neither prefix is given.")
+            return        
 
-        if x is not None and y is not None: # (x, y) pair given
-            if dataloader is not None:
-                print("Don't need to pass dataloader if x and y is given"\
-                    "This dataloader will be ignored.")
-                
-            vismap = self.run_vistool(x, y, layer_index=layer_index)
-            brain = x
-
-        elif dataloader is not None: # dataloader given.
-            if x is not None and y is not None:
-                print("(x, y) pair overpowers in priority against dataloader. "\
-                    "VisMap with a single (x, y) pair will be returned")
-
-            vismap = [np.zeros(self.cfg.resize) for l in range(len(self.vis_tool.conv_layers))]
-            brain = torch.zeros((1, 1, *self.cfg.resize))
-            for x, y, _ in dataloader:
-
-                _vismap = self.run_vistool(x, y, layer_index=layer_index)
-                brain += x
-                for i, v in enumerate(_vismap):
-                    vismap[i] += v
-
-        if visualize:
-            for idx, layer in enumerate(vismap):
-                plot_vismap(brain, layer, slc=slice_index, title=f"{idx}th layer.")
-
-        return vismap
-
-
+        
     def run_vistool(self, x, y, layer_index=None, **kwargs):
 
         self.model.to(self.cfg.device)
@@ -165,6 +206,8 @@ class VisTool:
 
         return vismap
 
+
+    @deprecate
     def run_pretrains_single(self, path, x, y, slc=None, visualize=True, **kwargs):
 
         '''
@@ -185,6 +228,7 @@ class VisTool:
         return vismaps
 
 
+    @deprecate
     def run_dataloader(self, dataloader, pth=None, slc=None, visualize=False, **kwargs):
         '''
         Runs VisTool on a single Dataloader
@@ -210,6 +254,7 @@ class VisTool:
         return avg_vismap
 
 
+    @deprecate
     def run_pretrains_dataloader(self, path, dataloader, slc=None, visualize=False, checkpoint=True, **kwargs):
 
         saved_models = sorted(glob(path), key=lambda x: int(x.split('ep')[1].split('-')[0]))
