@@ -137,7 +137,7 @@ class BrainAgeDataset(Dataset):
         return len(self.data_files)
 
 
-    def __getitem__(self, idx): # -> ((1, W', H', D'), age: torch.tensor.float)
+    def __getitem__(self, idx): # -> ((1, W', H', D'), age: torch.tensor.float, domain: torch.tensor.long)
 
         '''
         PIPELINE
