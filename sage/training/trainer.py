@@ -25,8 +25,8 @@ class MRITrainer:
         3. Extensible for future works
     '''
 
-    __version__ = 0.1
-    __date = 'Aug 2. 2021'
+    __version__ = 0.2
+    __date__ = 'Aug 19. 2021'
 
 
     def __init__(self, cfg):
@@ -97,7 +97,7 @@ class MRITrainer:
         print(f"MIXED PRECISION:: {cfg.use_amp}")
 
         # 5. SAVE Directory
-        self.save_dir = cfg.RESULT_PATH + get_today()
+        self.save_dir = f'{cfg.RESULT_PATH}/{get_today()}_{cfg.encoder.name}'
 
 
     def run(self, cfg=None, checkpoint=None):
@@ -123,7 +123,7 @@ class MRITrainer:
             start = 0
 
         best_mae = float('inf')
-        stop_count, long_term_patience = 0, 0
+        stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
         for e in range(start, cfg.epochs):
 
             phase = self.check_which_phase(e)
@@ -139,7 +139,7 @@ class MRITrainer:
             )
             wandb.log({**results})
 
-            model_name = f'ep{e}_mae{results.valid_mae:.2f}.pt'
+            model_name = f'ep{str(e).zfill(3)}_mae{results.valid_mae:.2f}.pt'
             if results.valid_mae < best_mae:
                 stop_count = 0
                 best_mae = results.valid_mae
@@ -148,6 +148,7 @@ class MRITrainer:
                 stop_count += 1
                 if stop_count >= cfg.early_patience:
                     if best_mae < cfg.mae_threshold:
+                        multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
                         print(f'Early stopped at {stop_count} / {cfg.early_patience} at EPOCH {e}')
                         break
                     
@@ -155,11 +156,16 @@ class MRITrainer:
                         long_term_patience += 1
 
             if long_term_patience >= 3:
+                multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
                 print(f'Waited for 3 times no better result {long_term_patience} / {3} at EPOCH {e}')
                 break
 
-            if best_mae < cfg.mae_threshold and (e + 1) % cfg.checkpoint_period == 0:
+            if best_mae < cfg.mae_threshold and (elapsed_epoch_saved + 1) % cfg.checkpoint_period == 0:
+                elapsed_epoch_saved += 1
                 multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
+
+            else:
+                elapsed_epoch_saved = 0
 
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
