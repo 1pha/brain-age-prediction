@@ -225,6 +225,16 @@ class ResNet(nn.Module):
 
         return x
 
+    @property
+    def conv_layers(self):
+
+        conv_layers = [self.conv1]
+        for layer in [self.layer1, self.layer2, self.layer3, self.layer4]:
+            conv_layers.append(layer.conv1)
+            conv_layers.append(layer.conv2)
+
+        return conv_layers
+
 
 def generate_model(model_depth, start_channels, **kwargs):
     assert model_depth in [10, 18, 34, 50, 101, 152, 200]

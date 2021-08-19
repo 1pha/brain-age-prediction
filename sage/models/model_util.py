@@ -137,8 +137,8 @@ def load_models(*cfg):
                 encoder = ENCODERS[config.name](**arg_config).to(device)
                 
             else:
-                arg_config = config
-                encoder = ENCODERS[config.name](arg_config).to(device)
+                arg_config = config.config
+                encoder = ENCODERS[config.name](**arg_config).to(device)
 
             vector_size = encoder(torch.zeros((2, 1, 96, 96, 96)).to(device)).shape
             assert len(vector_size) == 2 # It should be 1-dim vector with batch (=2dim)
