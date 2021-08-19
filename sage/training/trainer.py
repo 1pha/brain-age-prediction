@@ -129,7 +129,7 @@ class MRITrainer:
             phase = self.check_which_phase(e)
             actions = self.cfg.phase_config.update[phase]
 
-            print(f'Epoch {e + 1} / {cfg.epochs} (phase: {phase}) BEST MAE {best_mae:.3f}')
+            print(f'{"-" * 5} Epoch {e + 1} / {cfg.epochs} (phase: {phase}) BEST MAE {best_mae:.3f} {"-" * 5}')
 
             train_result = self.train(actions)
             valid_result = self.valid(actions)
@@ -137,6 +137,7 @@ class MRITrainer:
                 **train_result,
                 **valid_result,
             )
+            self.prompt(results)
             wandb.log({**results})
 
             model_name = f'ep{str(e).zfill(3)}_mae{results.valid_mae:.2f}.pt'
@@ -157,10 +158,10 @@ class MRITrainer:
 
             if long_term_patience >= 3:
                 multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
-                print(f'Waited for 3 times no better result {long_term_patience} / {3} at EPOCH {e}')
+                print(f'Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e}')
                 break
 
-            if best_mae < cfg.mae_threshold and (elapsed_epoch_saved + 1) % cfg.checkpoint_period == 0:
+            if best_mae < cfg.mae_threshold and (elapsed_epoch_saved + 1) == cfg.checkpoint_period:
                 elapsed_epoch_saved += 1
                 multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
@@ -407,3 +408,23 @@ class MRITrainer:
             gt = self.gt_src_train if train else self.gt_src_valid
 
             return {f'{prefix}_{metric}': get_metric(preds, gt, metric) for metric in metrics}
+
+        
+    def prompt(self, result):
+
+        metrics = sorted(set(map(lambda x: x.split('_')[-1], result.keys())))
+        
+        def _prompt(prefix):
+
+            print(f'{prefix.upper()}')
+            count = 0
+            for metric in metrics:
+                
+                key = f'{prefix}_{metric}'
+                if result.get(key) is not None:
+                    count += 1
+                    end = ' | ' if (count + 1) % 3 != 0 else '\n'
+                    print(f'{key:4s}: {result[key]:.3f}', end=end)    
+
+        _prompt('train')
+        _prompt('valid')
