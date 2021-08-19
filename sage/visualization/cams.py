@@ -57,57 +57,59 @@ class CAM:
             model_name = self.cfg.model_name
 
         self.hooks = dict()
-        if hasattr(self.model, 'conv_layers'):
-            self.conv_layers = self.model.conv_layers
+        try:
+            self.conv_layers = check_recursion(self.model, [], nn.Conv3d)
 
-        else:
-            if model_name == 'resnet' or model_name == 'resnet_no_maxpool':
-                self.conv_layers = [
-                    self.model.conv1,
-                    self.model.layer1[0].conv1,
-                    self.model.layer1[0].conv2,
-                    self.model.layer2[0].conv1,
-                    self.model.layer2[0].conv2,
-                    self.model.layer3[0].conv1,
-                    self.model.layer3[0].conv2,
-                    self.model.layer4[0].conv1,
-                    self.model.layer4[0].conv2,
-                ]
-
-            elif model_name == 'CNN':
-                self.conv_layers = [
-                    self.model.layer[0],
-                    self.model.layer[3],
-                    self.model.layer[7],
-                    self.model.layer[11],
-                ]
-
-            elif model_name == 'vanilla_residual_past':
-            
-                self.conv_layers = [
-                    self.model.feature_extractor[0].conv1,
-                    self.model.feature_extractor[0].conv2,
-                    self.model.feature_extractor[1].conv1,
-                    self.model.feature_extractor[1].conv2,
-                    self.model.feature_extractor[2].conv1,
-                    self.model.feature_extractor[2].conv2,
-                    self.model.feature_extractor[3].conv1,
-                    self.model.feature_extractor[3].conv2,
-                    self.model.feature_extractor[4].conv1,
-                    self.model.feature_extractor[4].conv2,
-                    self.model.feature_extractor[5].conv1,
-                    self.model.feature_extractor[5].conv2,
-                    self.model.feature_extractor[6].conv1,
-                    self.model.feature_extractor[6].conv2,
-                    self.model.feature_extractor[7].conv1,
-                    self.model.feature_extractor[7].conv2,
-                ]
-
-            elif model_name == "vanillaconv": # unlearning/vanilla_conv.py
-                self.conv_layers = 1 # TODO
+        except:
+                
+            if hasattr(self.model, 'conv_layers'):
+                self.conv_layers = self.model.conv_layers
 
             else:
-                raise NotImplementedError
+                if model_name == 'resnet' or model_name == 'resnet_no_maxpool':
+                    self.conv_layers = [
+                        self.model.conv1,
+                        self.model.layer1[0].conv1,
+                        self.model.layer1[0].conv2,
+                        self.model.layer2[0].conv1,
+                        self.model.layer2[0].conv2,
+                        self.model.layer3[0].conv1,
+                        self.model.layer3[0].conv2,
+                        self.model.layer4[0].conv1,
+                        self.model.layer4[0].conv2,
+                    ]
+
+                elif model_name == 'CNN':
+                    self.conv_layers = [
+                        self.model.layer[0],
+                        self.model.layer[3],
+                        self.model.layer[7],
+                        self.model.layer[11],
+                    ]
+
+                elif model_name == 'vanilla_residual_past':
+                
+                    self.conv_layers = [
+                        self.model.feature_extractor[0].conv1,
+                        self.model.feature_extractor[0].conv2,
+                        self.model.feature_extractor[1].conv1,
+                        self.model.feature_extractor[1].conv2,
+                        self.model.feature_extractor[2].conv1,
+                        self.model.feature_extractor[2].conv2,
+                        self.model.feature_extractor[3].conv1,
+                        self.model.feature_extractor[3].conv2,
+                        self.model.feature_extractor[4].conv1,
+                        self.model.feature_extractor[4].conv2,
+                        self.model.feature_extractor[5].conv1,
+                        self.model.feature_extractor[5].conv2,
+                        self.model.feature_extractor[6].conv1,
+                        self.model.feature_extractor[6].conv2,
+                        self.model.feature_extractor[7].conv1,
+                        self.model.feature_extractor[7].conv2,
+                    ]
+
+                else:
+                    raise NotImplementedError
 
     def register_hooks(self, model_name=None):
         for i, layer in enumerate(self.conv_layers):
@@ -184,6 +186,20 @@ class CAM:
         self.resized_cams = [resize(c.cpu().numpy(), output_shape=self.cfg.resize)
                             for c in self.cams]
         return self.resized_cams
+
+
+def check_recursion(module, layers=[], layer_type=nn.Conv3d):
+    
+    for layer in module.children():
+        
+        if list(layer.children()) == []:
+            if isinstance(layer, layer_type):
+                layers.append(layer)
+        
+        else:
+            check_recursion(layer, layers)
+        
+    return layers
 
 
 def run_gradcam(model, data, cfg):
