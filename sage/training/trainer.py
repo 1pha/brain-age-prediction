@@ -423,8 +423,11 @@ class MRITrainer:
                 key = f'{prefix}_{metric}'
                 if result.get(key) is not None:
                     count += 1
-                    end = ' | ' if (count + 1) % 3 != 0 else '\n'
-                    print(f'{key:4s}: {result[key]:.3f}', end=end)    
+                    end = '  |  ' if count % 3 != 0 else '\n'
+                    print(f'{metric:6s}: {result[key]:.4f}', end=end)    
+                
+            print('')
 
         _prompt('train')
         _prompt('valid')
+        print('')
