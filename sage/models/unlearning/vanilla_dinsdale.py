@@ -65,15 +65,28 @@ class StrideBlock(nn.Module):
 
         return x
 
+def get_inplanes(start_channels=16):
+    if start_channels == 8:
+        return [8, 16, 32, 64, 128]
+
+    elif start_channels == 16:
+        return [16, 32, 64, 128, 256]
+
+    elif start_channels == 32:
+        return [32, 64, 128, 256, 512]
+
+    elif start_channels == 64:
+        return [64, 128, 256, 512, 1024]
+
 
 class VanillaConv(nn.Module):
 
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, start_channels=16):
         super().__init__()
 
         self.cfg = cfg
 
-        layers = [8, 16, 32, 64, 128]
+        layers = get_inplanes(start_channels)
         self.layers = layers
         self.feature_extractor = nn.Sequential(
             StrideBlock(1, layers[0]),
