@@ -5,7 +5,6 @@ import wandb
 from easydict import EasyDict as edict
 
 import torch
-import torch.nn as nn
 
 from .metrics import get_metric
 from .optimizer import get_optimizer
@@ -117,56 +116,57 @@ class MRITrainer:
             '''
 
             self.load_checkpoint(checkpoint['models'])
-            start = checkpoint['resume_epoch'] if 'resume_epoch' in checkpoint.keys() else 0
+            offset = checkpoint['resume_epoch'] if 'resume_epoch' in checkpoint.keys() else 0
 
         else:
-            start = 0
+            offset = 0
 
         best_mae = float('inf')
-        stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
-        for e in range(start, cfg.epochs):
+        for phase, (epochs, actions) in zip(*self.cfg.phase_config.values()):
 
-            phase = self.check_which_phase(e)
-            actions = self.cfg.phase_config.update[phase]
+            stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
+            for e in range(epochs):
 
-            print(f'{"-" * 5} Epoch {e + 1} / {cfg.epochs} (phase: {phase}) BEST MAE {best_mae:.3f} {"-" * 5}')
+                print(f'{"-" * 5} Epoch {e + 1 + offset} / {cfg.epochs} (phase: {phase}) BEST MAE {best_mae:.3f} {"-" * 5}')
 
-            train_result = self.train(actions)
-            valid_result = self.valid(actions)
-            results = edict( # AGGREGATE RESLUTS
-                **train_result,
-                **valid_result,
-            )
-            self.prompt(results)
-            wandb.log({**results})
+                train_result = self.train(actions)
+                valid_result = self.valid(actions)
+                results = edict( # AGGREGATE RESLUTS
+                    **train_result,
+                    **valid_result,
+                )
+                self.prompt(results)
+                wandb.log({**results})
 
-            model_name = f'ep{str(e).zfill(3)}_mae{results.valid_mae:.2f}.pt'
-            if results.valid_mae < best_mae:
-                stop_count = 0
-                best_mae = results.valid_mae
+                model_name = f'ep{str(e).zfill(3)}_mae{results.valid_mae:.2f}.pt'
+                if results.valid_mae < best_mae:
+                    stop_count = 0
+                    best_mae = results.valid_mae
 
-            else:
-                stop_count += 1
-                if stop_count >= cfg.early_patience:
-                    if best_mae < cfg.mae_threshold:
-                        multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
-                        print(f'Early stopped at {stop_count} / {cfg.early_patience} at EPOCH {e}')
-                        break
-                    
-                    else:
-                        long_term_patience += 1
+                else:
+                    stop_count += 1
+                    if stop_count >= cfg.early_patience:
+                        if best_mae < cfg.mae_threshold:
+                            multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
+                            print(f'Early stopped at {stop_count} / {cfg.early_patience} at EPOCH {e + offset}')
+                            break
+                        
+                        else:
+                            long_term_patience += 1
 
-            if long_term_patience >= 3:
-                multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
-                print(f'Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e}')
-                break
+                if long_term_patience >= 3:
+                    multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
+                    print(f'Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e + offset}')
+                    break
 
-            if best_mae < cfg.mae_threshold and (elapsed_epoch_saved + 1) == cfg.checkpoint_period:
-                elapsed_epoch_saved += 1
-                multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
+                if best_mae < cfg.mae_threshold and (elapsed_epoch_saved + 1) == cfg.checkpoint_period:
+                    elapsed_epoch_saved += 1
+                    multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
-            else:
-                elapsed_epoch_saved = 0
+                else:
+                    elapsed_epoch_saved = 0
+
+            offset += e
 
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
