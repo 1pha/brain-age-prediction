@@ -197,8 +197,11 @@ def multimodel_save_checkpoint(states, model_name, model_dir='./models/'):
             s = s.state_dict()
         
         _model_dir = os.path.join(model_dir, name)
-        os.makedirs(_model_dir, exist_ok=True) 
-        torch.save(s, os.path.join(_model_dir, model_name))
+        os.makedirs(_model_dir, exist_ok=True)
+        fname = os.path.join(_model_dir, model_name)
+        if not os.path.exists(fname):
+            torch.save(s, fname)
+            
     print("Saved Models")
 
 

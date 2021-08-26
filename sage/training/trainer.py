@@ -122,7 +122,7 @@ class MRITrainer:
             offset = 0
 
         best_mae = float('inf')
-        for phase, (epochs, actions) in zip(*self.cfg.phase_config.values()):
+        for phase, (epochs, actions) in enumerate(zip(*self.cfg.phase_config.values())):
 
             stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
             for e in range(epochs):
@@ -142,6 +142,7 @@ class MRITrainer:
                 if results.valid_mae < best_mae:
                     stop_count = 0
                     best_mae = results.valid_mae
+                    multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
                 else:
                     stop_count += 1
@@ -159,12 +160,12 @@ class MRITrainer:
                     print(f'Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e + offset}')
                     break
 
-                if best_mae < cfg.mae_threshold and (elapsed_epoch_saved + 1) == cfg.checkpoint_period:
-                    elapsed_epoch_saved += 1
+                if best_mae < cfg.mae_threshold and elapsed_epoch_saved == cfg.checkpoint_period:
+                    elapsed_epoch_saved = 0
                     multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
                 else:
-                    elapsed_epoch_saved = 0
+                    elapsed_epoch_saved += 1
 
             offset += e
 
