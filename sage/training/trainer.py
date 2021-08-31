@@ -161,7 +161,7 @@ class MRITrainer:
                     break
 
                 if best_mae < cfg.mae_threshold and elapsed_epoch_saved == cfg.checkpoint_period:
-                    elapsed_epoch_saved = 0
+                    elapsed_epoch_saved = 1
                     multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
                 else:

@@ -6,6 +6,7 @@ from glob import glob
 import numpy as np
 
 import torch
+from torch._C import R
 from torch.utils.data import DataLoader
 
 import sys
@@ -19,6 +20,20 @@ except:
 from .cams import *
 from .smoothgrad import *
 from .auggrad import *
+
+
+def check_type(brain):
+
+    while brain.nidm > 3:
+        brain = brain[0]
+
+    if isinstance(brain, np.ndarray):
+        return brain
+
+    elif isinstance(brain, torch.tensor):
+        return brain.permute(1, 2, 0).data.cpu().numpy()
+
+        
 
 
 def plot_vismap(brain, vismap, masked=True, threshold=2,

@@ -1,3 +1,6 @@
+import os
+import numpy as np
+
 from glob import glob
 from IPython.display import clear_output
 
@@ -88,6 +91,7 @@ class VisTool:
         weight=None,
         prefix=None, # DEPRECATED
         layer_index=None,
+        save=False,
     ):
         '''
         This method interacts with `trainer`.
@@ -120,10 +124,10 @@ class VisTool:
                 Model of attribute would be set with a given weight.
                 Note that this should be a single checkpoint of a model.
                 To use multiple model, please use `path` instead.
-            path: dict, default=None <- DEPRECATED
+            prefix: dict, default=None <- DEPRECATED
                 directory of path that contains a total checkpoint of single run.
                 Directory must follow the next architecture
-                    path/
+                    prefix/
                         -encoder
                         -regressor
                         -domainer (optional)
@@ -131,6 +135,31 @@ class VisTool:
             layer_index: int|list default=None
                 Select a layer/layers to retrieve a saliency map.
                 If None is given, find all layers' visual map
+
+            save: bool default=False
+                Whether to save a saliency map.
+                If True, all maps will be saved depending on the arguments.
+                + prefix (multiple model) given
+                    All layers/timestamps of 3D voxel with size (W, H, D) will be saved as the following
+                    prefix/
+                        vismap_{date}/
+                            layers/
+                                layer1/
+                                    weight1.npy
+                                    weight2.npy
+                                    ...
+                                layer2/
+                                ...
+                            gifs/
+                                layer1.gif
+                                layer2.gif
+                                ...
+                + weight given <- DEPRECATED
+                    prefix/
+                        ep{epoch}_layer1.npy
+                        ep{epoch}_layer2.npy
+                        ...
+                    
                 
         '''
 
@@ -173,7 +202,17 @@ class VisTool:
                     'encoder': encoder_weight,
                     'regressor': regressor_weight,
                 })
-                vismaps.append(run())
+                layer_vismap = run()
+                vismaps.append(layer_vismap)
+
+                if save:
+                    os.makedirs(f'{prefix}/layers', exist_ok=True)
+                    weight_name = encoder_weight.split('\\')[-1].split('.pt')[0]
+                    for layer_idx, layer in enumerate(layer_vismap):
+                        save_path = f'{prefix}/layers/layer{layer_idx}'
+                        os.makedirs(save_path, exist_ok=True)
+                        np.save(f'{save_path}/weight{weight_name}_layer{layer_idx}.npy', layer)
+
 
         if weight is not None:
             self.load_weight(weight)
