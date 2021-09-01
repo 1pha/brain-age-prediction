@@ -6,7 +6,6 @@ from glob import glob
 import numpy as np
 
 import torch
-from torch._C import R
 from torch.utils.data import DataLoader
 
 import sys
@@ -24,16 +23,16 @@ from .auggrad import *
 
 def check_type(brain):
 
-    while brain.nidm > 3:
+    while brain.ndim > 3:
         brain = brain[0]
 
     if isinstance(brain, np.ndarray):
-        return brain
+        brain = np.transpose(brain, (1, 2, 0))
 
     elif isinstance(brain, torch.tensor):
-        return brain.permute(1, 2, 0).data.cpu().numpy()
-
+        brain = brain.permute(1, 2, 0).data.cpu().numpy()
         
+    return np.rot90(brain)
 
 
 def plot_vismap(brain, vismap, masked=True, threshold=2,
@@ -66,8 +65,8 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
     
     fig, axes = plt.subplots(ncols=3, figsize=(15, 6))
 
-    brain = np.rot90(brain[0][0].permute(1, 2, 0).data.cpu().numpy())
-    vismap = np.rot90(torch.tensor(vismap).permute(1, 2, 0).data.cpu().numpy())
+    brain = check_type(brain)
+    vismap = check_type(vismap)
 
     if title is not None:
         fig.suptitle(title)
