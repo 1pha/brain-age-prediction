@@ -346,7 +346,7 @@ if __name__=="__main__":
                                 sigmas=sigmas,
                                 factors=factors)
 
-    c_of_mass = transform_centers_of_mass(template_data, template_imge, moving_data, moving_img)
+    c_of_mass = transform_centers_of_mass(template_data, template_img, moving_data, moving_img)
     starting_affine = c_of_mass.affine
 
     # 02. Registration
