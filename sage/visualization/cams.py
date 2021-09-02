@@ -21,7 +21,7 @@ class CAM:
         self.layer_index = None
         self.make_conv_layers()
 
-    def __call__(self, x, y, layer_index=None):
+    def __call__(self, x, y, layer_index=None, verbose=False):
         
         '''
         x: 5-dim Brain (1, 1, 96, 96, 96): torch.tensor
@@ -31,8 +31,9 @@ class CAM:
         self.register_hooks()
         x, y = x.to(self.cfg.device), y.to(self.cfg.device)
         output = self.model(x)
-        print(f'[true] {int(y.data.cpu())}', end=' ')
-        print(f'[pred] {float(output.data.cpu()):.3f}')
+        if verbose:
+            print(f'[true] {int(y.data.cpu())}', end=' ')
+            print(f'[pred] {float(output.data.cpu()):.3f}')
         output.backward()
 
         self.cam_over_layers()
