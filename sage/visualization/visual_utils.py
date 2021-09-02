@@ -66,7 +66,7 @@ def check_type(brain, resize_shape=(96, 96, 96), maxcut=None):
     return np.rot90(brain)
 
 
-def plot_vismap(brain, vismap, masked=True, percentile_threshold=0.975, absolute_threshold=None,
+def plot_vismap(brain, vismap, masked=True, percentile_threshold=0.975, value_threshold=None, two_sided=True,
                 slc=48, alpha=.6, save=False, att_path=None, idx=None, title=None):
 
     '''
@@ -90,10 +90,13 @@ def plot_vismap(brain, vismap, masked=True, percentile_threshold=0.975, absolute
 
     if masked:
         if percentile_threshold is not None:
-            threshold = np.quantile(vismap.reshape(-1), percentile_threshold)
+            if two_sided:
+                threshold = np.quantile(abs(vismap).reshape(-1), percentile_threshold)
+            else:
+                threshold = np.quantile(vismap.reshape(-1), percentile_threshold)
 
-        elif absolute_threshold is not None:
-            threshold = absolute_threshold
+        elif value_threshold is not None:
+            threshold = value_threshold
 
         vismap = np.ma.masked_where(vismap < threshold, vismap)
     
@@ -132,6 +135,8 @@ def plot_vismap(brain, vismap, masked=True, percentile_threshold=0.975, absolute
             os.mkdir(att_path)
         plt.savefig(f'{att_path}/{str(idx).zfill(3)}.png')
     plt.show()
+
+    return fig
 
 
 def convert2nifti(path, data, vismap):

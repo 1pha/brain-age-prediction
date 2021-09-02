@@ -190,8 +190,8 @@ class VisTool:
 
             if visualize:
                 for idx, layer in enumerate(vismap):
-                    plot_vismap(brain, layer, slc=slice_index, title=f"{idx}th layer.")
-                    # plot_vismap('template', layer, slc=slice_index, title=f"{idx}th layer.")
+                    # plot_vismap(brain, layer, slc=slice_index, title=f"{idx}th layer.")
+                    plot_vismap('template', layer, slc=slice_index, title=f"{idx}th layer.")
                     clear_output()
 
             return vismap
