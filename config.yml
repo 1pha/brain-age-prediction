@@ -18,7 +18,6 @@ aug_proba:
 aug_intensity:
   affine: [0.1, 10]
   elastic_deform: [7, .5]
-age_scale: ~
 unused_src:
   - ~
 partial: 1.0
