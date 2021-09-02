@@ -62,6 +62,7 @@ class BrainAgeDataset(Dataset):
         self.load = get_loader(extension=self.data_cfg.extension)
         self.augment = cfg.augment
         self.test = test
+        self.set_age_scale()
 
         # DEBUG SETUP
         self.debug = cfg.debug
@@ -163,7 +164,7 @@ class BrainAgeDataset(Dataset):
         if aug:
             x = self.augmentation(x) # 4D (1, W', H', D')
 
-        return x, torch.tensor(self.data_ages[idx]).float(), \
+        return x, torch.tensor(self.age_scaler.transform(self.data_ages[idx])).float(), \
                     torch.tensor(self.data_src[idx]).long()
 
 
@@ -211,6 +212,20 @@ class BrainAgeDataset(Dataset):
         return x
 
 
+    def set_age_scale(self, scaler=None):
+
+        if self.cfg.age_scale is None:
+            age_scaler = 'linear'
+
+        if scaler is None:
+            age_scaler = 'linear'
+
+        self.age_scaler = {
+            'linear': LinearScaler(),
+            'minmax': MinMaxScaler().fit(np.array([0, 100]).reshape(-1, 1))
+        }[age_scaler]
+
+
     def augmentation(self, x: torch.tensor): # -> torch.Tensor (1, W', H', D')
         
         '''
@@ -254,6 +269,25 @@ def get_dataloader(cfg, test=False, return_dataset=False, pin_memory=True):
     dataset = BrainAgeDataset(cfg, test=test)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size, pin_memory=pin_memory)
     return dataloader if not return_dataset else dataset
+
+
+class LinearScaler:
+
+    '''
+    Nothing but in sklearn.preprocess form
+    '''
+
+    def __init__(self):
+
+        pass
+
+    def fit(self):
+
+        return None
+
+    def transform(self, x):
+
+        return x
 
 
 if __name__ == "__main__":
