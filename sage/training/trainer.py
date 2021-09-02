@@ -28,19 +28,19 @@ class MRITrainer:
     __date__ = 'Aug 19. 2021'
 
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, result_dir_suffix=None):
 
         self.cfg = cfg
         self.phase_dict = self.get_phase_dict()
         self.cfg.epochs = sum(len(_range) for _range in self.phase_dict.values())
-        self.setup(cfg=cfg)
+        self.setup(cfg=cfg, result_dir_suffix=result_dir_suffix)
         self.failure_cases = {
             'train': [],
             'valid': [],
         }
 
 
-    def setup(self, cfg=None):
+    def setup(self, cfg=None, result_dir_suffix=None):
 
         '''
         SETUP
@@ -97,6 +97,7 @@ class MRITrainer:
 
         # 5. SAVE Directory
         self.save_dir = f'{cfg.RESULT_PATH}/{get_today()}_{cfg.encoder.name}'
+        self.save_dir += f"_{result_dir_suffix}" if result_dir_suffix is not None else ''
 
 
     def run(self, cfg=None, checkpoint=None):
@@ -131,7 +132,7 @@ class MRITrainer:
 
                 train_result = self.train(actions)
                 valid_result = self.valid(actions)
-                results = edict( # AGGREGATE RESLUTS
+                results = edict( # AGGREGATE RESULTS
                     **train_result,
                     **valid_result,
                 )
@@ -139,28 +140,42 @@ class MRITrainer:
                 wandb.log({**results})
 
                 model_name = f'ep{str(e).zfill(3)}_mae{results.valid_mae:.2f}.pt'
+                # PERFORMANCE IMPROVEMENT
                 if results.valid_mae < best_mae:
+
                     stop_count = 0
                     best_mae = results.valid_mae
                     multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
+                # NO PERFORMANCE IMPROVEMENT
                 else:
+                    # COUNT PATIENCE
                     stop_count += 1
+
+                    # COUNT
                     if stop_count >= cfg.early_patience:
+
+                        # END OF PATIENCE
                         if best_mae < cfg.mae_threshold:
                             multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
                             print(f'Early stopped at {stop_count} / {cfg.early_patience} at EPOCH {e + offset}')
                             break
                         
+                        # IF THE FINAL RESULT IS NOT SATISFACTORY
+                        # WAIT FOR ANOTHER LONG-TERM PATIENCE
                         else:
                             long_term_patience += 1
 
+                # EVEN AFTER LONG-TERM PATIENCE - KILL
                 if long_term_patience >= 3:
                     multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
                     print(f'Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e + offset}')
                     break
 
-                if best_mae < cfg.mae_threshold and elapsed_epoch_saved == cfg.checkpoint_period:
+                # SAVING CRITERIA
+                # WILL BE SAVED TWICE IF THERE WAS A PERFORMANCE IMPROVEMENT
+                # BUT WON'T MATTER SINCE "save_checkpoint" SAVES ONLY WHEN MODEL IS NOT THERE
+                if elapsed_epoch_saved == cfg.checkpoint_period:
                     elapsed_epoch_saved = 1
                     multimodel_save_checkpoint(states=self.models, model_dir=self.save_dir, model_name=model_name)
 
