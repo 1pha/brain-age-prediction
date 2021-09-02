@@ -8,6 +8,10 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+from nilearn.datasets import load_mni152_template
+from skimage.transform import resize
+
+
 import sys
 sys.path.append('../')
 try: 
@@ -21,29 +25,53 @@ from .smoothgrad import *
 from .auggrad import *
 
 
-def check_type(brain):
+def check_type(brain, resize_shape=(96, 96, 96), maxcut=None):
 
-    while brain.ndim > 3:
-        brain = brain[0]
+    '''
+    Converts a given 3D (or even more than 4D) array (either numpy.ndarray or torch.tensor)
+    to a designated 3D shape
+    
+    This does
+        - reduce dimension until 3D
+        - if torch.tensor given, detach and fetch to CPU and turn to numpy array
+        - rotate to have the brain in a designated direction
+        - returns numpy array
+    '''
 
-    if isinstance(brain, np.ndarray):
-        brain = np.transpose(brain, (1, 2, 0))
+    if isinstance(brain, str):
 
-    elif isinstance(brain, torch.tensor):
-        brain = brain.permute(1, 2, 0).data.cpu().numpy()
-        
+        if brain == 'template':
+
+            brain = load_mni152_template().get_fdata()
+            maxcut = (
+                [8, 82],
+                [5, 104],
+                [0, 78],
+            ) if maxcut is None else maxcut
+            (w, W), (h, H), (d, D) = maxcut
+            brain = brain[w:W, h:H, d:D]
+            brain = resize(brain, resize_shape)
+            brain = np.transpose(brain, (1, 2, 0))
+
+    else:
+        while brain.ndim > 3:
+            brain = brain[0]
+
+        if isinstance(brain, np.ndarray):
+            brain = np.transpose(brain, (1, 2, 0))
+
+        elif torch.is_tensor(brain):
+            brain = brain.permute(1, 2, 0).data.cpu().numpy()
+
     return np.rot90(brain)
 
 
-def plot_vismap(brain, vismap, masked=True, threshold=2,
+def plot_vismap(brain, vismap, masked=True, percentile_threshold=0.975, absolute_threshold=None,
                 slc=48, alpha=.6, save=False, att_path=None, idx=None, title=None):
 
     '''
-    TODO - automated reshaping function. NUMPY <-> TORCH.TENSOR and 3D <-> 5D
-    brain:
-        Should take 3d input
-    vismap:
-        Also should be 3d.
+    brain, vismap:
+        Array that contains base template brain and saliency map
     
     masked:
         For non-normalized brains, this ables to cut out a value below the threshold.
@@ -61,6 +89,12 @@ def plot_vismap(brain, vismap, masked=True, threshold=2,
     '''
 
     if masked:
+        if percentile_threshold is not None:
+            threshold = np.quantile(vismap.reshape(-1), percentile_threshold)
+
+        elif absolute_threshold is not None:
+            threshold = absolute_threshold
+
         vismap = np.ma.masked_where(vismap < threshold, vismap)
     
     fig, axes = plt.subplots(ncols=3, figsize=(15, 6))
