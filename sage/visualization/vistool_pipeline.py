@@ -11,35 +11,38 @@ from .visual_utils import plot_vismap
 
 
 def deprecate(func):
-    print(f'This {(func.__name__)} function is no longer supported since version=0.2')
+    print(f"This {(func.__name__)} function is no longer supported since version=0.2")
+
     def class_wrapper(*args, **kwargs):
         return func(*args, **kwargs)
+
     return class_wrapper
 
 
 def get_weight_dict(prefix):
 
     return {
-        model_name: sorted(\
-            glob(f'{prefix}/{model_name}/*.pt'), \
-            key=lambda x: int(x.split('\\ep')[-1].split('_')[0]) \
-        ) for model_name in ['encoder', 'regressor']
+        model_name: sorted(
+            glob(f"{prefix}/{model_name}/*.pt"),
+            key=lambda x: int(x.split("\\ep")[-1].split("_")[0]),
+        )
+        for model_name in ["encoder", "regressor"]
     }
 
 
 class VisTool:
 
-    __version__ = '0.2'
-    __date__ = 'Aug 18. 2021'
+    __version__ = "0.2"
+    __date__ = "Aug 18. 2021"
     CAMS = {
-        'gcam': CAM,
-        'sgrad': SmoothGrad,
-        'agrad': AugGrad,
+        "gcam": CAM,
+        "sgrad": SmoothGrad,
+        "agrad": AugGrad,
     }
 
-    def __init__(self, cfg, model, cam_type='agrad', **kwargs):
+    def __init__(self, cfg, model, cam_type="agrad", **kwargs):
 
-        '''
+        """
         cfg:
             Configuration dict. necessary
         model:
@@ -48,24 +51,23 @@ class VisTool:
         cam_type:
             type in which cam to use. 3 options for Apr 7. - gcam, sgrad, agrad.
             which stands for GradCAM, SmoothGrad, AugGrad respectively
-        '''
+        """
 
         self.cfg = cfg
         self.model = model
         self.cam_type = cam_type
         self.vis_tool = VisTool.CAMS[self.cam_type](cfg, model, **kwargs)
 
-
     def load_weight(self, pth):
 
-        '''
+        """
         Load pretraind weights to model.
         Either use
             dict:
                 that contains {model_name: weight_path}
             str:
                 directly .pth
-        '''
+        """
 
         try:
             print(f"Load '{pth}'")
@@ -81,7 +83,6 @@ class VisTool:
             print("An error occurred during loading weights.")
             raise
 
-
     def __call__(
         self,
         x=None,
@@ -90,11 +91,11 @@ class VisTool:
         visualize=False,
         slice_index=48,
         weight=None,
-        prefix=None, # DEPRECATED
+        prefix=None,  # DEPRECATED
         layer_index=None,
         save=False,
     ):
-        '''
+        """
         This method interacts with `trainer`.
         Arguments:
             x: torch.tensor
@@ -132,7 +133,7 @@ class VisTool:
                         -encoder
                         -regressor
                         -domainer (optional)
-            
+
             layer_index: int|list default=None
                 Select a layer/layers to retrieve a saliency map.
                 If None is given, find all layers' visual map
@@ -160,26 +161,33 @@ class VisTool:
                         ep{epoch}_layer1.npy
                         ep{epoch}_layer2.npy
                         ...
-                    
-                
-        '''
+
+
+        """
 
         def run():
 
-            if x is not None and y is not None: # (x, y) pair given
+            if x is not None and y is not None:  # (x, y) pair given
                 if dataloader is not None:
-                    print("Don't need to pass dataloader if x and y is given. "\
-                        "This dataloader will be ignored.")
-                    
+                    print(
+                        "Don't need to pass dataloader if x and y is given. "
+                        "This dataloader will be ignored."
+                    )
+
                 vismap = self.run_vistool(x, y, layer_index=layer_index)
                 brain = x
 
-            elif dataloader is not None: # dataloader given.
+            elif dataloader is not None:  # dataloader given.
                 if x is not None and y is not None:
-                    print("(x, y) pair overpowers in priority against dataloader. "\
-                        "VisMap with a single (x, y) pair will be returned")
+                    print(
+                        "(x, y) pair overpowers in priority against dataloader. "
+                        "VisMap with a single (x, y) pair will be returned"
+                    )
 
-                vismap = [np.zeros(self.cfg.resize) for l in range(len(self.vis_tool.conv_layers))]
+                vismap = [
+                    np.zeros(self.cfg.resize)
+                    for l in range(len(self.vis_tool.conv_layers))
+                ]
                 brain = torch.zeros((1, 1, *self.cfg.resize))
                 for _x, _y, _ in dataloader:
 
@@ -191,7 +199,9 @@ class VisTool:
             if visualize:
                 for idx, layer in enumerate(vismap):
                     # plot_vismap(brain, layer, slc=slice_index, title=f"{idx}th layer.")
-                    plot_vismap('template', layer, slc=slice_index, title=f"{idx}th layer.")
+                    plot_vismap(
+                        "template", layer, slc=slice_index, title=f"{idx}th layer."
+                    )
                     clear_output()
 
             return vismap
@@ -199,23 +209,29 @@ class VisTool:
         if prefix is not None:
             weights = get_weight_dict(prefix)
             vismaps = list()
-            for encoder_weight, regressor_weight in zip(weights['encoder'], weights['regressor']):
-        
-                self.load_weight({
-                    'encoder': encoder_weight,
-                    'regressor': regressor_weight,
-                })
+            for encoder_weight, regressor_weight in zip(
+                weights["encoder"], weights["regressor"]
+            ):
+
+                self.load_weight(
+                    {
+                        "encoder": encoder_weight,
+                        "regressor": regressor_weight,
+                    }
+                )
                 layer_vismap = run()
                 vismaps.append(layer_vismap)
 
                 if save:
-                    os.makedirs(f'{prefix}/layers', exist_ok=True)
-                    weight_name = encoder_weight.split('\\')[-1].split('.pt')[0]
+                    os.makedirs(f"{prefix}/layers", exist_ok=True)
+                    weight_name = encoder_weight.split("\\")[-1].split(".pt")[0]
                     for layer_idx, layer in enumerate(layer_vismap):
-                        save_path = f'{prefix}/layers/layer{layer_idx}'
+                        save_path = f"{prefix}/layers/layer{layer_idx}"
                         os.makedirs(save_path, exist_ok=True)
-                        np.save(f'{save_path}/weight{weight_name}_layer{layer_idx}.npy', layer)
-
+                        np.save(
+                            f"{save_path}/weight{weight_name}_layer{layer_idx}.npy",
+                            layer,
+                        )
 
         if weight is not None:
             self.load_weight(weight)
@@ -225,41 +241,46 @@ class VisTool:
 
             weights = get_weight_dict(prefix)
             vismaps = list()
-            for encoder_weight, regressor_weight in zip(weights['encoder'], weights['regressor']):
-        
-                self.load_weight({
-                    'encoder': encoder_weight,
-                    'regressor': regressor_weight,
-                })
+            for encoder_weight, regressor_weight in zip(
+                weights["encoder"], weights["regressor"]
+            ):
+
+                self.load_weight(
+                    {
+                        "encoder": encoder_weight,
+                        "regressor": regressor_weight,
+                    }
+                )
                 vismaps.append(run())
 
-            return vismaps # [VISMAP_EP1(=[LAYER1, LAYER2, ...]), VISMAP_EP2, ...]
+            return vismaps  # [VISMAP_EP1(=[LAYER1, LAYER2, ...]), VISMAP_EP2, ...]
 
         else:
             print("None of weight neither prefix is given.")
-            return        
+            return
 
-        
     def run_vistool(self, x, y, layer_index=None, **kwargs):
 
         self.model.to(self.cfg.device)
         x, y = x.to(self.cfg.device), y.to(self.cfg.device)
-        vismap = self.vis_tool(x, y, layer_index=layer_index, **kwargs) # Should return (1, 96, 96, 96) visualization map
+        vismap = self.vis_tool(
+            x, y, layer_index=layer_index, **kwargs
+        )  # Should return (1, 96, 96, 96) visualization map
 
         return vismap
-
 
     @deprecate
     def run_pretrains_single(self, path, x, y, slc=None, visualize=True, **kwargs):
 
-        '''
+        """
         Put path that contains all the .pth during training
         This will run and visualize all the .pth
         slc: Selecting a slice to view
-        '''
+        """
 
-        saved_models = sorted(glob(path), \
-                              key=lambda x: int(x.split('ep')[1].split('-')[0]))
+        saved_models = sorted(
+            glob(path), key=lambda x: int(x.split("ep")[1].split("-")[0])
+        )
         vismaps = list()
         for idx, pth in enumerate(saved_models):
 
@@ -269,13 +290,12 @@ class VisTool:
 
         return vismaps
 
-
     @deprecate
     def run_dataloader(self, dataloader, pth=None, slc=None, visualize=False, **kwargs):
-        '''
+        """
         Runs VisTool on a single Dataloader
         No need to give a speicific path if its already pretrained, but you can give it as a input 'pth'
-        '''
+        """
 
         if pth is not None:
             self.load_weight(pth)
@@ -288,19 +308,22 @@ class VisTool:
 
             if i == 0:
                 avg_vismap = self.run_vistool(x, y, visualize=visualize, **kwargs)
-            
+
             else:
                 avg_vismap += self.run_vistool(x, y, visualize=visualize, **kwargs)
 
         avg_vismap = avg_vismap / len(dataloader)
         return avg_vismap
 
-
     @deprecate
-    def run_pretrains_dataloader(self, path, dataloader, slc=None, visualize=False, checkpoint=True, **kwargs):
+    def run_pretrains_dataloader(
+        self, path, dataloader, slc=None, visualize=False, checkpoint=True, **kwargs
+    ):
 
-        saved_models = sorted(glob(path), key=lambda x: int(x.split('ep')[1].split('-')[0]))
-        
+        saved_models = sorted(
+            glob(path), key=lambda x: int(x.split("ep")[1].split("-")[0])
+        )
+
         self.vismap_ts = list()
         for idx, pth in enumerate(saved_models):
 
@@ -310,6 +333,6 @@ class VisTool:
             vismap = self.run_dataloader(dataloader, visualize=visualize, **kwargs)
             self.vismap_ts.append(vismap)
             if checkpoint:
-                att_path = 'attention_maps'.join(path.split('models'))[:-6] + '_tmp'
-                np.save(f'{att_path}/{str(idx).zfill(3)}.npy', v)
+                att_path = "attention_maps".join(path.split("models"))[:-6] + "_tmp"
+                np.save(f"{att_path}/{str(idx).zfill(3)}.npy", v)
             clear_output()

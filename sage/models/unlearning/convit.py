@@ -5,9 +5,9 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-'''These modules are adapted from those of timm, see
+"""These modules are adapted from those of timm, see
 https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
-'''
+"""
 
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -26,7 +26,14 @@ import matplotlib.pyplot as plt
 
 
 class Mlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+    def __init__(
+        self,
+        in_features,
+        hidden_features=None,
+        out_features=None,
+        act_layer=nn.GELU,
+        drop=0.0,
+    ):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -35,16 +42,16 @@ class Mlp(nn.Module):
         self.fc2 = nn.Linear(hidden_features, out_features)
         self.drop = nn.Dropout(drop)
         self.apply(self._init_weights)
-        
+
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
-            
+
     def forward(self, x):
         x = self.fc1(x)
         x = self.act(x)
@@ -55,17 +62,26 @@ class Mlp(nn.Module):
 
 
 class GPSA(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.,
-                 locality_strength=1., use_local_init=True):
+    def __init__(
+        self,
+        dim,
+        num_heads=8,
+        qkv_bias=False,
+        qk_scale=None,
+        attn_drop=0.0,
+        proj_drop=0.0,
+        locality_strength=1.0,
+        use_local_init=True,
+    ):
         super().__init__()
         self.num_heads = num_heads
         self.dim = dim
         head_dim = dim // num_heads
         self.scale = qk_scale or head_dim ** -0.5
 
-        self.qk = nn.Linear(dim, dim * 2, bias=qkv_bias)       
-        self.v = nn.Linear(dim, dim, bias=qkv_bias)       
-        
+        self.qk = nn.Linear(dim, dim * 2, bias=qkv_bias)
+        self.v = nn.Linear(dim, dim, bias=qkv_bias)
+
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
         self.pos_proj = nn.Linear(4, num_heads)
@@ -78,80 +94,98 @@ class GPSA(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
-        
+
     def forward(self, x):
         B, N, C = x.shape
-        if not hasattr(self, 'rel_indices') or self.rel_indices.size(1)!=N:
+        if not hasattr(self, "rel_indices") or self.rel_indices.size(1) != N:
             self.get_rel_indices(N)
 
         attn = self.get_attention(x)
-        v = self.v(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+        v = (
+            self.v(x)
+            .reshape(B, N, self.num_heads, C // self.num_heads)
+            .permute(0, 2, 1, 3)
+        )
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
 
     def get_attention(self, x):
-        B, N, C = x.shape        
-        qk = self.qk(x).reshape(B, N, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        B, N, C = x.shape
+        qk = (
+            self.qk(x)
+            .reshape(B, N, 2, self.num_heads, C // self.num_heads)
+            .permute(2, 0, 3, 1, 4)
+        )
         q, k = qk[0], qk[1]
-        pos_score = self.rel_indices.expand(B, -1, -1,-1)
-        pos_score = self.pos_proj(pos_score).permute(0,3,1,2) 
+        pos_score = self.rel_indices.expand(B, -1, -1, -1)
+        pos_score = self.pos_proj(pos_score).permute(0, 3, 1, 2)
         patch_score = (q @ k.transpose(-2, -1)) * self.scale
         patch_score = patch_score.softmax(dim=-1)
         pos_score = pos_score.softmax(dim=-1)
 
-        gating = self.gating_param.view(1,-1,1,1)
-        attn = (1.-torch.sigmoid(gating)) * patch_score + torch.sigmoid(gating) * pos_score
+        gating = self.gating_param.view(1, -1, 1, 1)
+        attn = (1.0 - torch.sigmoid(gating)) * patch_score + torch.sigmoid(
+            gating
+        ) * pos_score
         attn /= attn.sum(dim=-1).unsqueeze(-1)
         attn = self.attn_drop(attn)
         return attn
 
-    def get_attention_map(self, x, return_map = False):
+    def get_attention_map(self, x, return_map=False):
 
-        attn_map = self.get_attention(x).mean(0) # average over batch
-        distances = self.rel_indices.squeeze()[:,:,-1]**.5
-        dist = torch.einsum('nm,hnm->h', (distances, attn_map))
+        attn_map = self.get_attention(x).mean(0)  # average over batch
+        distances = self.rel_indices.squeeze()[:, :, -1] ** 0.5
+        dist = torch.einsum("nm,hnm->h", (distances, attn_map))
         dist /= distances.size(0)
         if return_map:
             return dist, attn_map
         else:
             return dist
-    
 
-    def local_init(self, locality_strength=1.):
-        
+    def local_init(self, locality_strength=1.0):
+
         self.v.weight.data.copy_(torch.eye(self.dim))
-        locality_distance = 1 #max(1,1/locality_strength**.5)
-        
-        kernel_size = int(self.num_heads**.5)
-        center = (kernel_size-1)/2 if kernel_size%2==0 else kernel_size//2
+        locality_distance = 1  # max(1,1/locality_strength**.5)
+
+        kernel_size = int(self.num_heads ** 0.5)
+        center = (kernel_size - 1) / 2 if kernel_size % 2 == 0 else kernel_size // 2
         for h1 in range(kernel_size):
             for h2 in range(kernel_size):
-                position = h1+kernel_size*h2
-                self.pos_proj.weight.data[position,2] = -1
-                self.pos_proj.weight.data[position,1] = 2*(h1-center)*locality_distance
-                self.pos_proj.weight.data[position,0] = 2*(h2-center)*locality_distance
+                position = h1 + kernel_size * h2
+                self.pos_proj.weight.data[position, 2] = -1
+                self.pos_proj.weight.data[position, 1] = (
+                    2 * (h1 - center) * locality_distance
+                )
+                self.pos_proj.weight.data[position, 0] = (
+                    2 * (h2 - center) * locality_distance
+                )
         self.pos_proj.weight.data *= locality_strength
-
 
     def get_rel_indices(self, num_patches):
 
-        img_size = round(num_patches ** (1/3))
-        rel_indices   = torch.zeros(1, num_patches, num_patches, 4)
+        img_size = round(num_patches ** (1 / 3))
+        rel_indices = torch.zeros(1, num_patches, num_patches, 4)
 
-        ind = torch.arange(img_size).view(1,-1) - torch.arange(img_size).view(-1, 1)
+        ind = torch.arange(img_size).view(1, -1) - torch.arange(img_size).view(-1, 1)
 
-        indx = ind.repeat(img_size ** 2,img_size ** 2)
-        indy = ind.repeat_interleave(img_size,dim=0).repeat_interleave(img_size,dim=1).repeat(img_size, img_size)
-        indz = ind.repeat_interleave(img_size ** 2, dim=0).repeat_interleave(img_size ** 2, dim=1)
-        indd = indx**2 + indy**2 + indz**2
+        indx = ind.repeat(img_size ** 2, img_size ** 2)
+        indy = (
+            ind.repeat_interleave(img_size, dim=0)
+            .repeat_interleave(img_size, dim=1)
+            .repeat(img_size, img_size)
+        )
+        indz = ind.repeat_interleave(img_size ** 2, dim=0).repeat_interleave(
+            img_size ** 2, dim=1
+        )
+        indd = indx ** 2 + indy ** 2 + indz ** 2
 
         rel_indices[..., 3] = indd.unsqueeze(0)
         rel_indices[..., 2] = indz.unsqueeze(0)
@@ -162,9 +196,16 @@ class GPSA(nn.Module):
         self.rel_indices = rel_indices.to(device)
 
 
- 
 class MHSA(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+    def __init__(
+        self,
+        dim,
+        num_heads=8,
+        qkv_bias=False,
+        qk_scale=None,
+        attn_drop=0.0,
+        proj_drop=0.0,
+    ):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
@@ -175,43 +216,50 @@ class MHSA(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
         self.apply(self._init_weights)
-        
+
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def get_attention_map(self, x, return_map = False):
+    def get_attention_map(self, x, return_map=False):
         B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        qkv = (
+            self.qkv(x)
+            .reshape(B, N, 3, self.num_heads, C // self.num_heads)
+            .permute(2, 0, 3, 1, 4)
+        )
         q, k, v = qkv[0], qkv[1], qkv[2]
         attn_map = (q @ k.transpose(-2, -1)) * self.scale
         attn_map = attn_map.softmax(dim=-1).mean(0)
 
-        img_size = int(N**.5)
-        ind = torch.arange(img_size).view(1,-1) - torch.arange(img_size).view(-1, 1)
-        indx = ind.repeat(img_size,img_size)
-        indy = ind.repeat_interleave(img_size,dim=0).repeat_interleave(img_size,dim=1)
-        indd = indx**2 + indy**2
-        distances = indd**.5
-        distances = distances.to('cuda')
+        img_size = int(N ** 0.5)
+        ind = torch.arange(img_size).view(1, -1) - torch.arange(img_size).view(-1, 1)
+        indx = ind.repeat(img_size, img_size)
+        indy = ind.repeat_interleave(img_size, dim=0).repeat_interleave(img_size, dim=1)
+        indd = indx ** 2 + indy ** 2
+        distances = indd ** 0.5
+        distances = distances.to("cuda")
 
-        dist = torch.einsum('nm,hnm->h', (distances, attn_map))
+        dist = torch.einsum("nm,hnm->h", (distances, attn_map))
         dist /= N
-        
+
         if return_map:
             return dist, attn_map
         else:
             return dist
 
-            
     def forward(self, x):
         B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        qkv = (
+            self.qkv(x)
+            .reshape(B, N, 3, self.num_heads, C // self.num_heads)
+            .permute(2, 0, 3, 1, 4)
+        )
         q, k, v = qkv[0], qkv[1], qkv[2]
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
@@ -222,55 +270,95 @@ class MHSA(nn.Module):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
-    
-class Block(nn.Module):
 
-    def __init__(self, dim, num_heads,  mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, use_gpsa=True, **kwargs):
+
+class Block(nn.Module):
+    def __init__(
+        self,
+        dim,
+        num_heads,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_scale=None,
+        drop=0.0,
+        attn_drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        use_gpsa=True,
+        **kwargs,
+    ):
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.use_gpsa = use_gpsa
         if self.use_gpsa:
-            self.attn = GPSA(dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop, **kwargs)
+            self.attn = GPSA(
+                dim,
+                num_heads=num_heads,
+                qkv_bias=qkv_bias,
+                qk_scale=qk_scale,
+                attn_drop=attn_drop,
+                proj_drop=drop,
+                **kwargs,
+            )
         else:
-            self.attn = MHSA(dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop, **kwargs)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+            self.attn = MHSA(
+                dim,
+                num_heads=num_heads,
+                qkv_bias=qkv_bias,
+                qk_scale=qk_scale,
+                attn_drop=attn_drop,
+                proj_drop=drop,
+                **kwargs,
+            )
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+        self.mlp = Mlp(
+            in_features=dim,
+            hidden_features=mlp_hidden_dim,
+            act_layer=act_layer,
+            drop=drop,
+        )
 
     def forward(self, x):
         x = x + self.drop_path(self.attn(self.norm1(x)))
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
-    
+
 
 class PatchEmbed(nn.Module):
-    """ Image to Patch Embedding, from timm
-    """
+    """Image to Patch Embedding, from timm"""
+
     def __init__(self, img_size=96, patch_size=16, in_chans=1, embed_dim=768):
         super().__init__()
-        
+
         img_size = to_3tuple(img_size)
         patch_size = to_3tuple(patch_size)
-        
-        num_patches = reduce(lambda x, y: x * y, [i // p for i, p in zip(img_size, patch_size)])
+
+        num_patches = reduce(
+            lambda x, y: x * y, [i // p for i, p in zip(img_size, patch_size)]
+        )
         self.img_size = img_size
         self.patch_size = patch_size
         self.num_patches = num_patches
 
-        self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj = nn.Conv3d(
+            in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
+        )
         self.apply(self._init_weights)
+
     def forward(self, x):
         B, C, H, W, D = x.shape
-        assert H == self.img_size[0] and W == self.img_size[1] and D == self.img_size[2], \
-            f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        x = self.proj(x).flatten(2).transpose(1, 2)    
+        assert (
+            H == self.img_size[0] and W == self.img_size[1] and D == self.img_size[2]
+        ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+        x = self.proj(x).flatten(2).transpose(1, 2)
         return x
-    
+
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -279,9 +367,11 @@ class PatchEmbed(nn.Module):
 
 
 class HybridEmbed(nn.Module):
-    """ CNN Feature Map Embedding, from timm
-    """
-    def __init__(self, backbone, img_size=224, feature_size=None, in_chans=3, embed_dim=768):
+    """CNN Feature Map Embedding, from timm"""
+
+    def __init__(
+        self, backbone, img_size=224, feature_size=None, in_chans=3, embed_dim=768
+    ):
         super().__init__()
         assert isinstance(backbone, nn.Module)
         img_size = to_3tuple(img_size)
@@ -292,7 +382,9 @@ class HybridEmbed(nn.Module):
                 training = backbone.training
                 if training:
                     backbone.eval()
-                o = self.backbone(torch.zeros(1, in_chans, img_size[0], img_size[1]))[-1]
+                o = self.backbone(torch.zeros(1, in_chans, img_size[0], img_size[1]))[
+                    -1
+                ]
                 feature_size = o.shape[-2:]
                 feature_dim = o.shape[1]
                 backbone.train(training)
@@ -311,63 +403,116 @@ class HybridEmbed(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    """ Vision Transformer with support for patch or hybrid CNN input stage
-    """
-    def __init__(self, img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=48, depth=12,
-                 num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0., hybrid_backbone=None, norm_layer=nn.LayerNorm, global_pool=None,
-                 local_up_to_layer=10, locality_strength=1., use_pos_embed=True, return_embed=True,
-                 *args, **kwargs):
+    """Vision Transformer with support for patch or hybrid CNN input stage"""
+
+    def __init__(
+        self,
+        img_size=96,
+        patch_size=16,
+        in_chans=1,
+        num_classes=1,
+        embed_dim=48,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_scale=None,
+        drop_rate=0.0,
+        attn_drop_rate=0.0,
+        drop_path_rate=0.0,
+        hybrid_backbone=None,
+        norm_layer=nn.LayerNorm,
+        global_pool=None,
+        local_up_to_layer=10,
+        locality_strength=1.0,
+        use_pos_embed=True,
+        return_embed=True,
+        *args,
+        **kwargs,
+    ):
 
         super().__init__()
         self.num_classes = num_classes
         self.local_up_to_layer = local_up_to_layer
-        self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
+        self.num_features = (
+            self.embed_dim
+        ) = embed_dim  # num_features for consistency with other models
         self.locality_strength = locality_strength
         self.use_pos_embed = use_pos_embed
         self.return_embed = return_embed
 
         if hybrid_backbone is not None:
             self.patch_embed = HybridEmbed(
-                hybrid_backbone, img_size=img_size, in_chans=in_chans, embed_dim=embed_dim)
+                hybrid_backbone,
+                img_size=img_size,
+                in_chans=in_chans,
+                embed_dim=embed_dim,
+            )
         else:
             self.patch_embed = PatchEmbed(
-                img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+                img_size=img_size,
+                patch_size=patch_size,
+                in_chans=in_chans,
+                embed_dim=embed_dim,
+            )
         num_patches = self.patch_embed.num_patches
         self.num_patches = num_patches
-        
+
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         if self.use_pos_embed:
             self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
-            trunc_normal_(self.pos_embed, std=.02)
+            trunc_normal_(self.pos_embed, std=0.02)
 
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
-        self.blocks = nn.ModuleList([
-            Block(
-                dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer,
-                use_gpsa=True,
-                locality_strength=locality_strength)
-            if i<local_up_to_layer else
-            Block(
-                dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer,
-                use_gpsa=False)
-            for i in range(depth)])
+        dpr = [
+            x.item() for x in torch.linspace(0, drop_path_rate, depth)
+        ]  # stochastic depth decay rule
+        self.blocks = nn.ModuleList(
+            [
+                Block(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    qk_scale=qk_scale,
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                    drop_path=dpr[i],
+                    norm_layer=norm_layer,
+                    use_gpsa=True,
+                    locality_strength=locality_strength,
+                )
+                if i < local_up_to_layer
+                else Block(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    qk_scale=qk_scale,
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                    drop_path=dpr[i],
+                    norm_layer=norm_layer,
+                    use_gpsa=False,
+                )
+                for i in range(depth)
+            ]
+        )
         self.norm = norm_layer(embed_dim)
 
         # Classifier head
-        self.feature_info = [dict(num_chs=embed_dim, reduction=0, module='head')]
-        self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        self.feature_info = [dict(num_chs=embed_dim, reduction=0, module="head")]
+        self.head = (
+            nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        )
 
-        trunc_normal_(self.cls_token, std=.02)
+        trunc_normal_(self.cls_token, std=0.02)
         self.head.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -376,14 +521,16 @@ class VisionTransformer(nn.Module):
 
     @torch.jit.ignore
     def no_weight_decay(self):
-        return {'pos_embed', 'cls_token'}
+        return {"pos_embed", "cls_token"}
 
     def get_classifier(self):
         return self.head
 
-    def reset_classifier(self, num_classes, global_pool=''):
+    def reset_classifier(self, num_classes, global_pool=""):
         self.num_classes = num_classes
-        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = (
+            nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        )
 
     def forward_features(self, x):
         B = x.shape[0]
@@ -395,8 +542,8 @@ class VisionTransformer(nn.Module):
             x = x + self.pos_embed
         x = self.pos_drop(x)
 
-        for u,blk in enumerate(self.blocks):
-            if u == self.local_up_to_layer :
+        for u, blk in enumerate(self.blocks):
+            if u == self.local_up_to_layer:
                 x = torch.cat((cls_tokens, x), dim=1)
             x = blk(x)
 
@@ -408,78 +555,112 @@ class VisionTransformer(nn.Module):
         if not self.return_embed:
             x = self.head(x)
         return x
-    
+
+
 @dataclass
 class ConvitArguments:
-    '''
+    """
     Arguments for ConVit
-    '''
+    """
+
     img_size: int = field(
-        default=96, metadata={"help": "Size of an image. Currently supports regular-square only"}
+        default=96,
+        metadata={"help": "Size of an image. Currently supports regular-square only"},
     )
     patch_size: int = field(
-        default=16, metadata={"help": "One side of the patch. With 96-cubic MRI image will give 216 patches in total."}
+        default=16,
+        metadata={
+            "help": "One side of the patch. With 96-cubic MRI image will give 216 patches in total."
+        },
     )
     in_chans: int = field(
-        default=1, metadata={"help": "Number of channels of a given input. MRI uses grayscale image, it will be set to 1"}
+        default=1,
+        metadata={
+            "help": "Number of channels of a given input. MRI uses grayscale image, it will be set to 1"
+        },
     )
     num_classes: int = field(
         default=1,
-        metadata={"help": "Number of output classes. Regression will use 1 for default.\
-            No longer be used if `return_embed` is set to True."}
+        metadata={
+            "help": "Number of output classes. Regression will use 1 for default.\
+            No longer be used if `return_embed` is set to True."
+        },
     )
     embed_dim: int = field(
-        default=48, metadata={"help": "Number of embedding dimension. Should be a multiplier of n_heads."}
+        default=48,
+        metadata={
+            "help": "Number of embedding dimension. Should be a multiplier of n_heads."
+        },
     )
-    depth: int = field(
-        default=12, metadata={"help": "Number of layers"}
+    depth: int = field(default=12, metadata={"help": "Number of layers"})
+    num_heads: int = field(default=12, metadata={"help": "Number of attention heads."})
+    mlp_ratio: float = field(  # TODO : add description
+        default=4.0, metadata={"help": "."}
     )
-    num_heads: int = field(
-        default=12, metadata={"help": "Number of attention heads."}
-    )
-    mlp_ratio: float = field( # TODO : add description
-        default=4., metadata={"help": "."}
-    )
-    qkv_bias: bool = field( # TODO : add description
+    qkv_bias: bool = field(  # TODO : add description
         default=None, metadata={"help": "."}
     )
     qk_scale: bool = field(
-        default=None, metadata={"help": "Scaling scalar multiplied to QK^T. If not given, inversed square root of number of heads be used."}
+        default=None,
+        metadata={
+            "help": "Scaling scalar multiplied to QK^T. If not given, inversed square root of number of heads be used."
+        },
     )
     drop_rate: float = field(
-        default=0., metadata={"help": "Dropout ratio inside the attneion block used for linear projection."}
+        default=0.0,
+        metadata={
+            "help": "Dropout ratio inside the attneion block used for linear projection."
+        },
     )
     attn_drop_rate: float = field(
-        default=0., metadata={"help": "Dropout ratio inside the attneion block used for linear projection."}
+        default=0.0,
+        metadata={
+            "help": "Dropout ratio inside the attneion block used for linear projection."
+        },
     )
     drop_path_rate: float = field(
-        default=0., metadata={"help": "Dropout ratio for drop path used inside the attention block"}
+        default=0.0,
+        metadata={
+            "help": "Dropout ratio for drop path used inside the attention block"
+        },
     )
-    hybrid_backbone=None # TODO: what is this ...
+    hybrid_backbone = None  # TODO: what is this ...
     norm_layer: Any = field(
-        default=nn.LayerNorm, metadata={"help": "Type of normalization used inside the model. LayerNorm in default"}
+        default=nn.LayerNorm,
+        metadata={
+            "help": "Type of normalization used inside the model. LayerNorm in default"
+        },
     )
-    global_pool=None # TODO : What is this ... 2
+    global_pool = None  # TODO : What is this ... 2
     local_up_to_layer: int = field(
-        default=10, metadata={"help": "How many local layers that uses Gated Positional Self-attention"}
+        default=10,
+        metadata={
+            "help": "How many local layers that uses Gated Positional Self-attention"
+        },
     )
     locality_strength: float = field(
-        default=1., metadata={"help": "Larger the locality, will watch the pixels very nearby."}
+        default=1.0,
+        metadata={"help": "Larger the locality, will watch the pixels very nearby."},
     )
     use_pos_embed: bool = field(
-        default=True, metadata={"help": "Whehter to use positional embedding. This is a learned positional embedding"}
+        default=True,
+        metadata={
+            "help": "Whehter to use positional embedding. This is a learned positional embedding"
+        },
     )
     return_embed: bool = field(
-        default=True, metadata={"help": "Whether to return a vector embedding instead of probability of classes"}
+        default=True,
+        metadata={
+            "help": "Whether to return a vector embedding instead of probability of classes"
+        },
     )
-    
+
     @property
     def config(self):
         return vars(self)
 
 
-    
-if __name__=="__main__":
+if __name__ == "__main__":
 
     model = VisionTransformer(img_size=96, patch_size=16, in_chans=1, num_classes=1)
     sample_brain = torch.zeros(2, 1, 96, 96, 96)
