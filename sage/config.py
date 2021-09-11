@@ -33,7 +33,7 @@ def save_config(cfg, path=CONFIG_FILE_PATH):
 def load_config(path=CONFIG_FILE_PATH):
 
     with open(path, "r") as y:
-        return easydict.EasyDict(yaml.load(y, Loader=yaml.FullLoader))
+        return easydict.EasyDict(yaml.load(y, Loader=yaml.Loader))
 
 
 import contextlib
