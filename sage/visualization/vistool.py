@@ -78,8 +78,9 @@ class VisTool:
         self.model = Assembled(encoder, regressor)
         del trainer
 
-        self.train_dataloader = get_dataloader(self.cfg, test=False)
-        self.valid_dataloader = get_dataloader(self.cfg, test=True)
+        self.train_dataloader = get_dataloader(self.cfg, sampling="train")
+        self.valid_dataloader = get_dataloader(self.cfg, sampling="valid")
+        self.test_dataloader = get_dataloader(self.cfg, sampling="test")
 
     def load_weight(self, pth):
 
