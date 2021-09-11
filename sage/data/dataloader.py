@@ -34,11 +34,16 @@ def get_loader(extension):
 
 
 class BrainAgeDataset(Dataset):
-    def __init__(self, cfg, test=False):
+    def __init__(self, cfg, sampling="train"):
 
         """
         CONFIG file should contain .csv file and -
         that .csv file should contain 'path' columns that contains full absolute path of the file
+
+        sampling: str
+            either 'train', 'valid', 'test'
+            Test will always be the same with seed=42,
+            while train/valid will depend on the configuration seed
 
         ROOT is the path of database.
         In this folder, we need - (**VERY IMPORTANT**)
@@ -57,7 +62,7 @@ class BrainAgeDataset(Dataset):
         self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
         self.load = get_loader(extension=self.data_cfg.extension)
         self.augment = cfg.augment
-        self.test = test
+        self.sampling = sampling
 
         # DEBUG SETUP
         self.debug = cfg.debug
@@ -67,7 +72,7 @@ class BrainAgeDataset(Dataset):
             cfg.data_debug = []
 
         # VALIDATION SET SHOULD NOT DO AUGMENTATION
-        if test:
+        if sampling in ["valid", "test"]:
             self.augment = False
 
         # LABEL FILE
@@ -96,11 +101,14 @@ class BrainAgeDataset(Dataset):
         }
 
         # SPLIT DATA
-        trn, val = train_test_split(
-            self.label_file, test_size=cfg.test_size, random_state=SEED
+        trn, tst = train_test_split(
+            self.label_file, test_size=0.1, random_state=42  # FIXATED SEED
         )
+        trn, val = train_test_split(trn, test_size=cfg.test_size, random_state=cfg.seed)
+
         trn_idx, trn_age, trn_src = trn["abs_path"], trn["age"], trn["src"]
         val_idx, val_age, val_src = val["abs_path"], val["age"], val["src"]
+        tst_idx, tst_age, tst_src = tst["abs_path"], tst["age"], tst["src"]
 
         # AUGMENTATION
         if self.augment:
@@ -117,7 +125,7 @@ class BrainAgeDataset(Dataset):
             self.augmentation = lambda x: x
 
         # SETUP DATA_FILES
-        if not test:  # TRAIN SET
+        if sampling == "train":  # TRAIN SET
 
             # TODO: AUGRATIO
             self.data_files = (
@@ -136,10 +144,15 @@ class BrainAgeDataset(Dataset):
                 else trn_src
             )
 
-        else:  # VALIDATION SET
+        elif sampling == "valid":  # VALIDATION SET
             self.data_files = val_idx
             self.data_ages = val_age
             self.data_src = val_src
+
+        elif sampling == "test":  # TEST SET
+            self.data_files = tst_idx
+            self.data_ages = tst_age
+            self.data_src = tst_src
 
         self.data_files = self.data_files.to_list()
         self.data_ages = self.data_ages.to_list()
@@ -264,7 +277,7 @@ class BrainAgeDataset(Dataset):
         return self.cfg, self.data_cfg
 
 
-def get_dataloader(cfg, test=False, return_dataset=False, pin_memory=True):
+def get_dataloader(cfg, sampling="train", return_dataset=False, pin_memory=True):
     """
     Just giving cfg.registration will find a proper path
     """
@@ -275,7 +288,7 @@ def get_dataloader(cfg, test=False, return_dataset=False, pin_memory=True):
         "raw": "G:/My Drive/brain_data/brainmask_nii",
     }[cfg.registration]
 
-    dataset = BrainAgeDataset(cfg, test=test)
+    dataset = BrainAgeDataset(cfg, sampling=sampling)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size, pin_memory=pin_memory)
     return dataloader if not return_dataset else dataset
 

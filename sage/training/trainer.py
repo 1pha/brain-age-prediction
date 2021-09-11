@@ -87,20 +87,26 @@ class MRITrainer:
         }
 
         # 3. Load Dataloader
-        self.train_dataloader = get_dataloader(cfg, test=False)
+        self.train_dataloader = get_dataloader(cfg, sampling="train")
         self.gt_age_train = torch.tensor(
             self.train_dataloader.dataset.data_ages, dtype=torch.float
         )
         self.gt_src_train = torch.tensor(self.train_dataloader.dataset.data_src)
 
-        self.valid_dataloader = get_dataloader(cfg, test=True)
+        self.valid_dataloader = get_dataloader(cfg, sampling="valid")
         self.gt_age_valid = torch.tensor(
             self.valid_dataloader.dataset.data_ages, dtype=torch.float
         )
         self.gt_src_valid = torch.tensor(self.valid_dataloader.dataset.data_src)
 
+        self.test_dataloader = get_dataloader(cfg, sampling="test")
+        self.gt_age_test = torch.tensor(
+            self.test_dataloader.dataset.data_ages, dtype=torch.float
+        )
+        self.gt_src_test = torch.tensor(self.test_dataloader.dataset.data_src)
+
         print(
-            f"TOTAL TRAIN {len(self.train_dataloader.dataset)} | VALID {len(self.valid_dataloader.dataset)}"
+            f"TOTAL TRAIN {len(self.train_dataloader.dataset)} | VALID {len(self.valid_dataloader.dataset)} | TEST {len(self.test_dataloader.dataset)}"
         )
 
         # 4. AMP Scaler
@@ -167,6 +173,7 @@ class MRITrainer:
                         model_dir=self.save_dir,
                         model_name=model_name,
                     )
+                    best_epoch = e
 
                 # NO PERFORMANCE IMPROVEMENT
                 else:
@@ -220,6 +227,23 @@ class MRITrainer:
                     elapsed_epoch_saved += 1
 
             offset += e
+
+        # CHECK WITH TEST_DATALOADER
+        try:
+            self.load_checkpoint(
+                {
+                    "models": {
+                        "encoder": f"{self.save_dir}/encoder/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
+                        "domainer": f"{self.save_dir}/domainer/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
+                        "regressor": f"{self.save_dir}/regressor/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
+                    }
+                }
+            )
+            test_results = self.valid(actions, test=True)
+            cfg.test_mae = test_results["test_mae"]
+
+        except:
+            pass
 
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
@@ -286,14 +310,14 @@ class MRITrainer:
 
         results = {
             **self.agg_loss(losses),
-            **self.gather_result(ages, "age", train=True),
-            **self.gather_result(domains, "domain", train=True),
+            **self.gather_result(ages, "age", sampling="train"),
+            **self.gather_result(domains, "domain", sampling="train"),
         }
 
         return results
 
     @logging_time
-    def valid(self, actions):
+    def valid(self, actions, test=False):
 
         for _, model in self.models.items():
             model.eval()
@@ -303,8 +327,9 @@ class MRITrainer:
             [],
             [],
         )
+        dataloader = self.valid_dataloader if not test else self.test_dataloader
         with torch.no_grad():
-            for i, (x, y, d) in enumerate(self.valid_dataloader):
+            for i, (x, y, d) in enumerate(dataloader):
 
                 if self.cfg.debug and self.cfg.run_debug.verbose_all:
                     print(f"{i}th Batch.")
@@ -335,8 +360,10 @@ class MRITrainer:
 
         results = {
             **self.agg_loss(losses),
-            **self.gather_result(ages, "age", train=False),
-            **self.gather_result(domains, "domain", train=False),
+            **self.gather_result(ages, "age", sampling="valid" if not test else "test"),
+            **self.gather_result(
+                domains, "domain", sampling="valid" if not test else "test"
+            ),
         }
 
         return results
@@ -423,9 +450,9 @@ class MRITrainer:
         assert len(where_e) == 1
         return where_e[0][0]
 
-    def gather_result(self, preds, datatype="age", train=True):
+    def gather_result(self, preds, datatype="age", sampling="train"):
 
-        prefix = "train" if train else "valid"
+        prefix = sampling
 
         if isinstance(preds, list):
             preds = torch.tensor(preds, dtype=torch.float).squeeze()
@@ -439,7 +466,7 @@ class MRITrainer:
             - R Squared
             """
             metrics = ["mae", "corr", "r2"]
-            gt = self.gt_age_train if train else self.gt_age_valid
+            gt = getattr(self, f"gt_age_{sampling}")
 
             return {
                 f"{prefix}_{metric}": get_metric(preds, gt, metric)
@@ -458,7 +485,7 @@ class MRITrainer:
             metrics = ["auc", "acc"]
             if self.cfg.partial < 1:
                 metrics = ["acc"]
-            gt = self.gt_src_train if train else self.gt_src_valid
+            gt = getattr(self, f"gt_src_{sampling}")
 
             return {
                 f"{prefix}_{metric}": get_metric(preds, gt, metric)
