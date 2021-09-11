@@ -1,13 +1,14 @@
 import os
 import matplotlib.pyplot as plt
 
+from glob import glob
 import numpy as np
+import imageio
 
-import torch
-import nibabel as nib
-
-from nilearn.datasets import load_mni152_template
 from skimage.transform import resize
+from nilearn.datasets import load_mni152_template
+import nibabel as nib
+import torch
 
 
 from .cams import *
@@ -84,7 +85,7 @@ def plot_vismap(
         It will move out blues when overlaid
     threshold:
         values to be thrown out when masked is turned on
-    slc:
+    slc: int | list[int, ...]
         slice to plot up
     alpha:
         opacity for overlaid vismap
@@ -123,18 +124,29 @@ def plot_vismap(
     else:  # Title and Epoch both exists
         fig.suptitle(f"ep{idx} - {title}")
 
+    if isinstance(slc, list):
+
+        assert len(slc) == 3, "Give 3 indices for slice index"
+        slc_sag, slc_cor, slc_hor = slc
+
+    elif isinstance(slc, int):
+        slc_sag, slc_cor, slc_hor = (slc,) * 3
+
+    else:
+        raise "Give possible integers ..."
+
     fig.tight_layout()
     # axes[0].set_title('Saggital')
-    axes[0].imshow(brain[slc, :, :], cmap="gray", interpolation="none")
-    axes[0].imshow(vismap[slc, :, :], cmap="jet", interpolation="none", alpha=alpha)
+    axes[0].imshow(brain[slc_sag, :, :], cmap="gray", interpolation="none")
+    axes[0].imshow(vismap[slc_sag, :, :], cmap="jet", interpolation="none", alpha=alpha)
 
     # axes[1].set_title('Coronal')
-    axes[1].imshow(brain[:, slc, :], cmap="gray", interpolation="none")
-    axes[1].imshow(vismap[:, slc, :], cmap="jet", interpolation="none", alpha=alpha)
+    axes[1].imshow(brain[:, slc_cor, :], cmap="gray", interpolation="none")
+    axes[1].imshow(vismap[:, slc_cor, :], cmap="jet", interpolation="none", alpha=alpha)
 
     # axes[2].set_title('Horizontal')
-    axes[2].imshow(brain[:, :, slc], cmap="gray", interpolation="none")
-    axes[2].imshow(vismap[:, :, slc], cmap="jet", interpolation="none", alpha=alpha)
+    axes[2].imshow(brain[:, :, slc_hor], cmap="gray", interpolation="none")
+    axes[2].imshow(vismap[:, :, slc_hor], cmap="jet", interpolation="none", alpha=alpha)
 
     if save:
         if not os.path.exists(att_path):
@@ -145,12 +157,35 @@ def plot_vismap(
     return fig
 
 
+def save_gif(PREFIX, layer_idx):
+
+    vmap_files = sorted(glob(f"{PREFIX}/layers/layer{layer_idx}/*.npy"))
+    os.makedirs(f"{PREFIX}/gif", exist_ok=True)
+
+    for fname in vmap_files:
+
+        title = fname.split("\\")[-1].split(".npy")[0]
+        fig = plot_vismap("template", np.load(fname), title=title, masked=False)
+        fig.savefig(f"{PREFIX}/gif/{title}_gif.png")
+
+    pngs = glob(f"{PREFIX}/gif/*.png")
+
+    output_file_name = f"{PREFIX}/gif/weight_layer{layer_idx}.gif"
+    imgs_array = [imageio.imread(files) for files in pngs]
+    imageio.mimsave(output_file_name, imgs_array, duration=0.5)
+
+
 def convert2nifti(path, data, vismap):
 
     """
-    path: path of original dataloaders', e.g. '../../brainmask_tlrc/PAL318_mpr_wave1_orig-brainmask_tlrc.npy'
-    data: a single brain of 5-dim torch.tensor. Will be converted to numpy automatically
-    vismap: attention map derived from any methods of - GradCAM, GBP, GuidedGCAM
+    Parameters
+    ----------
+    path:
+        path of original dataloaders', e.g. '../../brainmask_tlrc/PAL318_mpr_wave1_orig-brainmask_tlrc.npy'
+    data:
+        a single brain of 5-dim torch.tensor. Will be converted to numpy automatically
+    vismap:
+        attention map derived from any methods of - GradCAM, GBP, GuidedGCAM
 
     Does not return anything but instead saved 2 nifti files (registrated brain, visualization map) in
     ../../attmap_result_pairs/filename/*.nii.gz

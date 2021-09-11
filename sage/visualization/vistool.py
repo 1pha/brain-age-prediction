@@ -10,6 +10,7 @@ from .auggrad import AugGrad
 from .utils import plot_vismap, Assembled
 
 from ..config import load_config
+from ..data.dataloader import get_dataloader
 from ..training.trainer import MRITrainer
 
 
@@ -77,6 +78,9 @@ class VisTool:
         self.model = Assembled(encoder, regressor)
         del trainer
 
+        self.train_dataloader = get_dataloader(self.cfg, test=False)
+        self.valid_dataloader = get_dataloader(self.cfg, test=True)
+
     def load_weight(self, pth):
 
         """
@@ -123,7 +127,8 @@ class VisTool:
             y: torch.tensor
                 A single age (or any target) in float contained in tensor
 
-            dataloader: torch.utils.data.DataLoader
+            dataloader: torch.utils.data.DataLoader | bool
+                If "True" given, use attribute dataloader
                 Dataloader from torch that yields (x, y) pair.
                 If dataloader returns x, y, d, this will be processed internally.
             average: bool, default=True # FURTHER IMPLEMENTED
@@ -183,6 +188,16 @@ class VisTool:
 
 
         """
+        if dataloader == "train":
+            dataloader = self.train_dataloader
+
+        elif dataloader == "valid":
+            dataloader = self.valid_dataloader
+
+        else:
+            assert isinstance(
+                dataloader, torch.utils.data.dataloader.DataLoader
+            ), "Please give external dataloader, or 'train'/'valid' as a string"
 
         def run():
 
