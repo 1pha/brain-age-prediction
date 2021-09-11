@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import torch
+import nibabel as nib
 
 from nilearn.datasets import load_mni152_template
 from skimage.transform import resize
@@ -255,5 +256,5 @@ class Assembled(nn.Module):
             return self.encoder.conv_layers
 
         except:
-            print("No conv_layers supported for this model !")
+            print("No conv_layers attribute supported for this model !")
             return
