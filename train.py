@@ -12,7 +12,7 @@ if __name__ == "__main__":
     cfg = load_config()
 
     # TODO Need These to be generalized
-    cfg.phase_config = {"epochs": [100], "update": [["reg"]]}
+    cfg.phase_config = {"epochs": [200], "update": [["reg"]]}
     cfg.encoder.name = "resnet"
     cfg.encoder.config.start_channels = 32  # THIS IS THE PROBLEM !!
 
