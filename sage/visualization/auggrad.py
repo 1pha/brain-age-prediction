@@ -8,7 +8,14 @@ class AugGrad:
         """
         Parameters
         ----------
+        cfg: easydict
+            Configuration file
 
+        model: torch.nn.Module
+            Use 'load_weight' method in order to use pre-trained model
+
+        n_samples: int
+            Trials to make augmented input
         """
 
         self.model = model
