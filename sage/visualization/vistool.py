@@ -7,7 +7,10 @@ import torch
 from .cams import CAM
 from .smoothgrad import SmoothGrad
 from .auggrad import AugGrad
-from .utils import plot_vismap
+from .utils import plot_vismap, Assembled
+
+from ..config import load_config
+from ..training.trainer import MRITrainer
 
 
 def deprecate(func):
@@ -40,7 +43,7 @@ class VisTool:
         "agrad": AugGrad,
     }
 
-    def __init__(self, cfg, model, cam_type="agrad", **kwargs):
+    def __init__(self, cfg=None, model=None, cam_type="agrad", PREFIX=None, **kwargs):
 
         """
         cfg:
@@ -53,10 +56,26 @@ class VisTool:
             which stands for GradCAM, SmoothGrad, AugGrad respectively
         """
 
-        self.cfg = cfg
-        self.model = model
+        if cfg is None and model is None and PREFIX is not None:
+            self.setup(PREFIX)
+
+        else:
+            self.cfg = cfg
+            self.model = model
+
+        self.cfg.batch_size = 1
         self.cam_type = cam_type
-        self.vis_tool = VisTool.CAMS[self.cam_type](cfg, model, **kwargs)
+        self.vis_tool = VisTool.CAMS[self.cam_type](self.cfg, self.model, **kwargs)
+
+    def setup(self, PREFIX):
+
+        self.cfg = load_config(f"{PREFIX}/config.yml")
+
+        trainer = MRITrainer(self.cfg)
+        encoder = trainer.models["encoder"]
+        regressor = trainer.models["regressor"]
+        self.model = Assembled(encoder, regressor)
+        del trainer
 
     def load_weight(self, pth):
 
