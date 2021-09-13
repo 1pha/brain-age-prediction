@@ -71,6 +71,7 @@ class VisTool:
     def setup(self, PREFIX):
 
         self.cfg = load_config(f"{PREFIX}/config.yml")
+        self.cfg.batch_size = 1
 
         trainer = MRITrainer(self.cfg)
         encoder = trainer.models["encoder"]
@@ -194,6 +195,9 @@ class VisTool:
 
         elif dataloader == "valid":
             dataloader = self.valid_dataloader
+
+        elif dataloader == "test":
+            dataloader = self.test_dataloader
 
         else:
             assert isinstance(
