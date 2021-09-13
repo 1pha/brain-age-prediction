@@ -36,8 +36,8 @@ def get_weight_dict(prefix):
 
 class VisTool:
 
-    __version__ = "0.2"
-    __date__ = "Aug 18. 2021"
+    __version__ = "0.3"
+    __date__ = "Sep 11. 2021"
     CAMS = {
         "gcam": CAM,
         "sgrad": SmoothGrad,

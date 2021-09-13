@@ -34,6 +34,7 @@ class MRITrainer:
         self.cfg = cfg
         self.phase_dict = self.get_phase_dict()
         self.cfg.epochs = sum(len(_range) for _range in self.phase_dict.values())
+        self.cfg.trainer_version = MRITrainer.__version__
         self.setup(cfg=cfg, result_dir_suffix=result_dir_suffix)
         self.failure_cases = {
             "train": [],
