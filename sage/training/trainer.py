@@ -229,22 +229,15 @@ class MRITrainer:
             offset += e
 
         # CHECK WITH TEST_DATALOADER
-        try:
-            self.load_checkpoint(
-                {
-                    "models": {
-                        "encoder": f"{self.save_dir}/encoder/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
-                        "domainer": f"{self.save_dir}/domainer/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
-                        "regressor": f"{self.save_dir}/regressor/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
-                    }
-                }
-            )
-            test_results = self.valid(actions, test=True)
-            cfg.test_mae = test_results["test_mae"]
-
-        except:
-            pass
-
+        self.load_checkpoint(
+            {
+                "encoder": f"{self.save_dir}/encoder/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
+                "domainer": f"{self.save_dir}/domainer/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
+                "regressor": f"{self.save_dir}/regressor/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
+            }
+        )
+        test_results = self.valid(actions, test=True)
+        cfg.test_mae = test_results["test_mae"]
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
         wandb.finish()
