@@ -168,7 +168,7 @@ def save_gif(PREFIX, layer_idx):
         fig = plot_vismap("template", np.load(fname), title=title, masked=False)
         fig.savefig(f"{PREFIX}/gif/{title}_gif.png")
 
-    pngs = glob(f"{PREFIX}/gif/*.png")
+    pngs = glob(f"{PREFIX}/gif/*layer{layer_idx}_gif.png")
 
     output_file_name = f"{PREFIX}/gif/weight_layer{layer_idx}.gif"
     imgs_array = [imageio.imread(files) for files in pngs]
