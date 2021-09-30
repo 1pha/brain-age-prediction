@@ -5,11 +5,11 @@ plot: False
 RESULT_PATH: ../result/models/
 use_amp: True
 
-
 # DATALOADER
 test_size: 0.2
 batch_size: 16
 augment: False
+augment_replacement: False
 resize: [96, 96, 96]
 aug_proba:
   affine: 0.33
@@ -22,7 +22,6 @@ unused_src:
   - ~
 partial: 1.0
 
-
 # DEBUG
 debug: False
 force_cpu: False
@@ -34,7 +33,6 @@ run_debug:
   return_all: False
   verbose_all: False
 
-
 # MODEL
 layers: [4, 8, 16, 32]
 batchnorm: True # Vres
@@ -42,7 +40,6 @@ double: False # Vres
 dropout: True # SFCN
 channel_number: [32, 64, 128, 256, 64] # SFCN
 start_channels: 16 # RESNET
-
 
 # TRAIN
 epochs: 100
@@ -69,7 +66,7 @@ metrics:
 encoder:
   name: vanillaconv
   # start_channel: 16 for Resnet
-  config: 
+  config:
     start_channels: 8
 
 regressor:
@@ -81,16 +78,15 @@ domainer:
   init_node: 128
   num_dbs: 2
 
-alpha: 1  # DOMAINER WEIGHT
-beta : 10 # CONFUSION WEIGHT
-  
-    
+alpha: 1 # DOMAINER WEIGHT
+beta: 10 # CONFUSION WEIGHT
+
 # OPTIMIZER SETTINGS
 reg_opt:
   optimizer: adam
   lr: .0001
   weight_decay: 0
-  
+
 clf_opt:
   optimizer: adam
   lr: .0001
@@ -103,8 +99,4 @@ unl_opt:
 
 phase_config:
   epochs: [100, 10, 50]
-  update: [
-    [reg],
-    [clf],
-    [unl, reg],
-  ]
+  update: [[reg], [clf], [unl, reg]]

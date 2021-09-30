@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import pandas as pd
+from itertools import permutations
 
 # SCIKIT-LEARN
 from sklearn.model_selection import train_test_split
@@ -61,8 +62,20 @@ class BrainAgeDataset(Dataset):
         SEED = cfg.seed
         self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
         self.load = get_loader(extension=self.data_cfg.extension)
+        self.sampling = sampling  # Train / Valid / Test
         self.augment = cfg.augment
-        self.sampling = sampling
+        self.augment_replacement = cfg.augment_replacement
+        if self.augment == True and self.augment_replacement == True:
+            augment = input(
+                "Please choose one of augmentation between - concatenate / replacement"
+            )
+            if augment in [None, " ", "replacement", "r"]:
+                self.augment = False
+                self.augment_replacement = True
+
+            elif augment in ["concatenate", "concat", "old"]:
+                self.augment = True
+                self.augment_replacement = False
 
         # DEBUG SETUP
         self.debug = cfg.debug
@@ -110,8 +123,9 @@ class BrainAgeDataset(Dataset):
         val_idx, val_age, val_src = val["abs_path"], val["age"], val["src"]
         tst_idx, tst_age, tst_src = tst["abs_path"], tst["age"], tst["src"]
 
-        # AUGMENTATION
-        if self.augment:
+        if (
+            self.augment
+        ):  # AUGMENTATION THROUGH CONCATENATE ((AT MOST) DOUBLES # OF SAMPLES)
             self.aug_proba = cfg.aug_proba
             self.aug_intensity = cfg.aug_intensity
 
@@ -119,10 +133,13 @@ class BrainAgeDataset(Dataset):
             aug_age = trn_age
             aug_src = trn_src
 
+        elif self.augment_replacement:  # AUGMENTATION WITH REPLACEMENT
+            self.aug_intensity = cfg.aug_intensity
+
         else:  # NO AUGMENTATION
             self.aug_proba = []
             self.aug_intensity = []
-            self.augmentation = lambda x: x
+            self.transformation = lambda x: x
 
         # SETUP DATA_FILES
         if sampling == "train":  # TRAIN SET
@@ -174,14 +191,14 @@ class BrainAgeDataset(Dataset):
 
         2. PREPROESS BRAIN (x = self.preprocess(x)) -> torch.tensor: (1, W', H', D')
             - preprocess with certain process
-            2+. AUGMENTATION (x = self.augmentation(x)) -> torch.tensor: (1, W', H', D')
+            2+. AUGMENTATION (x = self.transformation(x)) -> torch.tensor: (1, W', H', D')
 
         3. RETURN (BRAIN, AGE)
             - (torch.tensor(x, dtype=torch.float), torch.tensor(self.data_ages[idx]).float())
         """
 
         fpath = self.data_files[idx]
-        aug = True if fpath[-3:] == "aug" else False
+        aug = True if fpath.endswith("aug") else False
         if aug:
             fpath = fpath[:-3]
 
@@ -189,7 +206,10 @@ class BrainAgeDataset(Dataset):
         x = self.maxcut(x)  # 3D (W, H, D)
         x = self.preprocess(x)  # 4D (1, W', H', D')
         if aug:
-            x = self.augmentation(x)  # 4D (1, W', H', D')
+            x = self.transformation(x)  # 4D (1, W', H', D')
+
+        if self.augment_replacement:
+            x = self.transformation(x)  # 4D (1, W', H', D')
 
         return (
             x,
@@ -243,7 +263,25 @@ class BrainAgeDataset(Dataset):
 
         return x
 
-    def augmentation(self, x: torch.tensor):  # -> torch.Tensor (1, W', H', D')
+    def setup_augmentation(self, cfg=None):
+
+        """
+        Not setup yet.
+        """
+
+        transforms = [
+            tio.RandomAffine(),
+            tio.RandomFlip(axes=["left-right"]),
+            tio.RandomElasticDeformation(),
+        ]
+
+        tfm_combinations = []
+        for idx in range(len(transforms)):
+
+            for combination in permutations(transforms, idx + 1):
+                tfm_combinations.append(tio.Compose(list(combination)))
+
+    def transformation(self, x: torch.tensor):  # -> torch.Tensor (1, W', H', D')
 
         """
         x must be given with torch.tensor with (1, W', H', D')
@@ -291,27 +329,3 @@ def get_dataloader(cfg, sampling="train", return_dataset=False, pin_memory=True)
     dataset = BrainAgeDataset(cfg, sampling=sampling)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size, pin_memory=pin_memory)
     return dataloader if not return_dataset else dataset
-
-
-class LinearScaler:
-
-    """
-    Nothing but in sklearn.preprocess form
-    """
-
-    def __init__(self):
-
-        pass
-
-    def fit(self):
-
-        return None
-
-    def transform(self, x):
-
-        return x
-
-
-if __name__ == "__main__":
-
-    pass
