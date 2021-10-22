@@ -62,7 +62,7 @@ class BrainAgeDataset(Dataset):
         SEED = cfg.seed
         self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
         self.load = get_loader(extension=self.data_cfg.extension)
-        self.sampling = sampling  # Train / Valid / Test
+
         self.augment = cfg.augment
         self.augment_replacement = cfg.augment_replacement
         if self.augment == True and self.augment_replacement == True:
@@ -76,6 +76,12 @@ class BrainAgeDataset(Dataset):
             elif augment in ["concatenate", "concat", "old"]:
                 self.augment = True
                 self.augment_replacement = False
+        self.sampling = sampling  # TRAIN / VALID / TEST
+
+        # DO NOT AUGMENT WHEN VALID/TEST
+        if sampling is not "train":
+            self.augment = False
+            self.augment_replacement = False
 
         # DEBUG SETUP
         self.debug = cfg.debug
@@ -205,10 +211,7 @@ class BrainAgeDataset(Dataset):
         x = self.load(fpath)  # 3D (W, H, D)
         x = self.maxcut(x)  # 3D (W, H, D)
         x = self.preprocess(x)  # 4D (1, W', H', D')
-        if aug:
-            x = self.transformation(x)  # 4D (1, W', H', D')
-
-        if self.augment_replacement:
+        if aug or self.augment_replacement:
             x = self.transformation(x)  # 4D (1, W', H', D')
 
         return (
@@ -303,8 +306,8 @@ class BrainAgeDataset(Dataset):
         )
         aug_choice = np.random.choice(list(transform.keys()), p=p)
 
-        if self.aug_verbose:
-            print(f"Augmentation Choice: {aug_choice.capitalize()}")
+        # if self.aug_verbose:
+        #     print(f"Augmentation Choice: {aug_choice.capitalize()}")
 
         x = transform[aug_choice](x)
 
