@@ -15,6 +15,7 @@ import sys
 sys.path.append("../../")
 from utils.misc import seed_everything, logging_time, get_today
 from utils.average_meter import AverageMeter
+from ..config import save_config
 
 
 class MRITrainer:
@@ -242,8 +243,12 @@ class MRITrainer:
         cfg.best_mae = best_mae
         wandb.config.update(cfg)
         wandb.finish()
-        with open(f"{self.save_dir}/config.yml", "w") as y:
-            yaml.dump(cfg, y)
+        try:
+            save_config(cfg, f"{self.save_dir}/config.yml")
+        except:
+            print("Save config didnot work. Use the one before...")
+            with open(f"{self.save_dir}/config.yml", "w") as y:
+                yaml.dump(cfg, y)
 
     @logging_time
     def train(self, actions):
