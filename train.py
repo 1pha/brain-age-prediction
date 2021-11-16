@@ -29,7 +29,12 @@ if __name__ == "__main__":
         project="3d_smri",
         config=vars(cfg),
         name=run_name,
-        tags=[NAMEDICT[cfg.encoder.name], "baseline", "save", f"seed {cfg.seed}"],
+        tags=[
+            NAMEDICT[cfg.encoder.name],
+            "aug_replacement",
+            "save",
+            f"seed {cfg.seed}",
+        ],
     )
 
     trainer.run(cfg)
