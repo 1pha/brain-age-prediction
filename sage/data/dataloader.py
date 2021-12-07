@@ -324,9 +324,9 @@ def get_dataloader(cfg, sampling="train", return_dataset=False, pin_memory=True)
     """
 
     cfg.root = {
-        "tlrc": "G:/My Drive/brain_data/brainmask_tlrc",
-        "mni": "G:/My Drive/brain_data/brainmask_mni",
-        "raw": "G:/My Drive/brain_data/brainmask_nii",
+        "tlrc": "H:/My Drive/brain/age_prediction/brainmask_tlrc",
+        "mni": "H:/My Drive/brain/age_prediction/brainmask_mni",
+        "raw": "H:/My Drive/brain/age_prediction/brainmask_nii",
     }[cfg.registration]
 
     dataset = BrainAgeDataset(cfg, sampling=sampling)
