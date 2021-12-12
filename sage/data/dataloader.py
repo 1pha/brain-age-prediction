@@ -1,23 +1,17 @@
 # BASICS
 import os
-import numpy as np
-import pandas as pd
+import logging
 from itertools import permutations
 
-# SCIKIT-LEARN
+import nibabel as nib
+import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-# PREPROCESS
 from .preprocess import *
-
-# CONFIG
 from ..config import load_config
 
-# MRI RELATED
-import nibabel as nib
-
-# TORCH
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
@@ -27,6 +21,13 @@ try:
     import torchio as tio
 except:
     pass
+
+logging.basicConfig(
+    format="[%(asctime)s] %(levelname)s - %(name)s: %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
 
 def get_loader(extension):
@@ -57,6 +58,8 @@ class BrainAgeDataset(Dataset):
         """
 
         # INITIAL SETUP
+        logger.info("Initialize dataset.")
+
         self.cfg = cfg
         ROOT = cfg.root
         SEED = cfg.seed
@@ -106,14 +109,28 @@ class BrainAgeDataset(Dataset):
         if cfg.partial < 1:
             self.label_file = self.label_file[: int(len(self.label_file) * cfg.partial)]
 
-        if not os.path.exists("G:/My Drive"):
+        if os.path.exists("G:/"):
+            if not os.path.exists("G:/My Drive"):
+                logger.info(
+                    "Since G:/My Drive doesn't exist in thie environment, use G:/내 드라이브."
+                )
+                self.label_file["abs_path"] = self.label_file["abs_path"].apply(
+                    lambda x: x.replace("G:\My Drive", "G:\내 드라이브")
+                )
+
+        elif os.path.exists("/home/hoesung/hoesung_save2/daehyun/"):
             self.label_file["abs_path"] = self.label_file["abs_path"].apply(
-                lambda x: x.replace("G:\My Drive", "G:\내 드라이브")
+                lambda x: x.replace(
+                    "G:\\My Drive\\brain_data\\", "/home/hoesung/hoesung_save2/daehyun/"
+                )
             )
-            assert (
-                sum(self.label_file["abs_path"].apply(os.path.exists))
-                == self.label_file.shape[0]
+            self.label_file["abs_path"] = self.label_file["abs_path"].apply(
+                lambda x: x.replace("\\", "/")
             )
+        assert (
+            sum(self.label_file["abs_path"].apply(os.path.exists))
+            == self.label_file.shape[0]
+        )
 
         self.src_map = {
             src: i for i, src in enumerate(sorted(self.label_file.src.unique()))
@@ -325,7 +342,8 @@ def get_dataloader(cfg, sampling="train", return_dataset=False, pin_memory=True)
 
     cfg.root = {
         "tlrc": "H:/My Drive/brain/age_prediction/brainmask_tlrc",
-        "mni": "H:/My Drive/brain/age_prediction/brainmask_mni",
+        "mni": "/home/hoesung/hoesung_save2/daehyun/brainmask_mni",
+        # "mni": "H:/My Drive/brain/age_prediction/brainmask_mni",
         "raw": "H:/My Drive/brain/age_prediction/brainmask_nii",
     }[cfg.registration]
 
