@@ -1,7 +1,11 @@
+import os
 import numpy as np
 from glob import glob
+from itertools import chain
+from functools import partial
+from sage.config import load_config
 
-class Files:
+class FileSelector:
 
     def __init__(self, _type="naive"):
 
@@ -10,6 +14,64 @@ class Files:
             "naive": "../resnet256_naive_checkpoints",
             "augment": "../resnet256_augmentation_checkpoints",
         }[_type]
+
+        self.runs_dir = sorted(glob(self.ROOT + "/*")) # contains all runs
+        self.selector = "encoder"
+
+        # Possible Selectors
+        #   + encoder, domainer, regressor
+        #   + npy_maps, npy_mm, npy_std
+        #       - Possible layers: layer0 ~ layer8
+
+    def __len__(self):
+        return len(self.runs_dir)
+
+    def __getitem__(self, idx: int):
+        return sorted(glob(f"{self.runs_dir[idx]}/{self.selector}/*.pt"))
+
+    def get_config(self, idx: int = 0):
+        return load_config(f"{self.runs_dir[idx]}/config.yml")
+
+    def set_selector(self, selector: str):
+        self.selector = selector
+        # logger.info(f"Selector set to {selector}. Now everything gets selected from {self.runs_dir[idx]}/{self.selector}/")
+
+    def get(self, selector, idx: int = 0):
+
+        # Get list of checkpoints (.pt) or 
+
+        path = f"{self.runs_dir[idx]}/{selector}/"
+        files = list(chain(*[glob(path + extension) for extension in ["*.pt", "*.npy"]]))
+        return sorted(files)
+
+def check_existence(input, selector):
+
+    idx, epoch = input
+
+    # takes idx and epoch
+    #   idx: indicates index of the run
+    #   epoch: indicates epochs for selected run
+
+    try:
+        return os.path.exists(selector.get("npy_std/layer0", idx)[epoch])
+    except:
+        print(idx, epoch)
+        # return None
+
+def cherry_picker(input, selector):
+
+    idx, epoch = input
+
+    # takes idx and epoch
+    #   idx: indicates index of the run
+    #   epoch: indicates epochs for selected run
+
+    try:
+        return np.load(selector.get("npy_std/layer0", idx)[epoch])
+    except:
+        print(idx, epoch)
+        # return None
+        
 
 class Result:
 
@@ -61,6 +123,15 @@ class Result:
     def std(self):
         return {e: np.std(v) for e, v in self.epoch_pivot.items()}
 
+    def filterout_mae(self, func):
+        if isinstance(func, str):
+
+            if func == "first":
+                return [e[0][1] for e in self.raw_data.values()]
+            elif func == "last":
+                return [e[-1][1] for e in self.raw_data.values()]
+            elif func == "best":
+                return [min(_[1] for _ in e) for e in self.raw_data.values()]
 
 def transform(result):
 
