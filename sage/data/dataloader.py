@@ -118,6 +118,16 @@ class BrainAgeDataset(Dataset):
                     lambda x: x.replace("G:\My Drive", "G:\내 드라이브")
                 )
 
+        elif os.path.exists("/workspace/"):
+            self.label_file["abs_path"] = self.label_file["abs_path"].apply(
+                lambda x: x.replace(
+                    "G:\\My Drive\\brain_data\\", "/workspace/"
+                )
+            )
+            self.label_file["abs_path"] = self.label_file["abs_path"].apply(
+                lambda x: x.replace("\\", "/")
+            )
+
         elif os.path.exists("/home/hoesung/hoesung_save2/daehyun/"):
             self.label_file["abs_path"] = self.label_file["abs_path"].apply(
                 lambda x: x.replace(
@@ -342,7 +352,8 @@ def get_dataloader(cfg, sampling="train", return_dataset=False, pin_memory=True)
 
     cfg.root = {
         "tlrc": "H:/My Drive/brain/age_prediction/brainmask_tlrc",
-        "mni": "/home/hoesung/hoesung_save2/daehyun/brainmask_mni",
+        "mni": "/workspace/brainmask_mni",
+        # "mni": "/home/hoesung/hoesung_save2/daehyun/brainmask_mni",
         # "mni": "H:/My Drive/brain/age_prediction/brainmask_mni",
         "raw": "H:/My Drive/brain/age_prediction/brainmask_nii",
     }[cfg.registration]
