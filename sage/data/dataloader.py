@@ -63,7 +63,12 @@ class BrainAgeDataset(Dataset):
         self.cfg = cfg
         ROOT = cfg.root
         SEED = cfg.seed
-        self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
+        # self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
+        # Temporal Exception code
+        if os.path.exists(os.path.join(ROOT, "data_config.yml")):
+            self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
+        else:
+            self.data_cfg = load_config("/workspace/brainmask_mni/data_config.yml")
         self.load = get_loader(extension=self.data_cfg.extension)
 
         self.augment = cfg.augment
