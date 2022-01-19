@@ -1,4 +1,13 @@
 # MRI Data 3D Brain Convolution
+
+### TODO
++ Change config.debug+print to logger.debug
++ Change every print functions to logger
++ Multiple GPU handling code
++ Smarter ways for multiple metrics.
++ Parcellate/Encapsulate/Separate functions in dataloader & trainer.
++ Move out save directory to `train.py` from `trainer.py` and add `logging.FileHandler`
+
 ### Main Task
 + Age Prediction with 1.4k structural MRI data from 4 sources
 + Unlearning through confusion loss (nearly failure)
