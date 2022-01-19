@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-RESULT_DIR = "../resnet256_naive_checkpoints/"
+RESULT_DIR = "../resnet256_augmentation_checkpoints/"
 checkpoint_lists = sorted(glob(f"{RESULT_DIR}/*"))
 
 checkpoint = Path(checkpoint_lists[0])
@@ -73,6 +73,7 @@ def inference(checkpoint):
     with open(Path(checkpoint, "test.yml"), "w") as f:
         yaml.dump(test_results, f)
 
-for checkpoint in checkpoint_lists:
 
-    inference(checkpoint)
+if __name__=="__main__":
+    for checkpoint in checkpoint_lists[1:]:
+        inference(checkpoint)
