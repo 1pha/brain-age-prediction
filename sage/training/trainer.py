@@ -3,6 +3,9 @@ import yaml
 import wandb
 
 from easydict import EasyDict as edict
+import logging
+
+logger = logging.getLogger(__name__)
 
 import torch
 
@@ -107,23 +110,25 @@ class MRITrainer:
         )
         self.gt_src_test = torch.tensor(self.test_dataloader.dataset.data_src)
 
-        print(
+        logger.info(
             f"TOTAL TRAIN {len(self.train_dataloader.dataset)} | VALID {len(self.valid_dataloader.dataset)} | TEST {len(self.test_dataloader.dataset)}"
         )
 
         # 4. AMP Scaler
         self.scaler = torch.cuda.amp.GradScaler(enabled=cfg.use_amp)
-        print(f"MIXED PRECISION:: {cfg.use_amp}")
+        logger.info(f"MIXED PRECISION:: {cfg.use_amp}")
 
         # 5. SAVE Directory
         self.save_dir = f"{cfg.RESULT_PATH}/{get_today()}_{cfg.encoder.name}"
         self.save_dir += (
             f"_{result_dir_suffix}" if result_dir_suffix is not None else ""
         )
+        logger.debug("Done Initialization")
 
     def run(self, cfg=None, checkpoint=None):
 
         cfg = self.cfg if cfg is None else cfg
+        logger.debug("Start run")
 
         if checkpoint is not None:
 
@@ -141,6 +146,7 @@ class MRITrainer:
             offset = (
                 checkpoint["resume_epoch"] if "resume_epoch" in checkpoint.keys() else 0
             )
+            logger.debug("Load Checkpoint")
 
         else:
             offset = 0
@@ -151,7 +157,7 @@ class MRITrainer:
             stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
             for e in range(epochs):
 
-                print(
+                logger.info(
                     f'{"-" * 5} Epoch {e + 1 + offset} / {cfg.epochs} (phase: {phase}) BEST MAE {best_mae:.3f} {"-" * 5}'
                 )
 
@@ -192,7 +198,7 @@ class MRITrainer:
                                 model_dir=self.save_dir,
                                 model_name=model_name,
                             )
-                            print(
+                            logger.info(
                                 f"Early stopped at {stop_count} / {cfg.early_patience} at EPOCH {e + offset}"
                             )
                             break
@@ -209,7 +215,7 @@ class MRITrainer:
                         model_dir=self.save_dir,
                         model_name=model_name,
                     )
-                    print(
+                    logger.info(
                         f"Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e + offset}"
                     )
                     break
@@ -246,7 +252,7 @@ class MRITrainer:
         try:
             save_config(cfg, f"{self.save_dir}/config.yml")
         except:
-            print("Save config didnot work. Use the one before...")
+            logger.warn("Save config didnot work. Use the one before...")
             with open(f"{self.save_dir}/config.yml", "w") as y:
                 yaml.dump(cfg, y)
 
@@ -276,14 +282,13 @@ class MRITrainer:
                 for _, model in self.models.items():
                     model.train()
 
-                if self.cfg.debug and self.cfg.run_debug.verbose_all:
-                    print(f"{i}th Batch.")
+                logger.debug(f"train phase {i}th batch.")
 
                 try:
                     x, y, d = map(lambda x: x.to(self.cfg.device), (x, y, d))
 
                 except FileNotFoundError as e:
-                    print(e)
+                    logger.exception(e)
                     time.sleep(20)
                     self.failure_cases["train"].append(i)
                     continue
@@ -330,14 +335,13 @@ class MRITrainer:
         with torch.no_grad():
             for i, (x, y, d) in enumerate(dataloader):
 
-                if self.cfg.debug and self.cfg.run_debug.verbose_all:
-                    print(f"{i}th Batch.")
+                logger.debug(f"{'Valid' if not test else 'Test'} phase {i}th batch")
 
                 try:
                     x, y, d = map(lambda x: x.to(self.cfg.device), (x, y, d))
 
                 except FileNotFoundError as e:
-                    print(e)
+                    logger.exception(e)
                     time.sleep(20)
                     self.failure_cases["valid"].append(i)
                     continue
@@ -411,7 +415,7 @@ class MRITrainer:
 
         for model_name, pth_path in checkpoint.items():
             self.models[model_name].load_state_dict(torch.load(pth_path))
-            print(f"{model_name.capitalize()} is successfully loaded")
+            logger.info(f"{model_name.capitalize()} is successfully loaded")
 
     def zero_grad(self, model):
 
@@ -497,7 +501,7 @@ class MRITrainer:
 
         def _prompt(prefix):
 
-            print(f"{prefix.upper()}")
+            logger.info(f"{prefix.upper()}")
             count = 0
             for metric in metrics:
 
@@ -507,8 +511,8 @@ class MRITrainer:
                     end = "  |  " if count % 3 != 0 else "\n"
                     print(f"{metric:6s}: {result[key]:.4f}", end=end)
 
-            print("")
+            logger.info("")
 
         _prompt("train")
         _prompt("valid")
-        print("")
+        logger.info("")
