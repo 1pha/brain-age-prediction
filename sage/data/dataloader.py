@@ -1,6 +1,7 @@
 # BASICS
 import os
 import logging
+logger = logging.getLogger(__name__)
 from itertools import permutations
 
 import nibabel as nib
@@ -22,12 +23,6 @@ try:
 except:
     pass
 
-logging.basicConfig(
-    format="[%(asctime)s] %(levelname)s - %(name)s: %(message)s",
-    datefmt="%m/%d/%Y %H:%M:%S",
-    level=logging.INFO,
-)
-logger = logging.getLogger(__name__)
 
 
 def get_loader(extension):
@@ -126,7 +121,7 @@ class BrainAgeDataset(Dataset):
         elif os.path.exists("/workspace/"):
             self.label_file["abs_path"] = self.label_file["abs_path"].apply(
                 lambda x: x.replace(
-                    "G:\\My Drive\\brain_data\\", "/workspace/"
+                    "G:\\My Drive\\brain_data\\", "/workspace/brainmask_mni/"
                 )
             )
             self.label_file["abs_path"] = self.label_file["abs_path"].apply(
@@ -142,11 +137,11 @@ class BrainAgeDataset(Dataset):
             self.label_file["abs_path"] = self.label_file["abs_path"].apply(
                 lambda x: x.replace("\\", "/")
             )
-        assert (
-            sum(self.label_file["abs_path"].apply(os.path.exists))
-            == self.label_file.shape[0]
-        )
-
+        assert \
+            sum(self.label_file["abs_path"].apply(os.path.exists)) \
+            == self.label_file.shape[0], \
+            f"Possible Paths: {sum(self.label_file['abs_path'].apply(os.path.exists))} != #Rows: {self.label_file.shape[0]}"
+        
         self.src_map = {
             src: i for i, src in enumerate(sorted(self.label_file.src.unique()))
         }
@@ -258,9 +253,8 @@ class BrainAgeDataset(Dataset):
         Should explicity give maxcut with tuples of tuples ((w, W), (h, H), (d, D))
         """
 
-        maxcut = self.data_cfg.maxcut if self.data_cfg.maxcut else None
-        if maxcut is not None:
-            (w, W), (h, H), (d, D) = maxcut
+        if self.data_cfg.maxcut is not None:
+            (w, W), (h, H), (d, D) = self.data_cfg.maxcut
             return x[w:W, h:H, d:D]
         else:
             return x
@@ -361,6 +355,7 @@ def get_dataloader(cfg, sampling="train", return_dataset=False, pin_memory=True)
         # "mni": "/home/hoesung/hoesung_save2/daehyun/brainmask_mni",
         # "mni": "H:/My Drive/brain/age_prediction/brainmask_mni",
         "raw": "H:/My Drive/brain/age_prediction/brainmask_nii",
+        "non_registered": "/workspace/non_registered/npy"
     }[cfg.registration]
 
     dataset = BrainAgeDataset(cfg, sampling=sampling)
