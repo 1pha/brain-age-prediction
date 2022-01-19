@@ -1,8 +1,10 @@
 import os
+import yaml
+import easydict
 import numpy as np
 from glob import glob
 from itertools import chain
-from functools import partial
+from scipy.stats import ttest_ind
 from sage.config import load_config
 
 class FileSelector:
@@ -29,6 +31,12 @@ class FileSelector:
     def __getitem__(self, idx: int):
         return sorted(glob(f"{self.runs_dir[idx]}/{self.selector}/*.pt"))
 
+    def __next__(self):
+
+        idx = 0
+        idx += 1
+        yield self.__getitem__(idx)
+
     def get_config(self, idx: int = 0):
         return load_config(f"{self.runs_dir[idx]}/config.yml")
 
@@ -43,6 +51,36 @@ class FileSelector:
         path = f"{self.runs_dir[idx]}/{selector}/"
         files = list(chain(*[glob(path + extension) for extension in ["*.pt", "*.npy"]]))
         return sorted(files)
+
+    def get_test_result(self, idx: int = 0):
+
+        path = f"{self.runs_dir[idx]}/test.yml"
+        with open(path, "r") as f:
+            return yaml.load(f, Loader=yaml.FullLoader)
+
+    def get_config(self, idx: int = 0):
+        path = f"{self.runs_dir[idx]}/config.yml"
+        with open(path, "r") as f:
+            return easydict.EasyDict(yaml.load(f, Loader=yaml.Loader))
+
+    @property
+    def test_gt(self):
+        path = f"data/test_gt_age.yml"
+        with open(path, "r") as f:
+            return yaml.load(f, Loader=yaml.Loader)
+
+
+def MAE(true, pred):
+    return np.sum(np.abs(true - pred)) / len(true) 
+
+
+def group_stats(naive, augment, info=None):
+
+    if info:
+        print(info)
+    print(f"Naive: {np.mean(naive)}±{np.std(naive)}")
+    print(f"Augment: {np.mean(augment)}±{np.std(augment)}")
+
 
 def check_existence(input, selector):
 
