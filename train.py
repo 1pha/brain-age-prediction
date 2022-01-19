@@ -9,7 +9,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 from sage.config import load_config
 from sage.args import parse_args
 from sage.training.trainer import MRITrainer
@@ -20,7 +19,6 @@ NAMEDICT = {"vanillaconv": "VanillaConv", "resnet": "ResNet", "convit": "ConViT"
 if __name__ == "__main__":
 
     cfg = load_config()
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     # TODO Need These to be generalized
     cfg.phase_config = {"epochs": [200], "update": [["reg"]]}
@@ -30,6 +28,10 @@ if __name__ == "__main__":
 
     args = parse_args()
     cfg.update(args)
+    os.environ["CUDA_VISIBLE_DEVIECS"] = str(cfg.gpu_num)
+    if cfg.debug is True:
+        logger.setLevel(logging.DEBUG)
+    logger.info(f"Use GPU {cfg.gpu_num}")
 
     trainer = MRITrainer(cfg)
 
