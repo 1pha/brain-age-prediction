@@ -1,7 +1,6 @@
-python train.py --lr=1e-5 --augment_replacement=False --run_name="Naive lr1e-5"
-python train.py --lr=1e-6 --augment_replacement=False --run_name="Naive lr1e-6"
-python train.py --lr=1e-7 --augment_replacement=False --run_name="Naive lr1e-7"
+#!/bin/bash
 
-python train.py --lr=1e-5 --augment_replacement=True --run_name="Augment lr1e-5"
-python train.py --lr=1e-6 --augment_replacement=True --run_name="Augment lr1e-6"
-python train.py --lr=1e-7 --augment_replacement=True --run_name="Augment lr1e-7"
+for seed in {42..91};
+    do
+    python train.py --registration=non_registered --run_name="ResNet (Base) Non Registered seed$seed Naive" --checkpoint_period=1 --gpu_num=0
+done
