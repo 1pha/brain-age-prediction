@@ -4,6 +4,7 @@ registration: mni
 plot: False
 RESULT_PATH: ../result/models/
 use_amp: True
+gpu_num: 1
 
 # DATALOADER
 test_size: 0.2
