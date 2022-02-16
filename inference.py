@@ -19,7 +19,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-RESULT_DIR = "../resnet256_augmentation_checkpoints/"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+RESULT_DIR = "../resnet256_augmentation_nonreg_checkpoints/"
 checkpoint_lists = sorted(glob(f"{RESULT_DIR}/*"))
 
 checkpoint = Path(checkpoint_lists[0])
@@ -66,8 +67,8 @@ def inference(checkpoint):
             test_preds = torch.cat(test_preds).squeeze().tolist()
             test_results[e] = test_preds
 
-        except:
-            logger.info(f"{e} was not done.")
+        except Exception as e:
+            logger.exception(e)
             break
 
     with open(Path(checkpoint, "test.yml"), "w") as f:
@@ -75,5 +76,6 @@ def inference(checkpoint):
 
 
 if __name__=="__main__":
-    for checkpoint in checkpoint_lists[1:]:
-        inference(checkpoint)
+    # for checkpoint in checkpoint_lists[0:1]:
+    #     inference(checkpoint)
+    inference(checkpoint_lists[67])

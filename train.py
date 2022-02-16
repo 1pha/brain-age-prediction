@@ -28,7 +28,8 @@ if __name__ == "__main__":
 
     args = parse_args()
     cfg.update(args)
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_num)
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    cfg.augment_replacement = bool(cfg.augment_replacement)
     if cfg.debug is True:
         logger.setLevel(logging.DEBUG)
     logger.info(f"Use GPU {cfg.gpu_num}")
