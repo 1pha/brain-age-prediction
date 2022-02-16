@@ -1,4 +1,6 @@
 *.ini
+*.nii
+*.nii.gz
 .ipynb_checkpoints/*
 .ipynb_checkpoints/
 *ipynb_checkpoints*
