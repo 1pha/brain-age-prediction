@@ -15,6 +15,8 @@ class FileSelector:
         self.ROOT = {
             "naive": "../resnet256_naive_checkpoints",
             "augment": "../resnet256_augmentation_checkpoints",
+            "naive_nonreg": "../resnet256_naive_nonreg_checkpoints",
+            "augment_nonreg": "../resnet256_augmentation_nonreg_checkpoints",
         }[_type]
 
         self.runs_dir = sorted(glob(self.ROOT + "/*")) # contains all runs
