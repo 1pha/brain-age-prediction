@@ -33,7 +33,7 @@ if __name__ == "__main__":
     if cfg.debug is True:
         logger.setLevel(logging.DEBUG)
     logger.info(f"Use GPU {cfg.gpu_num}")
-
+    
     trainer = MRITrainer(cfg)
 
     run_name = cfg.run_name if cfg.get("run_name") else "DEFAULT NAME"
