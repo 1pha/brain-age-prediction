@@ -1,4 +1,5 @@
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import logging
 from pathlib import Path
 from glob import glob
@@ -25,7 +26,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-RESULT_DIR = "../resnet256_naive_checkpoints/"
+# RESULT_DIR = "../resnet256_naive_nonreg_checkpoints/"
+RESULT_DIR = "../result/models"
 checkpoint_lists = sorted(glob(f"{RESULT_DIR}/*"))
 
 checkpoint = Path(checkpoint_lists[0])
@@ -46,10 +48,11 @@ def load_model_ckpts(path: Path, epoch: int):
     return ckpts, mae
 
 
-for checkpoint in checkpoint_lists:
-
+for checkpoint in checkpoint_lists[3:]:
+    
     checkpoint = Path(checkpoint)
     cfg = load_config(Path(checkpoint, "config.yml"))
+    cfg.registration = "mni"
     logger.info(f"Starting seed {cfg.seed}")
     cfg.force_cpu = True
 
@@ -61,7 +64,7 @@ for checkpoint in checkpoint_lists:
     model = Assembled(trainer.models["encoder"], trainer.models["regressor"]).to("cuda")
 
     saliency_map_ep_naive = dict()
-    for e in range(100, 150):
+    for e in range(0, 151):
         try:
             ckpt_dict, mae = load_model_ckpts(checkpoint, e)
             model.load_weight(ckpt_dict)
@@ -70,7 +73,7 @@ for checkpoint in checkpoint_lists:
             break
 
         saliency_map_ep_naive[e] = []
-        for layer_idx, conv_layer in tqdm(enumerate(model.conv_layers())):
+        for layer_idx, conv_layer in tqdm(enumerate(model.conv_layers()[:1])):
 
             layer_save_mm_dir = Path(f"{saliency_mm_dir}/layer{layer_idx}/")
             layer_save_std_dir = Path(f"{saliency_std_dir}/layer{layer_idx}/")
