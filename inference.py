@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-RESULT_DIR = "../resnet256_augmentation_nonreg_checkpoints/"
+RESULT_DIR = "../resnet256_naive_nonreg_checkpoints/"
 checkpoint_lists = sorted(glob(f"{RESULT_DIR}/*"))
 
 checkpoint = Path(checkpoint_lists[0])
@@ -76,6 +76,7 @@ def inference(checkpoint):
 
 
 if __name__=="__main__":
-    # for checkpoint in checkpoint_lists[0:1]:
-    #     inference(checkpoint)
-    inference(checkpoint_lists[67])
+    for checkpoint in checkpoint_lists[-2:]:
+        inference(checkpoint)
+    # inference(checkpoint_lists[-2:])
+    # print(checkpoint_lists[-1])
