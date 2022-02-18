@@ -4,8 +4,12 @@ import easydict
 import numpy as np
 from glob import glob
 from itertools import chain
+from scipy import stats
 from scipy.stats import ttest_ind
 from sage.config import load_config
+import torch
+import torch.nn.functional as F
+import nibabel as nib
 
 class FileSelector:
 
@@ -76,14 +80,6 @@ def MAE(true, pred):
     return np.sum(np.abs(true - pred)) / len(true) 
 
 
-def group_stats(naive, augment, info=None):
-
-    if info:
-        print(info)
-    print(f"Naive: {np.mean(naive)}±{np.std(naive)}")
-    print(f"Augment: {np.mean(augment)}±{np.std(augment)}")
-
-
 def check_existence(input, selector):
 
     idx, epoch = input
@@ -109,7 +105,7 @@ def cherry_picker(input, selector):
     try:
         return np.load(selector.get("npy_std/layer0", idx)[epoch])
     except:
-        print(idx, epoch)
+        print(f"idx: {idx}, epoch:{epoch}")
         # return None
         
 
@@ -180,3 +176,52 @@ def transform(result):
     """
 
     return [_[0] for _ in result], [_[1] for _ in result]
+
+
+def group_stats(naive, augment, info=None):
+
+    if info:
+        print(info)
+    print(f"Naive  : {np.mean(naive):.3f} ± {np.std(naive):.3f}")
+    print(f"Augment: {np.mean(augment):.3f} ± {np.std(augment):.3f}")
+    t_stat, p_val = stats.ttest_ind(naive, augment)
+    print(f"Statistics: {t_stat:.2f} p-value: {p_val}\n")
+
+
+def save2nifti(npy, savename, overwrite=False, size=(207, 256, 215)):
+    
+    """
+    Takes saliency map with shape of (96, 96, 96)
+    """
+    if npy.ndim == 4:
+        print(f"Came across with array dimension of {npy.ndim}, {npy.shape}.")
+        print(f"Shrink with average on axis=0")
+        npy = np.mean(npy, axis=0)
+
+    # Resize
+    resized_nifti = F.interpolate(
+        torch.tensor(npy[None, None, ...]), size=size
+    ).squeeze().squeeze().numpy()
+
+    # Define Affine Matrix
+    affine = np.array([
+        [   0.73746312,    0.        ,    0.        ,  -75.7625351 ],
+        [   0.        ,    0.73746312,    0.        , -110.7625351 ],
+        [   0.        ,    0.        ,    0.73746312,  -71.7625351 ],
+        [   0.        ,    0.        ,    0.        ,    1.        ]
+    ])
+
+    
+    if os.path.exists(savename):
+        if overwrite is False:
+            print("File with same name exists, please allow overwrite to replace.")
+            return
+
+    nib.save(
+        nib.Nifti1Image(
+            resized_nifti,
+            affine,
+        ),
+        savename
+    )
+    print("Successfully saved.")
