@@ -306,16 +306,16 @@ class MRITrainer:
                     for _, model in self.models.items():
                         model.eval()
                     _, age = self.update_age_reg(x, y, d, update=False)
-                    _, domain = self.update_domain_clf(x, y, d, update=False)
+                    # _, domain = self.update_domain_clf(x, y, d, update=False)
 
                 ages.extend(age.cpu().detach().tolist())
-                domains.extend(domain.cpu().detach().tolist())
+                # domains.extend(domain.cpu().detach().tolist())
             torch.cuda.empty_cache()
 
         results = {
             **self.agg_loss(losses),
             **self.gather_result(ages, "age", sampling="train"),
-            **self.gather_result(domains, "domain", sampling="train"),
+            # **self.gather_result(domains, "domain", sampling="train"),
         }
 
         return results
@@ -355,18 +355,18 @@ class MRITrainer:
                     losses[j].append(float(loss.cpu().detach()))
 
                 _, age = self.update_age_reg(x, y, d, update=False)
-                _, domain = self.update_domain_clf(x, y, d, update=False)
+                # _, domain = self.update_domain_clf(x, y, d, update=False)
 
                 ages.extend(age.cpu().detach().tolist())
-                domains.extend(domain.cpu().detach().tolist())
+                # domains.extend(domain.cpu().detach().tolist())
             torch.cuda.empty_cache()
 
         results = {
             **self.agg_loss(losses),
             **self.gather_result(ages, "age", sampling="valid" if not test else "test"),
-            **self.gather_result(
-                domains, "domain", sampling="valid" if not test else "test"
-            ),
+            # **self.gather_result(
+            #     domains, "domain", sampling="valid" if not test else "test"
+            # ),
         }
 
         return results

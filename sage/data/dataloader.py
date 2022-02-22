@@ -82,7 +82,7 @@ class BrainAgeDataset(Dataset):
         self.sampling = sampling  # TRAIN / VALID / TEST
 
         # DO NOT AUGMENT WHEN VALID/TEST
-        if sampling is not "train":
+        if sampling != "train":
             self.augment = False
             self.augment_replacement = False
 
