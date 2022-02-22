@@ -19,8 +19,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-RESULT_DIR = "../resnet256_naive_nonreg_checkpoints/"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+RESULT_DIR = "../result/models/"
 checkpoint_lists = sorted(glob(f"{RESULT_DIR}/*"))
 
 checkpoint = Path(checkpoint_lists[0])
@@ -44,12 +44,13 @@ def inference(checkpoint):
 
     checkpoint = Path(checkpoint)
     cfg = load_config(Path(checkpoint, "config.yml"))
+    cfg.registration = "mni"
     logger.info(f"Starting seed {cfg.seed}")
 
     trainer = MRITrainer(cfg)
     model = Assembled(trainer.models["encoder"], trainer.models["regressor"]).to("cuda")
     test_results = {}
-    for e in range(150):
+    for e in range(151):
         try:
             ckpt_dict, mae = load_model_ckpts(checkpoint, e)
             model.load_weight(ckpt_dict)
@@ -69,7 +70,8 @@ def inference(checkpoint):
 
         except Exception as e:
             logger.exception(e)
-            break
+            # break
+            pass
 
     with open(Path(checkpoint, "test.yml"), "w") as f:
         yaml.dump(test_results, f)
@@ -78,5 +80,5 @@ def inference(checkpoint):
 if __name__=="__main__":
     for checkpoint in checkpoint_lists[-2:]:
         inference(checkpoint)
-    # inference(checkpoint_lists[-2:])
-    # print(checkpoint_lists[-1])
+    # inference(checkpoint_lists[-1])
+    # print(checkpoint_lists[41])

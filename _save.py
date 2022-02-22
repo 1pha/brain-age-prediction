@@ -26,8 +26,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# RESULT_DIR = "../resnet256_naive_nonreg_checkpoints/"
-RESULT_DIR = "../result/models"
+# RESULT_DIR = "../resnet256_naive_checkpoints/"
+RESULT_DIR = "../result/models/"
 checkpoint_lists = sorted(glob(f"{RESULT_DIR}/*"))
 
 checkpoint = Path(checkpoint_lists[0])
@@ -48,7 +48,7 @@ def load_model_ckpts(path: Path, epoch: int):
     return ckpts, mae
 
 
-for checkpoint in checkpoint_lists[3:]:
+for checkpoint in checkpoint_lists[-2:]:
     
     checkpoint = Path(checkpoint)
     cfg = load_config(Path(checkpoint, "config.yml"))
