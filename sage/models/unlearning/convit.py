@@ -77,7 +77,7 @@ class GPSA(nn.Module):
         self.num_heads = num_heads
         self.dim = dim
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qk_scale or head_dim**-0.5
 
         self.qk = nn.Linear(dim, dim * 2, bias=qkv_bias)
         self.v = nn.Linear(dim, dim, bias=qkv_bias)
@@ -155,7 +155,7 @@ class GPSA(nn.Module):
         self.v.weight.data.copy_(torch.eye(self.dim))
         locality_distance = 1  # max(1,1/locality_strength**.5)
 
-        kernel_size = int(self.num_heads ** 0.5)
+        kernel_size = int(self.num_heads**0.5)
         center = (kernel_size - 1) / 2 if kernel_size % 2 == 0 else kernel_size // 2
         for h1 in range(kernel_size):
             for h2 in range(kernel_size):
@@ -176,16 +176,16 @@ class GPSA(nn.Module):
 
         ind = torch.arange(img_size).view(1, -1) - torch.arange(img_size).view(-1, 1)
 
-        indx = ind.repeat(img_size ** 2, img_size ** 2)
+        indx = ind.repeat(img_size**2, img_size**2)
         indy = (
             ind.repeat_interleave(img_size, dim=0)
             .repeat_interleave(img_size, dim=1)
             .repeat(img_size, img_size)
         )
-        indz = ind.repeat_interleave(img_size ** 2, dim=0).repeat_interleave(
-            img_size ** 2, dim=1
+        indz = ind.repeat_interleave(img_size**2, dim=0).repeat_interleave(
+            img_size**2, dim=1
         )
-        indd = indx ** 2 + indy ** 2 + indz ** 2
+        indd = indx**2 + indy**2 + indz**2
 
         rel_indices[..., 3] = indd.unsqueeze(0)
         rel_indices[..., 2] = indz.unsqueeze(0)
@@ -209,7 +209,7 @@ class MHSA(nn.Module):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qk_scale or head_dim**-0.5
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
@@ -237,12 +237,12 @@ class MHSA(nn.Module):
         attn_map = (q @ k.transpose(-2, -1)) * self.scale
         attn_map = attn_map.softmax(dim=-1).mean(0)
 
-        img_size = int(N ** 0.5)
+        img_size = int(N**0.5)
         ind = torch.arange(img_size).view(1, -1) - torch.arange(img_size).view(-1, 1)
         indx = ind.repeat(img_size, img_size)
         indy = ind.repeat_interleave(img_size, dim=0).repeat_interleave(img_size, dim=1)
-        indd = indx ** 2 + indy ** 2
-        distances = indd ** 0.5
+        indd = indx**2 + indy**2
+        distances = indd**0.5
         distances = distances.to("cuda")
 
         dist = torch.einsum("nm,hnm->h", (distances, attn_map))

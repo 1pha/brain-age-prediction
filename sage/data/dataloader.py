@@ -1,6 +1,7 @@
 # BASICS
 import os
 import logging
+
 logger = logging.getLogger(__name__)
 from itertools import permutations
 
@@ -22,7 +23,6 @@ try:
     import torchio as tio
 except:
     pass
-
 
 
 def get_loader(extension):
@@ -61,7 +61,9 @@ class BrainAgeDataset(Dataset):
         # self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
         # Temporal Exception code
         if os.path.exists(os.path.join(ROOT, "data_config.yml")):
-            self.data_cfg = load_config(os.path.join(ROOT, "data_config.yml"))  # -> Edict
+            self.data_cfg = load_config(
+                os.path.join(ROOT, "data_config.yml")
+            )  # -> Edict
         else:
             self.data_cfg = load_config("/workspace/brainmask_mni/data_config.yml")
         self.load = get_loader(extension=self.data_cfg.extension)
@@ -137,11 +139,11 @@ class BrainAgeDataset(Dataset):
             self.label_file["abs_path"] = self.label_file["abs_path"].apply(
                 lambda x: x.replace("\\", "/")
             )
-        assert \
-            sum(self.label_file["abs_path"].apply(os.path.exists)) \
-            == self.label_file.shape[0], \
-            f"Possible Paths: {sum(self.label_file['abs_path'].apply(os.path.exists))} != #Rows: {self.label_file.shape[0]}"
-        
+        assert (
+            sum(self.label_file["abs_path"].apply(os.path.exists))
+            == self.label_file.shape[0]
+        ), f"Possible Paths: {sum(self.label_file['abs_path'].apply(os.path.exists))} != #Rows: {self.label_file.shape[0]}"
+
         self.src_map = {
             src: i for i, src in enumerate(sorted(self.label_file.src.unique()))
         }
@@ -355,7 +357,7 @@ def get_dataloader(cfg, sampling="train", return_dataset=False, pin_memory=True)
         # "mni": "/home/hoesung/hoesung_save2/daehyun/brainmask_mni",
         # "mni": "H:/My Drive/brain/age_prediction/brainmask_mni",
         "raw": "H:/My Drive/brain/age_prediction/brainmask_nii",
-        "non_registered": "/workspace/non_registered/npy"
+        "non_registered": "/workspace/non_registered/npy",
     }[cfg.registration]
 
     dataset = BrainAgeDataset(cfg, sampling=sampling)

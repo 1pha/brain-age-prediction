@@ -6,28 +6,28 @@ import torch.nn as nn
 from torchsummary import summary
 
 
-'''
+"""
 This module should contain models
     1. Takes 4D Brain Tensor as input
     2. that outputs 1-dim EMBEDDED vectors
         - this 1d embed vector will be fed to models from predictors
-'''
+"""
+
 
 class PoolBlock(nn.Module):
-
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
         self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.bn1   = nn.BatchNorm3d(num_features=out_channels)
+        self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1)
-        self.bn2   = nn.BatchNorm3d(num_features=out_channels)
+        self.bn2 = nn.BatchNorm3d(num_features=out_channels)
 
         self.relu = nn.ReLU(inplace=True)
         self.pool = nn.MaxPool3d(2)
 
     def forward(self, x):
-        
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -42,19 +42,22 @@ class PoolBlock(nn.Module):
 
 
 class StrideBlock(nn.Module):
-
     def __init__(self, in_channels, out_channels, stride=2):
         super().__init__()
 
-        self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.bn1   = nn.BatchNorm3d(num_features=out_channels)
-        self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, stride=stride, padding=1)
-        self.bn2   = nn.BatchNorm3d(num_features=out_channels)
+        self.conv1 = nn.Conv3d(
+            in_channels, out_channels, kernel_size=3, stride=1, padding=1
+        )
+        self.bn1 = nn.BatchNorm3d(num_features=out_channels)
+        self.conv2 = nn.Conv3d(
+            out_channels, out_channels, kernel_size=3, stride=stride, padding=1
+        )
+        self.bn2 = nn.BatchNorm3d(num_features=out_channels)
 
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -64,6 +67,7 @@ class StrideBlock(nn.Module):
         x = self.relu(x)
 
         return x
+
 
 def get_inplanes(start_channels=16):
     if start_channels == 8:
@@ -80,7 +84,6 @@ def get_inplanes(start_channels=16):
 
 
 class VanillaConv(nn.Module):
-
     def __init__(self, cfg=None, start_channels=16):
         super().__init__()
 
@@ -94,7 +97,7 @@ class VanillaConv(nn.Module):
             StrideBlock(layers[1], layers[2]),
             StrideBlock(layers[2], layers[3]),
             StrideBlock(layers[3], layers[4]),
-        )    
+        )
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
     def forward(self, x):
@@ -116,7 +119,8 @@ class VanillaConv(nn.Module):
 
         return conv_layers
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = VanillaConv().to(device)

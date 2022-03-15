@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-class NKRegressor(nn.Module):
 
+class NKRegressor(nn.Module):
     def __init__(self, cfg=None):
         super(NKRegressor, self).__init__()
 
@@ -16,7 +16,7 @@ class NKRegressor(nn.Module):
             nn.ReLU(),
             nn.Linear(init_node // 2, init_node // 4),
             nn.ReLU(),
-            nn.Linear(init_node // 4, 1)
+            nn.Linear(init_node // 4, 1),
         )
 
     def forward(self, x):
@@ -25,7 +25,6 @@ class NKRegressor(nn.Module):
 
 
 class NKDomainPredictor(nn.Module):
-    
     def __init__(self, cfg=None):
         super(NKDomainPredictor, self).__init__()
 
@@ -39,11 +38,11 @@ class NKDomainPredictor(nn.Module):
         self.domain = nn.Sequential(
             nn.Linear(init_node, init_node // 2),
             nn.ReLU(),
-            nn.Dropout3d(p=.2),
+            nn.Dropout3d(p=0.2),
             nn.Linear(init_node // 2, init_node // 4),
             nn.ReLU(),
             nn.Linear(init_node // 4, num_dbs),
-            nn.Softmax(dim=1)
+            nn.Softmax(dim=1),
         )
 
     def forward(self, x):
@@ -52,6 +51,6 @@ class NKDomainPredictor(nn.Module):
 
 
 load_predictors = {
-    'nkregressor': NKRegressor,
-    'nkdomainpredictor': NKDomainPredictor,
+    "nkregressor": NKRegressor,
+    "nkdomainpredictor": NKDomainPredictor,
 }

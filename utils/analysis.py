@@ -11,8 +11,8 @@ import torch
 import torch.nn.functional as F
 import nibabel as nib
 
-class FileSelector:
 
+class FileSelector:
     def __init__(self, _type="naive"):
 
         self._type = _type
@@ -23,7 +23,7 @@ class FileSelector:
             "augment_nonreg": "../resnet256_augmentation_nonreg_checkpoints",
         }[_type]
 
-        self.runs_dir = sorted(glob(self.ROOT + "/*")) # contains all runs
+        self.runs_dir = sorted(glob(self.ROOT + "/*"))  # contains all runs
         self.selector = "encoder"
 
         # Possible Selectors
@@ -52,10 +52,12 @@ class FileSelector:
 
     def get(self, selector, idx: int = 0):
 
-        # Get list of checkpoints (.pt) or 
+        # Get list of checkpoints (.pt) or
 
         path = f"{self.runs_dir[idx]}/{selector}/"
-        files = list(chain(*[glob(path + extension) for extension in ["*.pt", "*.npy"]]))
+        files = list(
+            chain(*[glob(path + extension) for extension in ["*.pt", "*.npy"]])
+        )
         return sorted(files)
 
     def get_test_result(self, idx: int = 0):
@@ -77,7 +79,7 @@ class FileSelector:
 
 
 def MAE(true, pred):
-    return np.sum(np.abs(true - pred)) / len(true) 
+    return np.sum(np.abs(true - pred)) / len(true)
 
 
 def check_existence(input, selector):
@@ -94,6 +96,7 @@ def check_existence(input, selector):
         print(idx, epoch)
         # return None
 
+
 def cherry_picker(input, selector):
 
     idx, epoch = input
@@ -107,10 +110,9 @@ def cherry_picker(input, selector):
     except:
         print(f"idx: {idx}, epoch:{epoch}")
         # return None
-        
+
 
 class Result:
-
     def __init__(self, data, _type="naive"):
 
         self._type = _type
@@ -120,7 +122,7 @@ class Result:
             setattr(self, f"result_{str(idx).zfill(3)}", result)
             self.run_names.append(run_name)
         self.epoch_organize()
-    
+
     def __getitem__(self, idx):
 
         if isinstance(idx, int):
@@ -141,10 +143,10 @@ class Result:
         return len(self.run_names)
 
     def epoch_organize(self):
-        
+
         self.epoch_pivot = {}
         for idx, run_name in enumerate(self.run_names):
-            
+
             # data of list[tuples, ...]
             data = self.raw_data[run_name]
             for d in data:
@@ -169,6 +171,7 @@ class Result:
             elif func == "best":
                 return [min(_[1] for _ in e) for e in self.raw_data.values()]
 
+
 def transform(result):
 
     """
@@ -189,7 +192,7 @@ def group_stats(naive, augment, info=None):
 
 
 def save2nifti(npy, savename, overwrite=False, size=(207, 256, 215)):
-    
+
     """
     Takes saliency map with shape of (96, 96, 96)
     """
@@ -199,19 +202,23 @@ def save2nifti(npy, savename, overwrite=False, size=(207, 256, 215)):
         npy = np.mean(npy, axis=0)
 
     # Resize
-    resized_nifti = F.interpolate(
-        torch.tensor(npy[None, None, ...]), size=size
-    ).squeeze().squeeze().numpy()
+    resized_nifti = (
+        F.interpolate(torch.tensor(npy[None, None, ...]), size=size)
+        .squeeze()
+        .squeeze()
+        .numpy()
+    )
 
     # Define Affine Matrix
-    affine = np.array([
-        [   0.73746312,    0.        ,    0.        ,  -75.7625351 ],
-        [   0.        ,    0.73746312,    0.        , -110.7625351 ],
-        [   0.        ,    0.        ,    0.73746312,  -71.7625351 ],
-        [   0.        ,    0.        ,    0.        ,    1.        ]
-    ])
+    affine = np.array(
+        [
+            [0.73746312, 0.0, 0.0, -75.7625351],
+            [0.0, 0.73746312, 0.0, -110.7625351],
+            [0.0, 0.0, 0.73746312, -71.7625351],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
 
-    
     if os.path.exists(savename):
         if overwrite is False:
             print("File with same name exists, please allow overwrite to replace.")
@@ -222,6 +229,6 @@ def save2nifti(npy, savename, overwrite=False, size=(207, 256, 215)):
             resized_nifti,
             affine,
         ),
-        savename
+        savename,
     )
     print("Successfully saved.")

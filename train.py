@@ -5,7 +5,7 @@ import logging
 logging.basicConfig(
     format="%(asctime)s(%(levelname)s) %(name)s - %(message)s",
     datefmt="%m/%d/%Y %H:%M:%S",
-    level=logging.INFO
+    level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     if cfg.debug is True:
         logger.setLevel(logging.DEBUG)
     logger.info(f"Use GPU {cfg.gpu_num}")
-    
+
     trainer = MRITrainer(cfg)
 
     run_name = cfg.run_name if cfg.get("run_name") else "DEFAULT NAME"
@@ -56,4 +56,3 @@ if __name__ == "__main__":
     )
 
     trainer.run(cfg)
-

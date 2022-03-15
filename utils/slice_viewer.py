@@ -2,24 +2,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import nibabel as nib
 
-class SliceViewer:
 
+class SliceViewer:
     def __init__(self, subject):
 
         if isinstance(subject, str):
-            if 'nii' in subject.split('.')[-1]:
+            if "nii" in subject.split(".")[-1]:
                 self.subject = nib.load(subject).get_fdata()
 
-            if 'npy' in subject.split('.')[-1]:
+            if "npy" in subject.split(".")[-1]:
                 self.subject = np.load(subject)
 
         else:
             self.subject = subject
-            
-        self.vertex  = self.subject.shape[0]
 
+        self.vertex = self.subject.shape[0]
 
-    def calculate_ratio(self, subject=None, view='axial'):
+    def calculate_ratio(self, subject=None, view="axial"):
 
         if subject is None:
             subject = self.subject
@@ -30,13 +29,12 @@ class SliceViewer:
 
         ratios = []
         for i in range(0, vertex):
-    
+
             slce = self._select_view(view=view, i=i)
             r = int((slce == 0).sum()) / vertex**2
             ratios.append(r)
 
         return ratios
-
 
     def triple_view(self, i=None):
 
@@ -44,8 +42,8 @@ class SliceViewer:
             i = self.vertex // 2
 
         saggital = self.subject[i, :, :]
-        axial    = self.subject[:, i, :]
-        coronal  = self.subject[:, :, i]
+        axial = self.subject[:, i, :]
+        coronal = self.subject[:, :, i]
 
         fig, axes = plt.subplots(1, 3)
         for _i, s in enumerate([saggital, axial, coronal]):
@@ -54,8 +52,7 @@ class SliceViewer:
         plt.show()
         plt.close()
 
-
-    def single_view(self, i, view='axial'):
+    def single_view(self, i, view="axial"):
 
         slce = self._select_view(view=view, i=i)
 
@@ -65,19 +62,19 @@ class SliceViewer:
         plt.show()
         plt.close()
 
-
-    def ratio_view(self, view='axial', threshold=.85):
+    def ratio_view(self, view="axial", threshold=0.85):
 
         for i in range(0, self.vertex):
-            
+
             slce = self._select_view(view=view, i=i)
-            r = int((slce == 0).sum()) / self.vertex ** 2
+            r = int((slce == 0).sum()) / self.vertex**2
             if r < threshold:
-                title = f"{view.capitalize()} View for EPI image {i}th slice, {r:.3f} ratio"
+                title = (
+                    f"{view.capitalize()} View for EPI image {i}th slice, {r:.3f} ratio"
+                )
                 self._show_slice(slce, title)
 
-
-    def multi_view(self, view='axial', step=5, subject=None):
+    def multi_view(self, view="axial", step=5, subject=None):
 
         if subject is None:
             subject = self.subject
@@ -87,27 +84,26 @@ class SliceViewer:
             vertex = subject.shape[0]
 
         for i in range(0, vertex):
-            
+
             if i % step == 0:
                 title = f"{view.capitalize()} View for EPI image {i}th slice"
                 self._show_slice(self._select_view(view, i), title=title)
-
 
     def _show_slice(self, slce, title=None):
 
         fig, axes = plt.subplots()
         axes.imshow(slce.T, cmap="gray", origin="lower")
-        if title: plt.suptitle(title)
+        if title:
+            plt.suptitle(title)
         plt.show()
         plt.close()
 
-
-    def _select_view(self, view='axial', i=None, subject=None):
-        '''
+    def _select_view(self, view="axial", i=None, subject=None):
+        """
         # X: Saggital View
         # Y: Axial View
         # Z: Coronal View
-        '''
+        """
 
         if subject is None:
             subject = self.subject
@@ -115,7 +111,11 @@ class SliceViewer:
         if i is None:
             i = self.vertex // 2
 
-        if view == 'saggital' : return subject[i, :, :]
-        elif view == 'axial'  : return subject[:, i, :]
-        elif view == 'coronal': return subject[:, :, i]
-        else: pass
+        if view == "saggital":
+            return subject[i, :, :]
+        elif view == "axial":
+            return subject[:, i, :]
+        elif view == "coronal":
+            return subject[:, :, i]
+        else:
+            pass

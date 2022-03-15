@@ -4,17 +4,17 @@ from tqdm import tqdm
 import torchio as tio
 import matplotlib.pyplot as plt
 
-original_path = glob('../../brainmask_tlrc/*.npy')
+original_path = glob("../../brainmask_tlrc/*.npy")
 original_path.sort()
 
-class VariationED:
 
+class VariationED:
     def __init__(self, cfg=(7, 7.5)):
 
         num_control_points, max_displacement = cfg
         self.cfg = {
-            'num_control_points': num_control_points, # default=7
-            'max_displacement': max_displacement # default=7.5
+            "num_control_points": num_control_points,  # default=7
+            "max_displacement": max_displacement,  # default=7.5
         }
 
         self.transform = tio.RandomElasticDeformation(**self.cfg)
@@ -27,24 +27,25 @@ class VariationED:
 
         return f"Deformed, num_ctrl_pts={self.cfg['num_control_points']}, max_dspl={self.cfg['max_displacement']}"
 
+
 def plot():
 
     original = np.load(original_path[0])[None, ...]
 
     cfg_combs = [
-        (7, 7.5), # default
+        (7, 7.5),  # default
         (7, 6.0),
         (7, 4.5),
     ]
 
     cfg_combs = [
-        (7, 7.5), # default
+        (7, 7.5),  # default
         (6, 7.5),
         (5, 7.5),
     ]
 
     cfg_combs = [
-        (7, 7.5), # default
+        (7, 7.5),  # default
         (5, 2.5),
         (5, 1.5),
     ]
@@ -69,11 +70,14 @@ def plot():
     plt.show()
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
     elastic_deform = VariationED((5, 1.5))
     for file in tqdm(original_path):
-    
+
         brain = np.load(file)
-        fname = file.split('\\')[1][:-4]
-        np.save(f'../../brainmask_elasticdeform/{fname}.npy', elastic_deform.transform(brain[None, ...]))
+        fname = file.split("\\")[1][:-4]
+        np.save(
+            f"../../brainmask_elasticdeform/{fname}.npy",
+            elastic_deform.transform(brain[None, ...]),
+        )

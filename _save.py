@@ -1,4 +1,5 @@
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import logging
 from pathlib import Path
@@ -49,7 +50,7 @@ def load_model_ckpts(path: Path, epoch: int):
 
 
 for checkpoint in checkpoint_lists[-2:]:
-    
+
     checkpoint = Path(checkpoint)
     cfg = load_config(Path(checkpoint, "config.yml"))
     cfg.registration = "mni"

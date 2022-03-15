@@ -40,6 +40,7 @@ def load_model_ckpts(path: Path, epoch: int):
 
     return ckpts, mae
 
+
 def inference(checkpoint):
 
     checkpoint = Path(checkpoint)
@@ -77,7 +78,7 @@ def inference(checkpoint):
         yaml.dump(test_results, f)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     for checkpoint in checkpoint_lists[-2:]:
         inference(checkpoint)
     # inference(checkpoint_lists[-1])
