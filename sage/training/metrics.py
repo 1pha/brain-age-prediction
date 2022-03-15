@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from sklearn.metrics import r2_score, roc_auc_score
 from scipy.stats import pearsonr
+from sklearn.metrics import r2_score, roc_auc_score
 
 
 class RMSELoss(nn.Module):

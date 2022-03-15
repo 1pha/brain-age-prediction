@@ -1,10 +1,9 @@
-from glob import glob
 import argparse
-from datetime import datetime
 import time
+from datetime import datetime
+from glob import glob
 
 from registration import *
-
 
 parser = argparse.ArgumentParser(description="Registration work")
 parser.add_argument(

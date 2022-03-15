@@ -1,17 +1,17 @@
 import os
-import numpy as np
 from glob import glob
-from IPython.display import clear_output
-import torch
 
-from .cams import CAM
-from .smoothgrad import SmoothGrad
-from .auggrad import AugGrad
-from .utils import plot_vismap, Assembled
+import numpy as np
+import torch
+from IPython.display import clear_output
 
 from ..config import load_config
 from ..data.dataloader import get_dataloader
 from ..training.trainer import MRITrainer
+from .auggrad import AugGrad
+from .cams import CAM
+from .smoothgrad import SmoothGrad
+from .utils import Assembled, plot_vismap
 
 
 def deprecate(func):

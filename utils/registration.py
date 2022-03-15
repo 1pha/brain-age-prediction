@@ -1,35 +1,28 @@
 import os
 import time
 from glob import glob
+
 import numpy as np
 
 np.set_printoptions(precision=4, suppress=True)
 
-import yaml
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+import yaml
 
 plt.rcParams["image.cmap"] = "gray"
 plt.rcParams["image.interpolation"] = "nearest"
 
 import nibabel as nib
-from nilearn.datasets import load_mni152_template
-
-from dipy.viz import regtools
-from dipy.align.imaffine import (
-    AffineMap,
-    transform_centers_of_mass,
-    MutualInformationMetric,
-    AffineRegistration,
-)
-from dipy.align.transforms import (
-    TranslationTransform3D,
-    RigidTransform3D,
-    AffineTransform3D,
-)
-
+from dipy.align.imaffine import (AffineMap, AffineRegistration,
+                                 MutualInformationMetric,
+                                 transform_centers_of_mass)
 from dipy.align.imwarp import SymmetricDiffeomorphicRegistration
 from dipy.align.metrics import CCMetric
+from dipy.align.transforms import (AffineTransform3D, RigidTransform3D,
+                                   TranslationTransform3D)
+from dipy.viz import regtools
+from nilearn.datasets import load_mni152_template
 
 
 def inform(original_fn):

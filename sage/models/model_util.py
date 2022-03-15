@@ -1,23 +1,23 @@
-import os
 import collections
-from ..config import edict2dict
+import os
+
 import torch
 from torchsummary import summary
 
+from ..config import edict2dict
 from .naive_models.dinsdale import *
+from .naive_models.efficientnet import EfficientNet3D
 from .naive_models.levakov_96 import *
+from .naive_models.res_sfcn import *
+from .naive_models.residual_vanilla import *
 from .naive_models.resnet import *
 from .naive_models.sequential import *
 from .naive_models.sfcn import *
 from .naive_models.vanilla import *
-from .naive_models.residual_vanilla import *
-from .naive_models.res_sfcn import *
-from .naive_models.efficientnet import EfficientNet3D
-
-from .unlearning.vanilla_dinsdale import VanillaConv
-from .unlearning.resnet import load_resnet
-from .unlearning.convit import VisionTransformer, ConvitArguments
+from .unlearning.convit import ConvitArguments, VisionTransformer
 from .unlearning.predictors import *
+from .unlearning.resnet import load_resnet
+from .unlearning.vanilla_dinsdale import VanillaConv
 
 
 def load_model(cfg=None, gpu=True, verbose=True):

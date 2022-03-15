@@ -1,6 +1,7 @@
 import os
-import pandas as pd
 from glob import glob
+
+import pandas as pd
 
 ROOT = "G:/My Drive/brain_data/brainmask_*"  # <- Change here
 

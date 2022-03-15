@@ -1,11 +1,10 @@
 import math
 from functools import partial
 
-from easydict import EasyDict as edict
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from easydict import EasyDict as edict
 from torchsummary import summary
 
 

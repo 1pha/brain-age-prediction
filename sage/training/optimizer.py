@@ -1,4 +1,5 @@
 from itertools import chain
+
 import torch.nn as nn
 
 try:

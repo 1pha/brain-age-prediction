@@ -10,19 +10,16 @@ https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision
 """
 
 from dataclasses import asdict, dataclass, field
+from functools import partial, reduce
 from typing import Any
 
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from functools import partial, reduce
 import torch.nn.functional as F
 from timm.models.helpers import load_pretrained
 from timm.models.layers import DropPath, to_3tuple, trunc_normal_
 from timm.models.registry import register_model
-
-import torch
-import torch.nn as nn
-import matplotlib.pyplot as plt
 
 
 class Mlp(nn.Module):

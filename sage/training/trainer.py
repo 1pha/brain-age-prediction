@@ -1,23 +1,26 @@
-import time
-import yaml
-import wandb
-
-from easydict import EasyDict as edict
 import logging
+import time
+
+import yaml
+from easydict import EasyDict as edict
+
+import wandb
 
 logger = logging.getLogger(__name__)
 
-import torch
-
-from .metrics import get_metric
-from .optimizer import get_optimizer
-from ..models.model_util import load_models, multimodel_save_checkpoint
-from ..data.dataloader import get_dataloader
 import sys
 
+import torch
+
+from ..data.dataloader import get_dataloader
+from ..models.model_util import load_models, multimodel_save_checkpoint
+from .metrics import get_metric
+from .optimizer import get_optimizer
+
 sys.path.append("../../")
-from utils.misc import seed_everything, logging_time, get_today
 from utils.average_meter import AverageMeter
+from utils.misc import get_today, logging_time, seed_everything
+
 from ..config import save_config
 
 

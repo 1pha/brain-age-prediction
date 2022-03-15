@@ -1,8 +1,8 @@
-import numpy as np
-from tqdm import tqdm
 from glob import glob
 
 import nibabel as nib
+import numpy as np
+from tqdm import tqdm
 
 
 def averaged_brain(path, file_ext="npy", save=False, all=None):

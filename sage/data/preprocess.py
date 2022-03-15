@@ -1,5 +1,6 @@
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
+
 # Identity Scaler (returns X)
 class Identity:
     def __init__(self):

@@ -1,19 +1,17 @@
 import os
-import matplotlib.pyplot as plt
-
 from glob import glob
-import numpy as np
+
 import imageio
-
-from skimage.transform import resize
-from nilearn.datasets import load_mni152_template
+import matplotlib.pyplot as plt
 import nibabel as nib
+import numpy as np
 import torch
+from nilearn.datasets import load_mni152_template
+from skimage.transform import resize
 
-
+from .auggrad import *
 from .cams import *
 from .smoothgrad import *
-from .auggrad import *
 
 
 def check_type(brain, resize_shape=(96, 96, 96), maxcut=None):

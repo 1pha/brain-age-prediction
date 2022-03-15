@@ -1,8 +1,9 @@
 from glob import glob
-import numpy as np
-from tqdm import tqdm
-import torchio as tio
+
 import matplotlib.pyplot as plt
+import numpy as np
+import torchio as tio
+from tqdm import tqdm
 
 original_path = glob("../../brainmask_tlrc/*.npy")
 original_path.sort()

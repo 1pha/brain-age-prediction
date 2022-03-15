@@ -1,19 +1,17 @@
+import argparse
 from datetime import datetime
-import seaborn as sns
 
+import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
-
-from src.run import run
 from src.dataloader import MyDataset
 from src.evaluate import eval, loss_plot, result_plot
-from src.model.vanilla import Vanilla3d
 from src.model.paper_ieee.levakov import Levakov
-
-import argparse
+from src.model.vanilla import Vanilla3d
+from src.run import run
+from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader
 
 parser = argparse.ArgumentParser(description="Age Prediction of sMRI Data")
 parser.add_argument(

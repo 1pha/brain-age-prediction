@@ -1,7 +1,8 @@
-import contextlib
-import yaml
-import easydict
 import argparse
+import contextlib
+
+import easydict
+import yaml
 
 
 def list2dict(args):

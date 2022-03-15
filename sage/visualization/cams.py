@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
-from skimage.transform import resize
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from skimage.transform import resize
 from torch.autograd import Function
 
 

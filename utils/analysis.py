@@ -1,15 +1,17 @@
 import os
-import yaml
-import easydict
-import numpy as np
 from glob import glob
 from itertools import chain
-from scipy import stats
-from scipy.stats import ttest_ind
-from sage.config import load_config
+
+import easydict
+import nibabel as nib
+import numpy as np
 import torch
 import torch.nn.functional as F
-import nibabel as nib
+import yaml
+from scipy import stats
+from scipy.stats import ttest_ind
+
+from sage.config import load_config
 
 
 class FileSelector:

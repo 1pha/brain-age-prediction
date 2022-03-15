@@ -2,9 +2,7 @@ from functools import reduce
 
 import torch
 import torch.nn as nn
-
 from torchsummary import summary
-
 
 """
 This module should contain models

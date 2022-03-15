@@ -1,6 +1,6 @@
 # BASICS
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 from itertools import permutations
@@ -8,15 +8,14 @@ from itertools import permutations
 import nibabel as nib
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.utils import shuffle
-
-from .preprocess import *
-from ..config import load_config
-
 import torch
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+from torch.utils.data import DataLoader, Dataset
+
+from ..config import load_config
+from .preprocess import *
 
 # AUGMENTATION
 try:

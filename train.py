@@ -1,6 +1,7 @@
-import wandb
-import os
 import logging
+import os
+
+import wandb
 
 logging.basicConfig(
     format="%(asctime)s(%(levelname)s) %(name)s - %(message)s",
@@ -9,8 +10,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from sage.config import load_config
 from sage.args import parse_args
+from sage.config import load_config
 from sage.training.trainer import MRITrainer
 
 NAMEDICT = {"vanillaconv": "VanillaConv", "resnet": "ResNet", "convit": "ConViT"}
