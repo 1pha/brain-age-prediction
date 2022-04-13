@@ -35,12 +35,15 @@ class NKDomainPredictor(nn.Module):
             init_node = self.cfg.init_node
             num_dbs = self.cfg.num_dbs
 
+        self.relu = nn.ReLU()
+        self.relu2 = nn.ReLU()
+
         self.domain = nn.Sequential(
             nn.Linear(init_node, init_node // 2),
-            nn.ReLU(),
+            self.relu,
             nn.Dropout3d(p=0.2),
             nn.Linear(init_node // 2, init_node // 4),
-            nn.ReLU(),
+            self.relu2,
             nn.Linear(init_node // 4, num_dbs),
             nn.Softmax(dim=1),
         )

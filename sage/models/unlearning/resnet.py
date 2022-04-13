@@ -40,7 +40,8 @@ class BasicBlock(nn.Module):
 
         self.conv1 = conv3x3x3(in_planes, planes, stride)
         self.bn1 = nn.BatchNorm3d(planes)
-        self.relu = nn.ReLU(inplace=True) if activation is None else activation
+        self.relu = nn.ReLU(inplace=False) if activation is None else activation
+        self.relu2 = nn.ReLU(inplace=False) if activation is None else activation
         self.conv2 = conv3x3x3(planes, planes)
         self.bn2 = nn.BatchNorm3d(planes)
         self.downsample = downsample
@@ -60,7 +61,7 @@ class BasicBlock(nn.Module):
             residual = self.downsample(x)
 
         out += residual
-        out = self.relu(out)
+        out = self.relu2(out)
 
         return out
 
@@ -77,9 +78,10 @@ class Bottleneck(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.conv3 = conv1x1x1(planes, planes * self.expansion)
         self.bn3 = nn.BatchNorm3d(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.downsample = downsample
         self.stride = stride
+        self.relu2 = nn.ReLU(inplace=False)
 
     def forward(self, x):
         residual = x
@@ -99,7 +101,7 @@ class Bottleneck(nn.Module):
             residual = self.downsample(x)
 
         out += residual
-        out = self.relu(out)
+        out = self.relu2(out)
 
         return out
 
@@ -135,7 +137,7 @@ class ResNet(nn.Module):
             bias=False,
         )
         self.bn1 = nn.BatchNorm3d(self.in_planes)
-        self.relu = nn.ReLU(inplace=True) if activation is None else activation
+        self.relu = nn.ReLU(inplace=False) if activation is None else activation
         self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(
             block, block_inplanes[0], layers[0], shortcut_type, activation=activation
@@ -166,6 +168,7 @@ class ResNet(nn.Module):
         )
 
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
+        self.flatten = nn.Flatten()
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -233,7 +236,10 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
 
-        x = x.view(x.size(0), -1)
+        if hasattr(self, "flatten"):
+            x = self.flatten(x)
+        else:
+            x = x.view(x.size(0), -1)
 
         return x
 

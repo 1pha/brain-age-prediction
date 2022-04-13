@@ -165,6 +165,7 @@ class ResNet(nn.Module):
         )
 
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
+        self.flatten = nn.Flatten()
         self.fc = nn.Linear(block_inplanes[3] * block.expansion, n_classes)
 
         for m in self.modules():
@@ -233,7 +234,9 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
 
-        x = x.view(x.size(0), -1)
+        # x = x.view(x.size(0), -1)
+        x = self.flatten(x)
+        print(x.shape)
         x = self.fc(x)
 
         return x
