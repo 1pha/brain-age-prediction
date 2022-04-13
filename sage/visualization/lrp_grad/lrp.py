@@ -10,9 +10,11 @@ Implementation can be adapted to work with other architectures as well by adding
         r = lrp_model.forward(x)
 
 """
+from copy import deepcopy
+
 import torch
 from torch import nn
-from copy import deepcopy
+
 from .utils import layers_lookup
 
 
@@ -50,8 +52,10 @@ class LRPModel(nn.Module):
                 if layer.__class__.__name__ == "BatchNorm3d":
                     layers[i] = lookup_table["wildcard"](layer=layer)
                 else:
-                    message = f"Layer-wise relevance propagation not implemented for " \
-                            f"{layer.__class__.__name__} layer."
+                    message = (
+                        f"Layer-wise relevance propagation not implemented for "
+                        f"{layer.__class__.__name__} layer."
+                    )
                     raise NotImplementedError(message)
 
         return layers
@@ -79,7 +83,7 @@ class LRPModel(nn.Module):
         #     layers.append(layer)
 
         return layers
-    
+
     def _get_children(self, model: torch.nn.Module):
         # get children form model!
         children = list(model.children())
@@ -88,12 +92,12 @@ class LRPModel(nn.Module):
             # if model has no children; model is last child! :O
             return model
         else:
-        # look for children from children... to the last child!
+            # look for children from children... to the last child!
             for child in children:
-                    try:
-                        flatt_children.extend(self._get_children(child))
-                    except TypeError:
-                        flatt_children.append(self._get_children(child))
+                try:
+                    flatt_children.extend(self._get_children(child))
+                except TypeError:
+                    flatt_children.append(self._get_children(child))
         return flatt_children
 
     def forward(self, x: torch.tensor) -> torch.tensor:

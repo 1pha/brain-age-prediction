@@ -4,8 +4,10 @@ Layers for layer-wise relevance propagation can be modified.
 
 """
 from select import EPOLLONESHOT
+
 import torch
 from torch import nn
+
 from .filter import relevance_filter
 
 top_k_percent = 1  # Proportion of relevance scores that are allowed to pass.
@@ -33,8 +35,8 @@ class RelevancePropagationAdaptiveAvgPool2d(nn.Module):
         r = (a * c).data
         return r
 
-class RelevancePropagationAdaptiveAvgPool3d(nn.Module):
 
+class RelevancePropagationAdaptiveAvgPool3d(nn.Module):
     def __init__(self, layer: torch.nn.AdaptiveAvgPool3d, eps: float = 1.0e-05) -> None:
         super().__init__()
         self.layer = layer
@@ -83,7 +85,9 @@ class RelevancePropagationMaxPool2d(nn.Module):
 
     """
 
-    def __init__(self, layer: torch.nn.MaxPool2d, mode: str = "avg", eps: float = 1.0e-05) -> None:
+    def __init__(
+        self, layer: torch.nn.MaxPool2d, mode: str = "avg", eps: float = 1.0e-05
+    ) -> None:
         super().__init__()
 
         if mode == "avg":
@@ -103,8 +107,9 @@ class RelevancePropagationMaxPool2d(nn.Module):
 
 
 class RelevancePropagationMaxPool3d(nn.Module):
-
-    def __init__(self, layer: torch.nn.MaxPool3d, mode: str = "avg", eps: float = 1.0e-05) -> None:
+    def __init__(
+        self, layer: torch.nn.MaxPool3d, mode: str = "avg", eps: float = 1.0e-05
+    ) -> None:
         super().__init__()
 
         if mode == "avg":
@@ -134,14 +139,20 @@ class RelevancePropagationConv2d(nn.Module):
 
     """
 
-    def __init__(self, layer: torch.nn.Conv2d, mode: str = "z_plus", eps: float = 1.0e-05) -> None:
+    def __init__(
+        self, layer: torch.nn.Conv2d, mode: str = "z_plus", eps: float = 1.0e-05
+    ) -> None:
         super().__init__()
 
         self.layer = layer
 
         if mode == "z_plus":
             self.layer.weight = torch.nn.Parameter(self.layer.weight.clamp(min=0.0))
-            self.layer.bias = torch.nn.Parameter(torch.zeros_like(self.layer.bias)) if self.layer.bias is not None else None
+            self.layer.bias = (
+                torch.nn.Parameter(torch.zeros_like(self.layer.bias))
+                if self.layer.bias is not None
+                else None
+            )
 
         self.eps = eps
 
@@ -156,15 +167,20 @@ class RelevancePropagationConv2d(nn.Module):
 
 
 class RelevancePropagationConv3d(nn.Module):
-
-    def __init__(self, layer: torch.nn.Conv3d, mode: str = "z_plus", eps: float = 1.0e-05) -> None:
+    def __init__(
+        self, layer: torch.nn.Conv3d, mode: str = "z_plus", eps: float = 1.0e-05
+    ) -> None:
         super().__init__()
 
         self.layer = layer
 
         if mode == "z_plus":
             self.layer.weight = torch.nn.Parameter(self.layer.weight.clamp(min=0.0))
-            self.layer.bias = torch.nn.Parameter(torch.zeros_like(self.layer.bias)) if self.layer.bias is not None else None
+            self.layer.bias = (
+                torch.nn.Parameter(torch.zeros_like(self.layer.bias))
+                if self.layer.bias is not None
+                else None
+            )
 
         self.eps = eps
 
@@ -189,7 +205,9 @@ class RelevancePropagationLinear(nn.Module):
 
     """
 
-    def __init__(self, layer: torch.nn.Linear, mode: str = "z_plus", eps: float = 1.0e-05) -> None:
+    def __init__(
+        self, layer: torch.nn.Linear, mode: str = "z_plus", eps: float = 1.0e-05
+    ) -> None:
         super().__init__()
 
         self.layer = layer

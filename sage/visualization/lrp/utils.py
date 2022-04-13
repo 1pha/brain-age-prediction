@@ -1,8 +1,8 @@
+# import jrieke.datasets as datasets
+import numpy as np
 import torch
 from scipy.ndimage import zoom
 from sklearn.model_selection import train_test_split
-# import jrieke.datasets as datasets
-import numpy as np
 
 
 def pprint(*args):
@@ -58,7 +58,12 @@ def scale_mask(mask, shape):
         remain_diff = np.array(nmm_map.shape) - np.array(zoomed_lbl.shape)
         pad_left = np.array(np.ceil(remain_diff / 2), dtype=int)
         pad_right = np.array(np.floor(remain_diff / 2), dtype=int)
-        nmm_map[pad_left[0]:-pad_right[0], pad_left[1]:-pad_right[1], pad_left[2]:-pad_right[2]] += zoomed_lbl * lbl_idx
+        nmm_map[
+            pad_left[0] : -pad_right[0],
+            pad_left[1] : -pad_right[1],
+            pad_left[2] : -pad_right[2],
+        ] += (
+            zoomed_lbl * lbl_idx
+        )
 
     return nmm_map
-

@@ -1,8 +1,7 @@
-
 import torch.nn as nn
 
-from sage.training.trainer import MRITrainer
 from sage.config import load_config
+from sage.training.trainer import MRITrainer
 
 cfg = load_config()
 cfg.force_cpu = True

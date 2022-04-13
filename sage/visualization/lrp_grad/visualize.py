@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import torch
 
 
-def plot_relevance_scores(x: torch.tensor, r: torch.tensor, name: str, config: dict) -> None:
+def plot_relevance_scores(
+    x: torch.tensor, r: torch.tensor, name: str, config: dict
+) -> None:
     """Plots results from layer-wise relevance propagation next to original image.
 
     Method currently accepts only a batch size of one.

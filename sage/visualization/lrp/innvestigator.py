@@ -1,8 +1,8 @@
-import torch
 import numpy as np
+import torch
 
 from .inverter_util import RelevancePropagator
-from .utils import pprint, Flatten
+from .utils import Flatten, pprint
 
 
 class InnvestigateModel(torch.nn.Module):
@@ -14,8 +14,9 @@ class InnvestigateModel(torch.nn.Module):
         only the functional max_poolnd is used, the inversion will not work.
     """
 
-    def __init__(self, the_model, lrp_exponent=1, beta=.5, epsilon=1e-6,
-                 method="e-rule"):
+    def __init__(
+        self, the_model, lrp_exponent=1, beta=0.5, epsilon=1e-6, method="e-rule"
+    ):
         """
         Model wrapper for pytorch models to 'innvestigate' them
         with layer-wise relevance propagation (LRP) as introduced by Bach et. al
@@ -50,21 +51,26 @@ class InnvestigateModel(torch.nn.Module):
         # Initialize the 'Relevance Propagator' with the chosen rule.
         # This will be used to back-propagate the relevance values
         # through the layers in the innvestigate method.
-        self.inverter = RelevancePropagator(lrp_exponent=lrp_exponent,
-                                            beta=beta, method=method, epsilon=epsilon,
-                                            device=self.device)
+        self.inverter = RelevancePropagator(
+            lrp_exponent=lrp_exponent,
+            beta=beta,
+            method=method,
+            epsilon=epsilon,
+            device=self.device,
+        )
 
         # Parsing the individual model layers
         self.register_hooks(self.model)
-        if method == "b-rule" and float(beta) in (-1., 0):
+        if method == "b-rule" and float(beta) in (-1.0, 0):
             which = "positive" if beta == -1 else "negative"
             which_opp = "negative" if beta == -1 else "positive"
-            print("WARNING: With the chosen beta value, "
-                  "only " + which + " contributions "
-                  "will be taken into account.\nHence, "
-                  "if in any layer only " + which_opp +
-                  " contributions exist, the "
-                  "overall relevance will not be conserved.\n")
+            print(
+                "WARNING: With the chosen beta value, "
+                "only " + which + " contributions "
+                "will be taken into account.\nHence, "
+                "if in any layer only " + which_opp + " contributions exist, the "
+                "overall relevance will not be conserved.\n"
+            )
 
     def cuda(self, device=None):
         self.device = torch.device("cuda", device)
@@ -92,12 +98,9 @@ class InnvestigateModel(torch.nn.Module):
             if list(mod.children()):
                 self.register_hooks(mod)
                 continue
-            mod.register_forward_hook(
-                self.inverter.get_layer_fwd_hook(mod))
+            mod.register_forward_hook(self.inverter.get_layer_fwd_hook(mod))
             if isinstance(mod, torch.nn.ReLU):
-                mod.register_backward_hook(
-                    self.relu_hook_function
-                )
+                mod.register_backward_hook(self.relu_hook_function)
 
     @staticmethod
     def relu_hook_function(module, grad_in, grad_out):
@@ -139,8 +142,10 @@ class InnvestigateModel(torch.nn.Module):
 
     def get_r_values_per_layer(self):
         if self.r_values_per_layer is None:
-            pprint("No relevances have been calculated yet, returning None in"
-                   " get_r_values_per_layer.")
+            pprint(
+                "No relevances have been calculated yet, returning None in"
+                " get_r_values_per_layer."
+            )
         return self.r_values_per_layer
 
     def innvestigate(self, in_tensor=None, rel_for_class=None):
@@ -169,11 +174,13 @@ class InnvestigateModel(torch.nn.Module):
         with torch.no_grad():
             # Check if innvestigation can be performed.
             if in_tensor is None and self.prediction is None:
-                raise RuntimeError("Model needs to be evaluated at least "
-                                   "once before an innvestigation can be "
-                                   "performed. Please evaluate model first "
-                                   "or call innvestigate with a new input to "
-                                   "evaluate.")
+                raise RuntimeError(
+                    "Model needs to be evaluated at least "
+                    "once before an innvestigation can be "
+                    "performed. Please evaluate model first "
+                    "or call innvestigate with a new input to "
+                    "evaluate."
+                )
 
             # Evaluate the model anew if a new input is supplied.
             if in_tensor is not None:
@@ -189,7 +196,9 @@ class InnvestigateModel(torch.nn.Module):
                 self.prediction = self.prediction.view(org_shape[0], -1)
                 max_v, _ = torch.max(self.prediction, dim=1, keepdim=True)
                 only_max_score = torch.zeros_like(self.prediction).to(self.device)
-                only_max_score[max_v == self.prediction] = self.prediction[max_v == self.prediction]
+                only_max_score[max_v == self.prediction] = self.prediction[
+                    max_v == self.prediction
+                ]
                 relevance_tensor = only_max_score.view(org_shape)
                 self.prediction.view(org_shape)
 

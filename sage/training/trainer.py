@@ -12,16 +12,15 @@ import sys
 
 import torch
 
-from ..data.dataloader import get_dataloader
-from ..models.model_util import load_models, multimodel_save_checkpoint
-from .metrics import get_metric
-from .optimizer import get_optimizer
+from sage.data.dataloader import get_dataloader
+from sage.models.model_util import load_models, multimodel_save_checkpoint
+from sage.training.metrics import get_metric
+from sage.training.optimizer import get_optimizer
 
 sys.path.append("../../")
+from sage.config import save_config
 from utils.average_meter import AverageMeter
 from utils.misc import get_today, logging_time, seed_everything
-
-from ..config import save_config
 
 
 class MRITrainer:
@@ -33,10 +32,20 @@ class MRITrainer:
         3. Extensible for future works
     """
 
-    __version__ = 0.2
-    __date__ = "Aug 19. 2021"
+    __version__ = 0.3
+    __date__ = "Apr 13. 2021"
 
-    def __init__(self, cfg, result_dir_suffix=None):
+    def __init__(
+        self,
+        model_args,
+        data_args,
+        training_args,
+        misc_args,
+        training_data,
+        validation_data,
+        test_data,
+        logger,
+    ):
 
         self.cfg = cfg
         self.phase_dict = self.get_phase_dict()
