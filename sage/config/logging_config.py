@@ -20,6 +20,7 @@ logger_conf = {  # only used when 'user_wandb==False'
     "root": {"level": "INFO", "handlers": ["console", "file_handler"]},
 }
 
+
 def get_logger():
     import logging
     import logging.config

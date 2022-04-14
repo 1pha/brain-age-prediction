@@ -1,20 +1,18 @@
-import os
 import json
-from typing import NewType, Any, List
+import os
+from typing import Any, List, NewType
 
 Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
+import nibabel as nib
 import numpy as np
 import pandas as pd
-import nibabel as nib
-
+import torch
+import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.utils import shuffle
-
-import torch
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 # Augmentation Library
@@ -23,8 +21,12 @@ try:
 except:
     pass
 
-# Identity Scaler (returns X)
+
 class Identity:
+    """
+    Identity Scaler (returns X)
+    """
+
     def __init__(self):
         pass
 
@@ -43,7 +45,9 @@ def get_loader(extension: str):
 
 
 class BrainAgeDataset(Dataset):
-    def __init__(self, data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger):
+    def __init__(
+        self, data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger
+    ):
 
         """
         CONFIG file should contain .csv file and -
@@ -113,7 +117,7 @@ class BrainAgeDataset(Dataset):
             sum(self.label_file["abs_path"].apply(os.path.exists))
             == self.label_file.shape[0]
         ), f"Possible Paths: {sum(self.label_file['abs_path'].apply(os.path.exists))} != #Rows: {self.label_file.shape[0]}"
-        
+
     def _split_data(self, data_args: Arguments, sampling: str, seed: int):
 
         self.logger.debug(f"Start spliting with seed {seed}")
@@ -146,11 +150,13 @@ class BrainAgeDataset(Dataset):
 
             self.data_files = (
                 shuffle(pd.concat([trn_idx, aug_idx]), random_state=seed)
-                if self.augmentation == "concat" else trn_idx
+                if self.augmentation == "concat"
+                else trn_idx
             )
             self.data_ages = (
                 shuffle(pd.concat([trn_age, aug_age]), random_state=seed)
-                if self.augmentation == "concat" else trn_age
+                if self.augmentation == "concat"
+                else trn_age
             )
 
         elif sampling == "valid":  # VALIDATION SET
@@ -164,14 +170,14 @@ class BrainAgeDataset(Dataset):
         self.data_files = self.data_files.to_list()
         self.data_ages = self.data_ages.to_list()
 
-        self.logger.info(f"Successfully setup {self.__len__()} brains for {sampling.capitalize()}")
+        self.logger.info(
+            f"Successfully setup {self.__len__()} brains for {sampling.capitalize()}"
+        )
 
     def __len__(self):
         return len(self.data_files)
 
-    def __getitem__(
-        self, idx: int
-    ):  # -> ((1, W', H', D'), age: torch.tensor.float)
+    def __getitem__(self, idx: int):  # -> ((1, W', H', D'), age: torch.tensor.float)
 
         """
         PIPELINE
@@ -264,7 +270,9 @@ class BrainAgeDataset(Dataset):
         return x
 
 
-def get_dataloader(data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger):
+def get_dataloader(
+    data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger
+):
 
     dataset = BrainAgeDataset(data_args, misc_args, sampling, logger)
     dataloader = DataLoader(

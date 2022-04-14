@@ -148,12 +148,14 @@ class MiscArguments:
         metadata={"help": "Designate number/ratio of the total data when debug."},
     )
 
+
 def arguments_to_dict(*args):
 
     arguments = dict()
     for a in args:
         arguments.update(**vars(a))
     return arguments
+
 
 if __name__ == "__main__":
 
@@ -163,5 +165,5 @@ if __name__ == "__main__":
     model_args, misc_args = parser.parse_args_into_dataclasses()
     print(arguments_to_dict(model_args, misc_args))
     # for v in iter(model_args):
-        # print(v)
+    # print(v)
     # print(vars(model_args[0]))
