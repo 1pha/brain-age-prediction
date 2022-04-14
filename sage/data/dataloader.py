@@ -1,5 +1,9 @@
 import os
 import json
+from typing import NewType, Any, List
+
+Arguments = NewType("Arguments", Any)
+Logger = NewType("Logger", Any)
 
 import numpy as np
 import pandas as pd
@@ -24,22 +28,22 @@ class Identity:
     def __init__(self):
         pass
 
-    def fit_transform(self, X):
+    def fit_transform(self, X: np.ndarray):
         return X
 
 
-def get_scaler(scaler):
+def get_scaler(scaler: str):
     return {"minmax": MinMaxScaler, "zscore": StandardScaler, "identity": Identity}[
         scaler
     ]()
 
 
-def get_loader(extension):
+def get_loader(extension: str):
     return {"npy": np.load, "nii": lambda x: nib.load(x).get_fdata()}[extension]
 
 
 class BrainAgeDataset(Dataset):
-    def __init__(self, data_args, misc_args, sampling, logger):
+    def __init__(self, data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger):
 
         """
         CONFIG file should contain .csv file and -
@@ -69,7 +73,7 @@ class BrainAgeDataset(Dataset):
         self._split_data(data_args, sampling, misc_args.seed)
         self._augmentation_setup(data_args)
 
-    def _load_dataset_config(self, data_args):
+    def _load_dataset_config(self, data_args: Arguments):
 
         """
         Loads dataset configuration file (json).
@@ -90,7 +94,7 @@ class BrainAgeDataset(Dataset):
             )
         self.load = get_loader(extension=self.dataset_config["extension"])
 
-    def _load_label(self, data_args, exclude_source):
+    def _load_label(self, data_args: Arguments, exclude_source: List[str]):
 
         label_fname = os.path.join(data_args.data_path, data_args.label_file)
         self.logger.debug(f"Load label file. PATH: {label_fname}")
@@ -110,7 +114,7 @@ class BrainAgeDataset(Dataset):
             == self.label_file.shape[0]
         ), f"Possible Paths: {sum(self.label_file['abs_path'].apply(os.path.exists))} != #Rows: {self.label_file.shape[0]}"
         
-    def _split_data(self, data_args, sampling, seed):
+    def _split_data(self, data_args: Arguments, sampling: str, seed: int):
 
         self.logger.debug(f"Start spliting with seed {seed}")
 
@@ -166,7 +170,7 @@ class BrainAgeDataset(Dataset):
         return len(self.data_files)
 
     def __getitem__(
-        self, idx
+        self, idx: int
     ):  # -> ((1, W', H', D'), age: torch.tensor.float)
 
         """
@@ -195,7 +199,7 @@ class BrainAgeDataset(Dataset):
 
         return (x, torch.tensor(self.data_ages[idx]).float())
 
-    def maxcut(self, x):
+    def maxcut(self, x: torch.Tensor):
         """
         For brains that has many blanks.
         Should explicity give maxcut with tuples of tuples ((w, W), (h, H), (d, D))
@@ -207,7 +211,7 @@ class BrainAgeDataset(Dataset):
         else:
             return x
 
-    def preprocess(self, x):  # -> (1, W', H', D')
+    def preprocess(self, x: torch.Tensor):  # -> (1, W', H', D')
 
         """
         Given with raw brain np.ndarray
@@ -234,9 +238,9 @@ class BrainAgeDataset(Dataset):
 
         return x
 
-    def _augmentation_setup(self, data_args):
+    def _augmentation_setup(self, data_args: Arguments):
 
-        self.logger.debug("Start setting up augmentation.")
+        self.logger.debug("Setting up augmentation.")
 
         self.transform = {
             "affine": tio.RandomAffine(),
@@ -249,7 +253,7 @@ class BrainAgeDataset(Dataset):
             data_args.elasticdeform_proba,
         )
 
-    def augmentation(self, x: torch.tensor):  # -> torch.Tensor (1, W', H', D')
+    def augmentation(self, x: torch.Tensor):  # -> torch.Tensor (1, W', H', D')
 
         """
         x must be given with torch.tensor with (1, W', H', D')
@@ -260,7 +264,7 @@ class BrainAgeDataset(Dataset):
         return x
 
 
-def get_dataloader(data_args, misc_args, sampling, logger):
+def get_dataloader(data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger):
 
     dataset = BrainAgeDataset(data_args, misc_args, sampling, logger)
     dataloader = DataLoader(
@@ -269,7 +273,7 @@ def get_dataloader(data_args, misc_args, sampling, logger):
     return dataloader
 
 
-def get_dataloaders(data_args, misc_args, logger):
+def get_dataloaders(data_args: Arguments, misc_args: Arguments, logger: Logger):
 
     _dataloaders = []
     for sampling in ["train", "valid", "test"]:
