@@ -1,11 +1,28 @@
 __all__ = ["ModelArguments", "DataArguments", "TrainingArguments", "MiscArguments"]
 
-from dataclasses import asdict, dataclass, field
-from typing import Union
+import os
+import json
+from dataclasses import dataclass, field
+
+
+class BaseArgument:
+    def to_dict(self):
+        return vars(self)
+
+    def save(self, output_dir):
+
+        os.makedirs(f"{output_dir}/config", exist_ok=True)
+        fname = f"{output_dir}/config/{self.get_name()}"
+        configs = self.to_dict()
+        with open(fname, "w") as f:
+            json.dump(configs, f)
+
+    def get_name(self):
+        raise NotImplementedError
 
 
 @dataclass
-class ModelArguments:
+class ModelArguments(BaseArgument):
 
     """
     Model arguments.
@@ -18,9 +35,12 @@ class ModelArguments:
         },
     )
 
+    def get_name(self):
+        return "model_args"
+
 
 @dataclass
-class DataArguments:
+class DataArguments(BaseArgument):
     """
     Configurations related to data/dataloader/augmentation
     """
@@ -78,9 +98,12 @@ class DataArguments:
         new_list = list(map(lambda x: x / norm, _list))
         return new_list
 
+    def get_name(self):
+        return "data_args"
+
 
 @dataclass
-class TrainingArguments:
+class TrainingArguments(BaseArgument):
     """
     Configurations related to training setup.
     """
@@ -97,6 +120,10 @@ class TrainingArguments:
     )
     weight_decay: float = field(
         default=0, metadata={"help": "Weight decay for AdamW. Default=0"}
+    )
+    momentum: float = field(
+        default=0.9,
+        metadata={"help": "Set momentum values for optimizers that needs them."},
     )
     result_path: str = field(
         default="../result/",
@@ -119,10 +146,21 @@ class TrainingArguments:
             "help": "In order to prevent models early stop before 'satisfying' performance, we set the threshold for early stopping."
         },
     )
+    loss_fn: str = field(
+        default="mse", metadata={"help": "Designate loss functions as string."}
+    )
+    # TODO: deal with multiple metrics
+    metrics_fn: str = field(
+        default="mae",
+        metadata={"help": "List of metrics to measure during the training."},
+    )
+
+    def get_name(self):
+        return "train_args"
 
 
 @dataclass
-class MiscArguments:
+class MiscArguments(BaseArgument):
     """
     Other minor configurations
     """
@@ -147,6 +185,22 @@ class MiscArguments:
         default=0.1,
         metadata={"help": "Designate number/ratio of the total data when debug."},
     )
+    output_path: str = field(
+        default="../result/", metadata={"help": "Root directory for results."}
+    )
+    output_dir: str = field(
+        default=None,
+        metadata={
+            "help": "Name of output directory. Final directory will be `output_path/output_dir/`. If None, dir name will be automatically made."
+        },
+    )
+    overwrite_output: str = field(
+        default=False,
+        metadata={"help": "If set to True, allow output directory to be overwritten."},
+    )
+
+    def get_name(self):
+        return "misc_args"
 
 
 def arguments_to_dict(*args):
@@ -163,7 +217,8 @@ if __name__ == "__main__":
 
     parser = CustomParser((ModelArguments, MiscArguments))
     model_args, misc_args = parser.parse_args_into_dataclasses()
-    print(arguments_to_dict(model_args, misc_args))
+    # print(arguments_to_dict(model_args, misc_args))
+    print(model_args.to_dict())
     # for v in iter(model_args):
     # print(v)
     # print(vars(model_args[0]))
