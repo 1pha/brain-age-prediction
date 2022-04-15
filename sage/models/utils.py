@@ -1,23 +1,25 @@
-import collections
 import os
 
 import torch
 from torchsummary import summary
 
-from ..config import edict2dict
-from .naive_models.dinsdale import *
-from .naive_models.efficientnet import EfficientNet3D
-from .naive_models.levakov_96 import *
-from .naive_models.res_sfcn import *
-from .naive_models.residual_vanilla import *
-from .naive_models.resnet import *
-from .naive_models.sequential import *
-from .naive_models.sfcn import *
-from .naive_models.vanilla import *
-from .unlearning.convit import ConvitArguments, VisionTransformer
-from .unlearning.predictors import *
-from .unlearning.resnet import load_resnet
-from .unlearning.vanilla_dinsdale import VanillaConv
+from .model_zoo import (
+    build_resnet,
+)
+
+# from .naive_models.dinsdale import *
+# from .naive_models.efficientnet import EfficientNet3D
+# from .naive_models.levakov_96 import *
+# from .naive_models.res_sfcn import *
+# from .naive_models.residual_vanilla import *
+# from .naive_models.resnet import *
+# from .naive_models.sequential import *
+# from .naive_models.sfcn import *
+# from .naive_models.vanilla import *
+# from .unlearning.convit import ConvitArguments, VisionTransformer
+# from .unlearning.prediction_layer import *
+# from .unlearning.resnet_wo_linear import load_resnet
+# from .unlearning.vanilla_dinsdale import VanillaConv
 
 
 def load_model(cfg=None, gpu=True, verbose=True):
@@ -84,19 +86,7 @@ def load_model(cfg=None, gpu=True, verbose=True):
     return model, device
 
 
-ENCODERS = {
-    "vanillaconv": VanillaConv,
-    "resnet": load_resnet,
-    "convit": VisionTransformer,
-}
-
-PREDICTORS = {
-    "nkregressor": NKRegressor,
-    "nkdomainpredictor": NKDomainPredictor,
-}
-
-
-def count_num_params(model):
+def count_params(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
@@ -209,6 +199,11 @@ def multimodel_save_checkpoint(states, model_name, model_dir="./models/"):
             torch.save(s, fname)
 
     print("Saved Models")
+
+
+def build_model(model_args):
+
+    return build_resnet()
 
 
 if __name__ == "__main__":

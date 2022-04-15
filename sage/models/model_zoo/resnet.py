@@ -4,7 +4,6 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from easydict import EasyDict as edict
 from torchsummary import summary
 
 
@@ -40,8 +39,7 @@ class BasicBlock(nn.Module):
 
         self.conv1 = conv3x3x3(in_planes, planes, stride)
         self.bn1 = nn.BatchNorm3d(planes)
-        self.relu = nn.ReLU(inplace=False) if activation is None else activation
-        self.relu2 = nn.ReLU(inplace=False) if activation is None else activation
+        self.relu = nn.ReLU(inplace=True) if activation is None else activation
         self.conv2 = conv3x3x3(planes, planes)
         self.bn2 = nn.BatchNorm3d(planes)
         self.downsample = downsample
@@ -61,7 +59,7 @@ class BasicBlock(nn.Module):
             residual = self.downsample(x)
 
         out += residual
-        out = self.relu2(out)
+        out = self.relu(out)
 
         return out
 
@@ -78,10 +76,9 @@ class Bottleneck(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.conv3 = conv1x1x1(planes, planes * self.expansion)
         self.bn3 = nn.BatchNorm3d(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=False)
+        self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
-        self.relu2 = nn.ReLU(inplace=False)
 
     def forward(self, x):
         residual = x
@@ -101,7 +98,7 @@ class Bottleneck(nn.Module):
             residual = self.downsample(x)
 
         out += residual
-        out = self.relu2(out)
+        out = self.relu(out)
 
         return out
 
@@ -137,7 +134,7 @@ class ResNet(nn.Module):
             bias=False,
         )
         self.bn1 = nn.BatchNorm3d(self.in_planes)
-        self.relu = nn.ReLU(inplace=False) if activation is None else activation
+        self.relu = nn.ReLU(inplace=True) if activation is None else activation
         self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(
             block, block_inplanes[0], layers[0], shortcut_type, activation=activation
@@ -169,6 +166,7 @@ class ResNet(nn.Module):
 
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
         self.flatten = nn.Flatten()
+        self.fc = nn.Linear(block_inplanes[3] * block.expansion, n_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -182,9 +180,9 @@ class ResNet(nn.Module):
         zero_pads = torch.zeros(
             out.size(0), planes - out.size(1), out.size(2), out.size(3), out.size(4)
         )
-        # if isinstance(out.data, torch.cuda.FloatTensor):
-        #     zero_pads = zero_pads.cuda()
-        zero_pads = zero_pads.to(out.device)
+        if isinstance(out.data, torch.cuda.FloatTensor):
+            zero_pads = zero_pads.cuda()
+
         out = torch.cat([out.data, zero_pads], dim=1)
 
         return out
@@ -236,10 +234,10 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
 
-        if hasattr(self, "flatten"):
-            x = self.flatten(x)
-        else:
-            x = x.view(x.size(0), -1)
+        # x = x.view(x.size(0), -1)
+        x = self.flatten(x)
+        print(x.shape)
+        x = self.fc(x)
 
         return x
 
@@ -286,6 +284,7 @@ class Option:
         conv1_t_size=7,
         conv1_t_stride=2,
         no_max_pool=False,
+        resnet_widen_factor=1.0,
         start_channels=16,
     ):
 
@@ -296,30 +295,50 @@ class Option:
         self.conv1_t_size = conv1_t_size
         self.conv1_t_stride = conv1_t_stride
         self.no_max_pool = no_max_pool
+        self.resnet_widen_factor = resnet_widen_factor
         self.start_channels = start_channels
 
 
-def load_resnet(*args, **kwargs):
+def build_resnet():
 
-    opt = Option(**kwargs)
-    opt = edict(vars(opt))
+    opt = Option()
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    return generate_model(**opt).to(device)
+    opt.start_channels = 32
+    model = generate_model(
+        model_depth=opt.model_depth,
+        n_classes=opt.n_classes,
+        n_input_channels=opt.n_input_channels,
+        shortcut_type=opt.shortcut_type,
+        conv1_t_size=opt.conv1_t_size,
+        conv1_t_stride=opt.conv1_t_stride,
+        no_max_pool=opt.no_max_pool,
+        widen_factor=opt.resnet_widen_factor,
+        start_channels=opt.start_channels,
+    )
+    model.to(device)
+    return model
 
 
 if __name__ == "__main__":
 
     opt = Option()
-    opt.start_channels = 32
-    opt = edict(vars(opt))
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = generate_model(**opt)
+    opt.start_channels = 32
+    model = generate_model(
+        model_depth=opt.model_depth,
+        n_classes=opt.n_classes,
+        n_input_channels=opt.n_input_channels,
+        shortcut_type=opt.shortcut_type,
+        conv1_t_size=opt.conv1_t_size,
+        conv1_t_stride=opt.conv1_t_stride,
+        no_max_pool=opt.no_max_pool,
+        widen_factor=opt.resnet_widen_factor,
+        start_channels=opt.start_channels,
+    )
     model.to(device)
 
-    # print(summary(model, input_size=(1, 96, 96, 96)))
-    sample = torch.zeros(2, 1, 96, 96, 96, device=device)
-    print(model.forward(sample).shape)
+    print(summary(model, input_size=(1, 96, 96, 96)))
