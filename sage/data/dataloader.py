@@ -201,7 +201,7 @@ class BrainAgeDataset(Dataset):
         x = self.maxcut(x)  # 3D (W, H, D)
         x = self.preprocess(x)  # 4D (1, W', H', D')
         if aug or self.augmentation == "replace":
-            x = self.augmentation(x)  # 4D (1, W', H', D')
+            x = self.transform(x)  # 4D (1, W', H', D')
 
         return (x, torch.tensor(self.data_ages[idx]).float())
 
@@ -248,7 +248,7 @@ class BrainAgeDataset(Dataset):
 
         self.logger.debug("Setting up augmentation.")
 
-        self.transform = {
+        self._transform = {
             "affine": tio.RandomAffine(),
             "flip": tio.RandomFlip(axes=["left-right"]),
             "elastic_deform": tio.RandomElasticDeformation(),
@@ -259,14 +259,14 @@ class BrainAgeDataset(Dataset):
             data_args.elasticdeform_proba,
         )
 
-    def augmentation(self, x: torch.Tensor):  # -> torch.Tensor (1, W', H', D')
+    def transform(self, x: torch.Tensor):  # -> torch.Tensor (1, W', H', D')
 
         """
         x must be given with torch.tensor with (1, W', H', D')
         """
 
-        aug_choice = np.random.choice(list(self.transform.keys()), p=self.p)
-        x = self.transform[aug_choice](x)
+        aug_choice = np.random.choice(list(self._transform.keys()), p=self.p)
+        x = self._transform[aug_choice](x)
         return x
 
 
