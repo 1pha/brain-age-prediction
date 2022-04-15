@@ -8,18 +8,19 @@ except:
     from torch.optim import Adam
 
 
-def get_optimizer(models, cfg):
+def construct_optimizer(model, training_args):
 
-    if isinstance(models, nn.Module):
-        params = models.parameters()
-    else:
-        params = list(chain(*([list(m.parameters()) for m in models])))
+    params = model.parameters()
+    optimizer = training_args.optimizer
+    learning_rate = training_args.learning_rate
+    weight_decay = training_args.weight_decay
+    momentum = training_args.momentum
 
-    if cfg.optimizer == "adam":
-        optimizer = Adam(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+    if optimizer == "adam":
+        optimizer = Adam(params, lr=learning_rate, weight_decay=weight_decay)
 
-    elif cfg.optimizer == "adamW":
-        optimizer = AdamW(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+    elif optimizer == "adamW":
+        optimizer = AdamW(params, lr=learning_rate, weight_decay=weight_decay)
 
     optimizer.zero_grad()
 

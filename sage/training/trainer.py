@@ -1,530 +1,383 @@
-import logging
+import os
 import time
+import json
+from typing import Dict, NewType, Any, Callable, List, Tuple
+from collections import defaultdict
 
-import yaml
-from easydict import EasyDict as edict
+Arguments = NewType("Arguments", Any)
+Logger = NewType("Logger", Any)
 
 import wandb
-
-logger = logging.getLogger(__name__)
-
-import sys
-
 import torch
 
-from sage.data.dataloader import get_dataloader
-from sage.models.model_util import load_models, multimodel_save_checkpoint
-from sage.training.metrics import get_metric
-from sage.training.optimizer import get_optimizer
-
-sys.path.append("../../")
-from sage.config import save_config
-from utils.average_meter import AverageMeter
-from utils.misc import get_today, logging_time, seed_everything
+from .utils import save_checkpoint, walltime
+from .optimizer import construct_optimizer
+from .metrics import get_metric_fn
 
 
 class MRITrainer:
 
-    """
-    This is an integrated trainer class that combines -
-        1. Training the naive age
-        2. Training with Unlearning strategy
-        3. Extensible for future works
-    """
+    """ """
 
     __version__ = 0.3
     __date__ = "Apr 13. 2021"
 
     def __init__(
         self,
-        model_args,
-        data_args,
-        training_args,
-        misc_args,
-        training_data,
-        validation_data,
-        test_data,
-        logger,
-    ):
+        model: torch.nn.Module,
+        model_args: Arguments,
+        data_args: Arguments,
+        training_args: Arguments,
+        misc_args: Arguments,
+        logger: Logger,
+        training_data: torch.utils.data.DataLoader = None,
+        validation_data: torch.utils.data.DataLoader = None,
+        test_data: torch.utils.data.DataLoader = None,
+    ) -> None:
 
-        self.cfg = cfg
-        self.phase_dict = self.get_phase_dict()
-        self.cfg.epochs = sum(len(_range) for _range in self.phase_dict.values())
-        self.cfg.trainer_version = MRITrainer.__version__
-        self.setup(cfg=cfg, result_dir_suffix=result_dir_suffix)
-        self.failure_cases = {
-            "train": [],
-            "valid": [],
-        }
+        arguments = locals()
+        arguments.pop("self")
+        self._allocate(**arguments)
 
-    def setup(self, cfg=None, result_dir_suffix=None):
+        # Construct Optimizer
+        self.optimizer = construct_optimizer(self.model, training_args)
+        self._set_fp16(training_args.fp16)
+
+        # Construct Loss functions & Metrics
+        self.loss_fn = get_metric_fn(training_args.loss_fn)
+        self.metrics_fn = get_metric_fn(training_args.metrics_fn)
+
+        # Force devices to CPU is needed (for debugs)
+        self._find_device()
+        if misc_args.force_cpu:
+            self._force_cpu()
+
+        # Buckets to save results or failures.
+        self.loading_failures = defaultdict(list)
+        self.results = defaultdict(list)
+
+    def _set_fp16(self, fp16: bool) -> None:
+
+        self.fp16 = fp16
+        self.scaler = torch.cuda.amp.GradScaler(enabled=fp16)
+        self.logger.info(f"Fp16: {str(fp16)}")
+
+    def _force_cpu(self) -> None:
 
         """
-        SETUP
-            Set every options through configuration file.
-            Pipelines are as follows
-            1. Fixate seed
-            2. Load Models & Optimizers
-            3. Load Dataloader
-            4. Load AMP Scaler (optional)
-                - May not be able to use L2-Loss
+        Forcibly place models to CPU for certain usage.
+        """
+        self.model.to("cpu")
+        self.device = "cpu"
+        self.logger.info("Device forced to use CPU.")
+
+    def _find_device(self) -> None:
+
+        """
+        Find where the model locates - CPU or GPU and if multiple, which GPUs
+        """
+        self.device = next(self.model.parameters()).device
+        self.logger.info(f"Use {self.device} as a device.")
+
+    def _allocate(self, **kwargs) -> None:
+
+        for arg, val in kwargs.items():
+            if arg != "self":
+                setattr(self, arg, val)
+
+    def _reallocate(self, **kwargs) -> Dict:
+
+        """
+        Reallocate function arguments to attributes inside the instance if None given.
+        None will be returned to each arguments if they are not attributes inside the instance.
         """
 
-        cfg = self.cfg if cfg is None else cfg
+        reallocated_dict = {}
+        for arg, val in kwargs.items():
+            if arg == "self":
+                pass
 
-        # 1. Fixate Seed
-        seed_everything(seed=cfg.seed)
+            elif val is None:
+                try:
+                    # Find attribute and reallocate
+                    reallocated_dict[arg] = getattr(self, arg)
+                except AttributeError:
+                    # If attribute not found, allocate None
+                    reallocated_dict[arg] = None
+                
+            else:
+                # If proper value was already given, don't reallocate.
+                reallocated_dict[arg] = val
+        return reallocated_dict
 
-        # 2. Count Database
-        cfg.domainer.num_dbs = (
-            4 if cfg.unused_src[0] is None else 4 - len(cfg.unused_src)
-        )
+    def run(
+        self,
+        model: torch.nn.Module = None,
+        model_args: Arguments = None,
+        data_args: Arguments = None,
+        training_args: Arguments = None,
+        misc_args: Arguments = None,
+        training_data: torch.utils.data.DataLoader = None,
+        validation_data: torch.utils.data.DataLoader = None,
+        test_data: torch.utils.data.DataLoader = None,
+    ) -> None:
+        try:
+            arguments = locals()
+            arguments.pop("self")
+            kwargs = self._reallocate(**arguments)
+            self._run(**kwargs)
 
-        # 2. SETUP MODEL & OPTIMIZER
-        (encoder, regressor, domainer), cfg.device = load_models(
-            cfg.encoder, cfg.regressor, cfg.domainer
-        )
+        except Exception as e:
+            self.logger.exception(e)
+            self.logger.warn(f"Error found. Return arguments and end training.")
+            self.save_configs(**kwargs)
 
-        if cfg.force_cpu:
-            cfg.device = torch.device("cpu")
-            for model in (encoder, regressor, domainer):
-                model.to(cfg.device)
+    def _run(
+        self,
+        model: torch.nn.Module,
+        model_args: Arguments,
+        data_args: Arguments,
+        training_args: Arguments,
+        misc_args: Arguments,
+        training_data: torch.utils.data.DataLoader = None,
+        validation_data: torch.utils.data.DataLoader = None,
+        test_data: torch.utils.data.DataLoader = None,
+    ) -> None:
 
-        self.models = {
-            "encoder": encoder,
-            "regressor": regressor,
-            "domainer": domainer,
-        }
-        self.optimizers = {
-            "regression": get_optimizer(
-                [encoder, regressor], cfg.reg_opt
-            ),  # AGE PREDICTOR
-            "domain": get_optimizer([domainer], cfg.clf_opt),  # DOMAIN PREDICTOR
-            "confusion": get_optimizer([encoder], cfg.unl_opt),  # CONFUSION
-        }
-
-        # 3. Load Dataloader
-        self.train_dataloader = get_dataloader(cfg, sampling="train")
-        self.gt_age_train = torch.tensor(
-            self.train_dataloader.dataset.data_ages, dtype=torch.float
-        )
-        self.gt_src_train = torch.tensor(self.train_dataloader.dataset.data_src)
-
-        self.valid_dataloader = get_dataloader(cfg, sampling="valid")
-        self.gt_age_valid = torch.tensor(
-            self.valid_dataloader.dataset.data_ages, dtype=torch.float
-        )
-        self.gt_src_valid = torch.tensor(self.valid_dataloader.dataset.data_src)
-
-        self.test_dataloader = get_dataloader(cfg, sampling="test")
-        self.gt_age_test = torch.tensor(
-            self.test_dataloader.dataset.data_ages, dtype=torch.float
-        )
-        self.gt_src_test = torch.tensor(self.test_dataloader.dataset.data_src)
-
-        logger.info(
-            f"TOTAL TRAIN {len(self.train_dataloader.dataset)} | VALID {len(self.valid_dataloader.dataset)} | TEST {len(self.test_dataloader.dataset)}"
-        )
-
-        # 4. AMP Scaler
-        self.scaler = torch.cuda.amp.GradScaler(enabled=cfg.use_amp)
-        logger.info(f"MIXED PRECISION:: {cfg.use_amp}")
-
-        # 5. SAVE Directory
-        self.save_dir = f"{cfg.RESULT_PATH}/{get_today()}_{cfg.encoder.name}"
-        self.save_dir += (
-            f"_{result_dir_suffix}" if result_dir_suffix is not None else ""
-        )
-        logger.debug("Done Initialization")
-
-    def run(self, cfg=None, checkpoint=None):
-
-        cfg = self.cfg if cfg is None else cfg
-        logger.debug("Start run")
-
-        if checkpoint is not None:
-
-            """
-            checkpoint: dict = {
-                'resume_epoch': start, # NECESSARY
-                'models': {
-                    'encoder': ~.pt,
-                    ..
-                }
-            }
-            """
-
-            self.load_checkpoint(checkpoint["models"])
-            offset = (
-                checkpoint["resume_epoch"] if "resume_epoch" in checkpoint.keys() else 0
-            )
-            logger.debug("Load Checkpoint")
-
-        else:
-            offset = 0
+        self.logger.info("Start Training")
 
         best_mae = float("inf")
-        for phase, (epochs, actions) in enumerate(zip(*self.cfg.phase_config.values())):
 
-            stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
-            for e in range(epochs):
+        epochs = training_args.epochs
+        stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
+        for e in range(epochs):
 
-                logger.info(
-                    f'{"-" * 5} Epoch {e + 1 + offset} / {cfg.epochs} (phase: {phase}) BEST MAE {best_mae:.3f} {"-" * 5}'
+            self.logger.info(f' EPOCH {e} / {epochs}  BEST MAE {best_mae:.3f}')
+
+            if training_data is not None:
+                loss, metric = self.train(model, training_data)
+                wandb.log({"train_loss": loss, "train_metric": metric}, commit=False)
+
+            if validation_data is not None:
+                loss, metric = self.valid(model, validation_data)
+                wandb.log({"valid_loss": loss, "valid_metric": metric}, commit=False)
+
+            wandb.log({"epoch": e})
+
+            # Check performance improvement
+            model_name = f"ep{str(e).zfill(3)}.pt"
+            current_mae = self.results["valid"][-1]
+            # Yes Improvement
+            if current_mae < best_mae:
+
+                stop_count = 0
+                best_mae = current_mae
+                save_checkpoint(
+                    model=self.model,
+                    model_name=model_name,
+                    output_dir=misc_args.output_dir,
+                )
+                best_epoch = e
+
+            # No Improvement
+            else:
+                # COUNT PATIENCE
+                stop_count += 1
+
+                # COUNT
+                if stop_count >= training_args.early_patience:
+
+                    # END OF PATIENCE
+                    if best_mae < training_args.mae_threshold:
+                        save_checkpoint(
+                            model=self.model,
+                            model_name=model_name,
+                            output_dir=misc_args.output_dir,
+                        )
+                        self.logger.info(
+                            f"Early stopped at {stop_count} / {training_args.early_patience} at EPOCH {e}"
+                        )
+                        break
+
+                    # IF THE FINAL RESULT IS NOT SATISFACTORY
+                    # WAIT FOR ANOTHER LONG-TERM PATIENCE
+                    else:
+                        long_term_patience += 1
+
+            # EVEN AFTER LONG-TERM PATIENCE - KILL
+            if long_term_patience >= 3:
+                save_checkpoint(
+                    model=self.model,
+                    model_name=model_name,
+                    output_dir=misc_args.output_dir,
+                )
+                self.logger.info(
+                    f"Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e}"
+                )
+                break
+
+            # SAVING CRITERIA
+            # WILL BE SAVED TWICE IF THERE WAS A PERFORMANCE IMPROVEMENT
+            # BUT WON'T MATTER SINCE "save_checkpoint" SAVES ONLY WHEN MODEL IS NOT THERE
+            if elapsed_epoch_saved == training_args.checkpoint_period:
+                elapsed_epoch_saved = 1
+                save_checkpoint(
+                    model=self.model,
+                    model_name=model_name,
+                    output_dir=misc_args.output_dir,
                 )
 
-                train_result = self.train(actions)
-                valid_result = self.valid(actions)
-                results = edict(  # AGGREGATE RESULTS
-                    **train_result,
-                    **valid_result,
-                )
-                self.prompt(results)
-                wandb.log({**results})
+            else:
+                elapsed_epoch_saved += 1
 
-                model_name = f"ep{str(e).zfill(3)}_mae{results.valid_mae:.2f}.pt"
-                # PERFORMANCE IMPROVEMENT
-                if results.valid_mae < best_mae:
-
-                    stop_count = 0
-                    best_mae = results.valid_mae
-                    multimodel_save_checkpoint(
-                        states=self.models,
-                        model_dir=self.save_dir,
-                        model_name=model_name,
-                    )
-                    best_epoch = e
-
-                # NO PERFORMANCE IMPROVEMENT
-                else:
-                    # COUNT PATIENCE
-                    stop_count += 1
-
-                    # COUNT
-                    if stop_count >= cfg.early_patience:
-
-                        # END OF PATIENCE
-                        if best_mae < cfg.mae_threshold:
-                            multimodel_save_checkpoint(
-                                states=self.models,
-                                model_dir=self.save_dir,
-                                model_name=model_name,
-                            )
-                            logger.info(
-                                f"Early stopped at {stop_count} / {cfg.early_patience} at EPOCH {e + offset}"
-                            )
-                            break
-
-                        # IF THE FINAL RESULT IS NOT SATISFACTORY
-                        # WAIT FOR ANOTHER LONG-TERM PATIENCE
-                        else:
-                            long_term_patience += 1
-
-                # EVEN AFTER LONG-TERM PATIENCE - KILL
-                if long_term_patience >= 3:
-                    multimodel_save_checkpoint(
-                        states=self.models,
-                        model_dir=self.save_dir,
-                        model_name=model_name,
-                    )
-                    logger.info(
-                        f"Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e + offset}"
-                    )
-                    break
-
-                # SAVING CRITERIA
-                # WILL BE SAVED TWICE IF THERE WAS A PERFORMANCE IMPROVEMENT
-                # BUT WON'T MATTER SINCE "save_checkpoint" SAVES ONLY WHEN MODEL IS NOT THERE
-                if elapsed_epoch_saved == cfg.checkpoint_period:
-                    elapsed_epoch_saved = 1
-                    multimodel_save_checkpoint(
-                        states=self.models,
-                        model_dir=self.save_dir,
-                        model_name=model_name,
-                    )
-
-                else:
-                    elapsed_epoch_saved += 1
-
-            offset += e
-
-        # CHECK WITH TEST_DATALOADER
-        self.load_checkpoint(
-            {
-                "encoder": f"{self.save_dir}/encoder/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
-                "domainer": f"{self.save_dir}/domainer/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
-                "regressor": f"{self.save_dir}/regressor/ep{str(best_epoch).zfill(3)}_mae{best_mae:.2f}.pt",
-            }
-        )
-        test_results = self.valid(actions, test=True)
-        cfg.test_mae = test_results["test_mae"]
-        cfg.best_mae = best_mae
-        wandb.config.update(cfg)
+        # Finish training
+        # TODO
         wandb.finish()
-        try:
-            save_config(cfg, f"{self.save_dir}/config.yml")
-        except:
-            logger.warn("Save config didnot work. Use the one before...")
-            with open(f"{self.save_dir}/config.yml", "w") as y:
-                yaml.dump(cfg, y)
+        if test_data is not None:
+            loss, metric = self.valid(model, test_data)
+            wandb.config.best_test = loss
+            wandb.config.best_metric = metric
 
-    @logging_time
-    def train(self, actions):
-
-        """
-        3 Phases of Training
-            1. Pre-train Encoder (around 100+ epochs with Full 4 Database)
-                - update encoder/age_regressor only
-
-            2. Train Domain Predictor (around 10- epochs will do fine)
-                - update domain_predictor only
-
-            3. Do Unlearning (with confusion loss)
-                - update encoder only
-        """
-
-        losses, ages, domains = (
-            [AverageMeter(tag=action, train=True) for action in actions],
-            [],
-            [],
+        self.save_configs(
+            misc_args.output_dir, model_args, data_args, training_args, misc_args
         )
+
+    @walltime
+    def train(
+        self,
+        model: torch.nn.Module,
+        dataloader: torch.utils.data.DataLoader,
+        optimizer: torch.optim.Optimizer = None,
+        loss: str = None,
+    ) -> Tuple[List, List]:
+
+        """
+        * Note *
+            Unlearning phase removed in Apr 14. 2022
+        """
+
+        losses, preds = [], []
+        model.train()
         with torch.autograd.set_detect_anomaly(True):
-            for i, (x, y, d) in enumerate(self.train_dataloader):
+            for i, (x, y) in enumerate(dataloader):
 
-                for _, model in self.models.items():
-                    model.train()
-
-                logger.debug(f"train phase {i}th batch.")
+                self.logger.debug(f"train phase, {i}th batch.")
 
                 try:
-                    x, y, d = map(lambda x: x.to(self.cfg.device), (x, y, d))
-
+                    x, y = map(lambda obj: obj.to(self.device), (x, y))
                 except FileNotFoundError as e:
-                    logger.exception(e)
+                    self.logger.exception(e)
                     time.sleep(20)
-                    self.failure_cases["train"].append(i)
+                    self.loading_failures["train"].append((e, i))
                     continue
 
-                with torch.cuda.amp.autocast(self.cfg.use_amp):
-                    for j, action in enumerate(actions):
-                        loss, _ = {
-                            "reg": self.update_age_reg,
-                            "clf": self.update_domain_clf,
-                            "unl": self.update_domain_conf,
-                        }[action](x, y, d, update=True)
-                        losses[j].append(float(loss.cpu().detach()))
+                with torch.cuda.amp.autocast(self.fp16):
+                    loss, pred = self.step(
+                        x, y, model=model, update=True, optimizer=optimizer
+                    )
+                    losses.append(float(loss.cpu().detach()))
+                    preds.append(pred)
 
-                with torch.no_grad():
-                    for _, model in self.models.items():
-                        model.eval()
-                    _, age = self.update_age_reg(x, y, d, update=False)
-                    # _, domain = self.update_domain_clf(x, y, d, update=False)
+                torch.cuda.empty_cache()
 
-                ages.extend(age.cpu().detach().tolist())
-                # domains.extend(domain.cpu().detach().tolist())
+        loss, metric = self.organize_result(losses, preds, dataloader)
+        return loss, metric
+
+    @walltime
+    def valid(
+        self, model: torch.nn.Module, dataloader: torch.utils.data.DataLoader
+    ) -> Tuple[List, List]:
+
+        losses, preds = [], []
+        model.eval()
+        for i, (x, y) in enumerate(dataloader):
+
+            self.logger.debug(f"validation phase, {i}th batch.")
+
+            try:
+                x, y = map(lambda obj: obj.to(self.device), (x, y))
+            except FileNotFoundError as e:
+                self.logger.exception(e)
+                time.sleep(20)
+                self.loading_failures["valid"].append((e, i))
+                continue
+
+            with torch.no_grad():
+                loss, pred = self.step(x, y, model=model, update=False)
+                losses.append(float(loss.cpu().detach()))
+                preds.append(pred)
+
             torch.cuda.empty_cache()
 
-        results = {
-            **self.agg_loss(losses),
-            **self.gather_result(ages, "age", sampling="train"),
-            # **self.gather_result(domains, "domain", sampling="train"),
-        }
+        loss, metric = self.organize_result(losses, preds, dataloader)
+        return loss, metric
 
-        return results
+    def step(
+        self,
+        x: torch.FloatTensor,
+        y: torch.IntTensor,
+        model: torch.nn.Module,
+        update: bool = True,
+        optimizer: torch.optim.Optimizer = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
 
-    @logging_time
-    def valid(self, actions, test=False):
-
-        for _, model in self.models.items():
-            model.eval()
-
-        losses, ages, domains = (
-            [AverageMeter(tag=action, train=False) for action in actions],
-            [],
-            [],
-        )
-        dataloader = self.valid_dataloader if not test else self.test_dataloader
-        with torch.no_grad():
-            for i, (x, y, d) in enumerate(dataloader):
-
-                logger.debug(f"{'Valid' if not test else 'Test'} phase {i}th batch")
-
-                try:
-                    x, y, d = map(lambda x: x.to(self.cfg.device), (x, y, d))
-
-                except FileNotFoundError as e:
-                    logger.exception(e)
-                    time.sleep(20)
-                    self.failure_cases["valid"].append(i)
-                    continue
-
-                for j, action in enumerate(actions):
-                    loss, _ = {
-                        "reg": self.update_age_reg,
-                        "clf": self.update_domain_clf,
-                        "unl": self.update_domain_conf,
-                    }[action](x, y, d, update=False)
-                    losses[j].append(float(loss.cpu().detach()))
-
-                _, age = self.update_age_reg(x, y, d, update=False)
-                # _, domain = self.update_domain_clf(x, y, d, update=False)
-
-                ages.extend(age.cpu().detach().tolist())
-                # domains.extend(domain.cpu().detach().tolist())
-            torch.cuda.empty_cache()
-
-        results = {
-            **self.agg_loss(losses),
-            **self.gather_result(ages, "age", sampling="valid" if not test else "test"),
-            # **self.gather_result(
-            #     domains, "domain", sampling="valid" if not test else "test"
-            # ),
-        }
-
-        return results
-
-    def update_age_reg(self, x, y, d, update=True):
-
-        embed = self.models["encoder"](x)
-        y_pred = self.models["regressor"](embed)
-        loss = get_metric(y_pred.squeeze(), y, "rmse")
+        pred = model(x)
+        loss = self.calculate_loss(pred.squeeze(), y)
 
         if update:
-            self.update_loss(loss, self.optimizers["regression"])
+            self.update_loss(loss, optimizer)
 
-        return loss, y_pred
+        return loss, pred
 
-    def update_domain_clf(self, x, y, d, update=True):
+    def calculate_loss(self, y_pred, y_true, loss_fn: Callable = None) -> torch.Tensor:
 
-        embed = self.models["encoder"](x)
-        d_pred = self.models["domainer"](embed)
-        loss = self.cfg.alpha * get_metric(d_pred, d, "ce")
+        if loss_fn is None:
+            loss_fn = self.loss_fn
 
-        if update:
-            self.update_loss(loss, self.optimizers["domain"])
+        return loss_fn(y_pred, y_true)
 
-        return loss, d_pred
+    def update_loss(self, loss, optimizer=None) -> None:
 
-    def update_domain_conf(self, x, y, d, update=True):
-
-        embed = self.models["encoder"](x)
-        d_pred = self.models["domainer"](embed)
-        loss = self.cfg.beta * get_metric(d_pred, d, "confusion")
-
-        if update:
-            self.update_loss(loss, self.optimizers["confusion"])
-
-        return loss, d_pred
-
-    def update_loss(self, loss, optimizer):
+        if optimizer is None:
+            optimizer = self.optimizer
 
         self.scaler.scale(loss).backward()
         self.scaler.step(optimizer)
         self.scaler.update()
         optimizer.zero_grad()
 
-    def load_checkpoint(self, checkpoint):
+    def load_checkpoint(self, checkpoint) -> None:
 
-        for model_name, pth_path in checkpoint.items():
-            self.models[model_name].load_state_dict(torch.load(pth_path))
-            logger.info(f"{model_name.capitalize()} is successfully loaded")
+        self.model.load_state_dict(torch.load(checkpoint))
+        self.logger.info(f"Successfully loaded model.")
 
-    def zero_grad(self, model):
+    def organize_result(
+        self,
+        losses: list,
+        pred: list,
+        dataloader: torch.utils.data.DataLoader,
+        metrics_fn: str = None,
+    ) -> Tuple[float, float]:
 
-        for param in model.parameters():
-            param.grad = None
+        loss = sum(losses) / len(losses)
+        gt = self.get_ground_truth(dataloader)
+        if metrics_fn is not None and isinstance(metrics_fn, str):
+            metrics_fn = get_metric_fn(metrics)
+        else:
+            metrics_fn = self.metrics_fn
+        metrics = metrics_fn(pred, gt)
+        return loss, metrics
 
-    def get_phase_dict(self):  # DEPRECATED
+    def get_ground_truth(self, dataloader: torch.utils.data.DataLoader) -> list:
+        return dataloader.dataset.data_ages
 
-        phase_dict = dict()
-        stop = 0
-        for i, e in enumerate(self.cfg.phase_config.epochs):
+    def save_configs(self, **kwargs) -> None:
 
-            phase_dict[i] = range(stop, stop + e)
-            stop += e
-
-        return phase_dict
-
-    def agg_loss(self, losses):
-
-        loss_dict = dict()
-        for l in losses:
-            k, v = list(l.average.items())[0]
-            loss_dict[k] = v
-        return loss_dict
-
-    def check_which_phase(self, e):
-
-        if not hasattr(self, "phase_dict"):
-            self.phase_dict = self.get_phase_dict()
-
-        # WILL CONTAIN [('phase_n'), range(n1, n2)]
-        where_e = list(
-            filter(lambda args: e in args[1], enumerate(self.phase_dict.values()))
-        )
-        assert len(where_e) == 1
-        return where_e[0][0]
-
-    def gather_result(self, preds, datatype="age", sampling="train"):
-
-        prefix = sampling
-
-        if isinstance(preds, list):
-            preds = torch.tensor(preds, dtype=torch.float).squeeze()
-
-        if datatype == "age":
-
-            """
-            Calculate
-            - Mean Absolute Error
-            - Correlation
-            - R Squared
-            """
-            metrics = ["mae", "corr", "r2"]
-            gt = getattr(self, f"gt_age_{sampling}")
-
-            return {
-                f"{prefix}_{metric}": get_metric(preds, gt, metric)
-                for metric in metrics
-            }
-
-        elif datatype == "domain":
-
-            """
-            Receive Domain predictor
-            Calculate
-            - AUC
-            - Accuracy
-            """
-
-            metrics = ["auc", "acc"]
-            if self.cfg.partial < 1:
-                metrics = ["acc"]
-            gt = getattr(self, f"gt_src_{sampling}")
-
-            return {
-                f"{prefix}_{metric}": get_metric(preds, gt, metric)
-                for metric in metrics
-            }
-
-    def prompt(self, result):
-
-        metrics = sorted(set(map(lambda x: x.split("_")[-1], result.keys())))
-
-        def _prompt(prefix):
-
-            logger.info(f"{prefix.upper()}")
-            count = 0
-            for metric in metrics:
-
-                key = f"{prefix}_{metric}"
-                if result.get(key) is not None:
-                    count += 1
-                    end = "  |  " if count % 3 != 0 else "\n"
-                    print(f"{metric:6s}: {result[key]:.4f}", end=end)
-
-            logger.info("")
-
-        _prompt("train")
-        _prompt("valid")
-        logger.info("")
+        output_dir = kwargs["misc_args"].output_dir
+        print(kwargs["misc_args"])
+        os.makedirs(output_dir, exist_ok=True)
+        fname = os.path.join(output_dir, "config.json")
+        configs = {a.get_name(): a.to_dict() for k, a in kwargs.items() if k.endswith("_args")}
+        with open(fname, "w") as f:
+            json.dump(configs, f, indent=4, sort_keys=True)
+        self.logger.info(f"Successfully saved configurations to {fname}")

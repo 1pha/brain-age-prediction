@@ -71,6 +71,32 @@ def get_metric(y_pred, y, metric: str):
         return TORCH_METRICS[metric](y_pred, y)
 
 
+def get_metric_fn(metric: str):
+
+    NUMPY_METRICS = {
+        "r2": r2_score,
+        "acc": accuracy,
+        "auc": auc,
+    }
+
+    TORCH_METRICS = {
+        "mse": nn.MSELoss(),
+        "rmse": RMSELoss(),
+        "mae": nn.L1Loss(),
+        "corr": lambda _p, _t: pearsonr(_p, _t)[0],
+        "ce": nn.CrossEntropyLoss(),
+        "confusion": confusion_loss(),
+    }
+
+    metric = metric.lower()
+    if metric in NUMPY_METRICS.keys():
+        fn = lambda y_pred, y: NUMPY_METRICS[metric](y.numpy(), y_pred.numpy())
+        return fn
+
+    elif metric in TORCH_METRICS.keys():
+        return TORCH_METRICS[metric]
+
+
 if __name__ == "__main__":
 
     y_pred = torch.tensor(
