@@ -1,3 +1,5 @@
+__all__ = ["get_today"]
+
 import os
 import random
 import time
