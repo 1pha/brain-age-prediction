@@ -1,10 +1,13 @@
 import torch.optim.lr_scheduler as lr
 
 
-def construct_optimizer(optimizer, training_args):
+def construct_optimizer(optimizer, training_args, logger=None):
 
     name = training_args.scheduler
     patience = training_args.patience
+
+    if logger is not None:
+        logger.debug(f"Construct {name} learning rate scheduler.")
 
     if name == "plateau":
         scheduler = lr.ReduceLROnPlateau(

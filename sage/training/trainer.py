@@ -43,8 +43,8 @@ class MRITrainer:
         self._allocate(**arguments)
 
         # Construct Optimizer
-        self.optimizer = construct_optimizer(self.model, training_args)
-        self.scheduler = construct_scheduler(self.optimizer, training_args)
+        self.optimizer = construct_optimizer(self.model, training_args, logger)
+        self.scheduler = construct_scheduler(self.optimizer, training_args, logger)
         self._set_fp16(training_args.fp16)
 
         # Construct Loss functions & Metrics
