@@ -157,10 +157,12 @@ class MRITrainer:
 
             if training_data is not None:
                 loss, metric = self.train(model, training_data)
+                self.logger(f"Train {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}")
                 wandb.log({"train_loss": loss, "train_metric": metric}, commit=False)
 
             if validation_data is not None:
                 loss, metric = self.valid(model, validation_data)
+                self.logger(f"Valid {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}")
                 wandb.log({"valid_loss": loss, "valid_metric": metric}, commit=False)
 
             wandb.log({"epoch": e})
