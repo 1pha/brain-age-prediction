@@ -180,7 +180,7 @@ class ResNet(nn.Module):
         zero_pads = torch.zeros(
             out.size(0), planes - out.size(1), out.size(2), out.size(3), out.size(4)
         )
-        if isinstance(out.data, torch.cuda.FloatTensor):
+        if out.is_cuda:
             zero_pads = zero_pads.cuda()
 
         out = torch.cat([out.data, zero_pads], dim=1)
@@ -236,7 +236,6 @@ class ResNet(nn.Module):
 
         # x = x.view(x.size(0), -1)
         x = self.flatten(x)
-        print(x.shape)
         x = self.fc(x)
 
         return x
