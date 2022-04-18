@@ -160,8 +160,8 @@ class MRITrainer:
 
             if training_data is not None:
                 train_loss, train_metric = self.train(model, training_data)
-                self.logger(
-                    f"Train {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}"
+                self.logger.info(
+                    f"Train {training_args.loss_fn.capitalize()} {train_loss:.3f} | {training_args.metrics_fn} {train_metric:.3f}"
                 )
                 wandb.log(
                     {"train_loss": train_loss, "train_metric": train_metric},
@@ -170,8 +170,8 @@ class MRITrainer:
 
             if validation_data is not None:
                 valid_loss, valid_metric = self.valid(model, validation_data)
-                self.logger(
-                    f"Valid {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}"
+                self.logger.info(
+                    f"Valid {training_args.loss_fn.capitalize()} {valid_loss:.3f} | {training_args.metrics_fn} {valid_metric:.3f}"
                 )
                 wandb.log(
                     {"valid_loss": valid_loss, "valid_metric": valid_metric},
@@ -255,12 +255,12 @@ class MRITrainer:
 
         # Finish training
         # TODO
-        wandb.finish()
         if test_data is not None:
             loss, metric = self.valid(model, test_data)
             wandb.config.best_test = loss
             wandb.config.best_metric = metric
 
+        wandb.finish()
         self.save_configs(
             misc_args.output_dir, model_args, data_args, training_args, misc_args
         )
