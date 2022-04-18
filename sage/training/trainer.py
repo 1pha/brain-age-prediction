@@ -8,6 +8,7 @@ Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
 import wandb
+import numpy as np
 import torch
 
 from .utils import save_checkpoint, walltime
@@ -152,7 +153,7 @@ class MRITrainer:
         stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
         for e in range(epochs):
 
-            self.logger.info(f' EPOCH {e} / {epochs}  BEST MAE {best_mae:.3f}')
+            self.logger.info(f'EPOCH {e}/{epochs} | BEST MAE {best_mae:.3f}')
 
             if training_data is not None:
                 loss, metric = self.train(model, training_data)
@@ -166,7 +167,7 @@ class MRITrainer:
 
             # Check performance improvement
             model_name = f"ep{str(e).zfill(3)}.pt"
-            current_mae = self.results["valid"][-1]
+            current_mae = metric
             # Yes Improvement
             if current_mae < best_mae:
 
@@ -176,6 +177,7 @@ class MRITrainer:
                     model=self.model,
                     model_name=model_name,
                     output_dir=misc_args.output_dir,
+                    logger=self.logger
                 )
                 best_epoch = e
 
@@ -193,6 +195,7 @@ class MRITrainer:
                             model=self.model,
                             model_name=model_name,
                             output_dir=misc_args.output_dir,
+                            logger=self.logger
                         )
                         self.logger.info(
                             f"Early stopped at {stop_count} / {training_args.early_patience} at EPOCH {e}"
@@ -210,6 +213,7 @@ class MRITrainer:
                     model=self.model,
                     model_name=model_name,
                     output_dir=misc_args.output_dir,
+                    logger=self.logger
                 )
                 self.logger.info(
                     f"Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e}"
@@ -225,6 +229,7 @@ class MRITrainer:
                     model=self.model,
                     model_name=model_name,
                     output_dir=misc_args.output_dir,
+                    logger=self.logger
                 )
 
             else:
@@ -354,18 +359,20 @@ class MRITrainer:
     def organize_result(
         self,
         losses: list,
-        pred: list,
+        preds: list,
         dataloader: torch.utils.data.DataLoader,
         metrics_fn: str = None,
     ) -> Tuple[float, float]:
 
         loss = sum(losses) / len(losses)
-        gt = self.get_ground_truth(dataloader)
+        preds = torch.cat(preds).cpu().detach().squeeze()
+        gt = torch.tensor(self.get_ground_truth(dataloader)).squeeze()
+
         if metrics_fn is not None and isinstance(metrics_fn, str):
             metrics_fn = get_metric_fn(metrics)
         else:
             metrics_fn = self.metrics_fn
-        metrics = metrics_fn(pred, gt)
+        metrics = metrics_fn(preds, gt)
         return loss, metrics
 
     def get_ground_truth(self, dataloader: torch.utils.data.DataLoader) -> list:
@@ -374,7 +381,6 @@ class MRITrainer:
     def save_configs(self, **kwargs) -> None:
 
         output_dir = kwargs["misc_args"].output_dir
-        print(kwargs["misc_args"])
         os.makedirs(output_dir, exist_ok=True)
         fname = os.path.join(output_dir, "config.json")
         configs = {a.get_name(): a.to_dict() for k, a in kwargs.items() if k.endswith("_args")}
