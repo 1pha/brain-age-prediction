@@ -24,7 +24,6 @@
   + [Brain MRI-based 3D Convolutional Neural Networks for Classification of Schizophrenia and Controls
 ](https://arxiv.org/abs/2003.08818)
 
-+ Brain Age Biomarkers
-  + (Further updated)
-+ Represnetation Disentanglement
-  + (Further updated)
+### Minor Experiment Notes
+
+* MSE does not help converging below age 20 when augmentation + Naive Resnet was used. (Apr 18, 2022)
