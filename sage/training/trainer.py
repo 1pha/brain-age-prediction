@@ -179,7 +179,10 @@ class MRITrainer:
                 )
 
             if self.scheduler is not None:
-                self.scheduler.step(valid_loss)
+                if self.training_args.scheduler == "plateau":
+                    self.scheduler.step(valid_loss)
+                else:
+                    self.scheduler.step()
 
             wandb.log({"epoch": e, "lr": self.optimizer.param_groups[0]["lr"]})
 
