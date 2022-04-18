@@ -109,8 +109,8 @@ class TrainingArguments(BaseArgument):
     """
 
     fp16: bool = field(
-        default=True,
-        metadata={"help": "Option to use mixed-precision to speed up training."},
+        default=False,
+        metadata={"help": "Option to use mixed-precision to speed up training. However if your loss is too small, NaN values in gradients during training might occur."},
     )
     optimizer: str = field(
         default="adam", metadata={"help": "Which optimizer to use. Default=adam"}
@@ -197,6 +197,10 @@ class MiscArguments(BaseArgument):
     overwrite_output: str = field(
         default=False,
         metadata={"help": "If set to True, allow output directory to be overwritten."},
+    )
+    which_gpu: int = field(
+        default=1,
+        metadata={"help": "Choose which gpu to use. -1 if you can deviate all of them."}
     )
 
     def get_name(self):
