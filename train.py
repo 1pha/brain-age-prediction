@@ -36,7 +36,9 @@ def run():
         os.environ["CUDA_VISIBLE_DEVICES"] = str(misc_args.which_gpu)
 
     # Set saving path
-    misc_args.output_dir, run_name = set_path(model_args, data_args, training_args, misc_args)
+    misc_args.output_dir, run_name = set_path(
+        model_args, data_args, training_args, misc_args
+    )
 
     # Set logger configuration. Change logger file to "/run.log"
     logger_conf["handlers"]["file_handler"]["filename"] = (
