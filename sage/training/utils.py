@@ -1,6 +1,7 @@
 import os
 import time
-from typing import NewType, Any
+from typing import Any, NewType
+
 import torch
 
 Logger = NewType("Logger", Any)

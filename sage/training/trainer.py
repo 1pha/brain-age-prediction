@@ -1,20 +1,21 @@
+import json
 import os
 import time
-import json
-from typing import Dict, NewType, Any, Callable, List, Tuple
 from collections import defaultdict
+from typing import Any, Callable, Dict, List, NewType, Tuple
 
 Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
-import wandb
 import numpy as np
 import torch
 
-from .utils import save_checkpoint, walltime
+import wandb
+
+from .metrics import get_metric_fn
 from .optimizer import construct_optimizer
 from .scheduler import construct_scheduler
-from .metrics import get_metric_fn
+from .utils import save_checkpoint, walltime
 
 
 class MRITrainer:
@@ -107,7 +108,7 @@ class MRITrainer:
                 except AttributeError:
                     # If attribute not found, allocate None
                     reallocated_dict[arg] = None
-                
+
             else:
                 # If proper value was already given, don't reallocate.
                 reallocated_dict[arg] = val
@@ -155,17 +156,27 @@ class MRITrainer:
         stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
         for e in range(epochs):
 
-            self.logger.info(f'EPOCH {e}/{epochs} | BEST MAE {best_mae:.3f}')
+            self.logger.info(f"EPOCH {e}/{epochs} | BEST MAE {best_mae:.3f}")
 
             if training_data is not None:
                 train_loss, train_metric = self.train(model, training_data)
-                self.logger(f"Train {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}")
-                wandb.log({"train_loss": train_loss, "train_metric": train_metric}, commit=False)
+                self.logger(
+                    f"Train {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}"
+                )
+                wandb.log(
+                    {"train_loss": train_loss, "train_metric": train_metric},
+                    commit=False,
+                )
 
             if validation_data is not None:
                 valid_loss, valid_metric = self.valid(model, validation_data)
-                self.logger(f"Valid {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}")
-                wandb.log({"valid_loss": valid_loss, "valid_metric": valid_metric}, commit=False)
+                self.logger(
+                    f"Valid {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}"
+                )
+                wandb.log(
+                    {"valid_loss": valid_loss, "valid_metric": valid_metric},
+                    commit=False,
+                )
 
             if self.scheduler is not None:
                 self.scheduler.step(valid_loss)
@@ -184,7 +195,7 @@ class MRITrainer:
                     model=self.model,
                     model_name=model_name,
                     output_dir=misc_args.output_dir,
-                    logger=self.logger
+                    logger=self.logger,
                 )
                 best_epoch = e
 
@@ -202,7 +213,7 @@ class MRITrainer:
                             model=self.model,
                             model_name=model_name,
                             output_dir=misc_args.output_dir,
-                            logger=self.logger
+                            logger=self.logger,
                         )
                         self.logger.info(
                             f"Early stopped at {stop_count} / {training_args.early_patience} at EPOCH {e}"
@@ -220,7 +231,7 @@ class MRITrainer:
                     model=self.model,
                     model_name=model_name,
                     output_dir=misc_args.output_dir,
-                    logger=self.logger
+                    logger=self.logger,
                 )
                 self.logger.info(
                     f"Waited for 3 times and no better result {long_term_patience} / {3} at EPOCH {e}"
@@ -236,7 +247,7 @@ class MRITrainer:
                     model=self.model,
                     model_name=model_name,
                     output_dir=misc_args.output_dir,
-                    logger=self.logger
+                    logger=self.logger,
                 )
 
             else:
@@ -390,7 +401,9 @@ class MRITrainer:
         output_dir = kwargs["misc_args"].output_dir
         os.makedirs(output_dir, exist_ok=True)
         fname = os.path.join(output_dir, "config.json")
-        configs = {a.get_name(): a.to_dict() for k, a in kwargs.items() if k.endswith("_args")}
+        configs = {
+            a.get_name(): a.to_dict() for k, a in kwargs.items() if k.endswith("_args")
+        }
         with open(fname, "w") as f:
             json.dump(configs, f, indent=4, sort_keys=True)
         self.logger.info(f"Successfully saved configurations to {fname}")

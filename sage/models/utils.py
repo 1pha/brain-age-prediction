@@ -1,12 +1,10 @@
-import os
 import math
+import os
 
 import torch
 from torchsummary import summary
 
-from .model_zoo import (
-    build_resnet,
-)
+from .model_zoo import build_resnet
 
 # from .naive_models.dinsdale import *
 # from .naive_models.efficientnet import EfficientNet3D
@@ -215,14 +213,19 @@ def build_model(model_args, logger):
     return build_resnet()
 
 
-millnames = ['',' K',' M',' B',' T']
+millnames = ["", " K", " M", " B", " T"]
+
 
 def millify(n):
     n = float(n)
-    millidx = max(0,min(len(millnames)-1,
-                        int(math.floor(0 if n == 0 else math.log10(abs(n))/3))))
+    millidx = max(
+        0,
+        min(
+            len(millnames) - 1, int(math.floor(0 if n == 0 else math.log10(abs(n)) / 3))
+        ),
+    )
 
-    return '{:.0f}{}'.format(n / 10**(3 * millidx), millnames[millidx])
+    return "{:.0f}{}".format(n / 10 ** (3 * millidx), millnames[millidx])
 
 
 if __name__ == "__main__":

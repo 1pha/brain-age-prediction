@@ -3,16 +3,10 @@ from torch import nn
 from torch.nn import functional as F
 from torchsummary import summary
 
-from .efficientnet_utils import (
-    MemoryEfficientSwish,
-    Swish,
-    drop_connect,
-    efficientnet_params,
-    get_model_params,
-    get_same_padding_conv3d,
-    round_filters,
-    round_repeats,
-)
+from .efficientnet_utils import (MemoryEfficientSwish, Swish, drop_connect,
+                                 efficientnet_params, get_model_params,
+                                 get_same_padding_conv3d, round_filters,
+                                 round_repeats)
 
 
 class MBConvBlock3D(nn.Module):

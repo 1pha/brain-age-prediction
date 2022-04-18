@@ -1,7 +1,7 @@
 __all__ = ["ModelArguments", "DataArguments", "TrainingArguments", "MiscArguments"]
 
-import os
 import json
+import os
 from dataclasses import dataclass, field
 
 
@@ -110,7 +110,9 @@ class TrainingArguments(BaseArgument):
 
     fp16: bool = field(
         default=False,
-        metadata={"help": "Option to use mixed-precision to speed up training. However if your loss is too small, NaN values in gradients during training might occur."},
+        metadata={
+            "help": "Option to use mixed-precision to speed up training. However if your loss is too small, NaN values in gradients during training might occur."
+        },
     )
     optimizer: str = field(
         default="adam", metadata={"help": "Which optimizer to use. Default=adam"}
@@ -127,7 +129,9 @@ class TrainingArguments(BaseArgument):
     )
     scheduler: str = field(
         default=None,
-        metadata={"help": "Which scheduler to use. Currently 'plateau' is only supportable."}
+        metadata={
+            "help": "Which scheduler to use. Currently 'plateau' is only supportable."
+        },
     )
     result_path: str = field(
         default="../result/",
@@ -204,7 +208,9 @@ class MiscArguments(BaseArgument):
     )
     which_gpu: int = field(
         default=1,
-        metadata={"help": "Choose which gpu to use. -1 if you can deviate all of them."}
+        metadata={
+            "help": "Choose which gpu to use. -1 if you can deviate all of them."
+        },
     )
 
     def get_name(self):
