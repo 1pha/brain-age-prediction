@@ -17,6 +17,7 @@ def construct_scheduler(optimizer, training_args, logger=None):
 
     elif name == "cosine_linear_warmup":
         from transformers import get_cosine_schedule_warmup
+
         scheduler = get_cosine_schedule_warmup(
             optimizer,
             num_warmup_steps=args.warmup_steps,
@@ -24,6 +25,7 @@ def construct_scheduler(optimizer, training_args, logger=None):
         )
     elif name == "linear_warmup":
         from transformers import get_linear_schedule_with_warmup
+
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
             num_warmup_steps=args.warmup_steps,

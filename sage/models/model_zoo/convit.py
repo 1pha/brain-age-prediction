@@ -660,6 +660,7 @@ class ConvitArguments:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+
 def build_convit(model_args):
 
     convitargs = ConvitArguments()
@@ -670,7 +671,9 @@ def build_convit(model_args):
 
 if __name__ == "__main__":
 
-    model = VisionTransformer(img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=192)
+    model = VisionTransformer(
+        img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=192
+    )
     sample_brain = torch.zeros(2, 1, 96, 96, 96)
     print(model(sample_brain))
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

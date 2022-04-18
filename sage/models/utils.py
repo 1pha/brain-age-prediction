@@ -1,11 +1,7 @@
 import math
 import os
 
-from .model_zoo import (
-    build_resnet,
-    build_convit,
-    build_convnext
-)
+from .model_zoo import build_convit, build_convnext, build_resnet
 
 
 def count_params(model):
@@ -28,13 +24,15 @@ def build_model(model_args, logger):
 
     elif name == "convnext":
         model = build_convnext(model_args)
-    
+
     params = count_params(model)
     logger.info(f"{model_args.model_name.capitalize()} has #params: {millify(params)}.")
     return build_resnet()
 
 
 millnames = ["", " K", " M", " B", " T"]
+
+
 def millify(n):
     n = float(n)
     millidx = max(

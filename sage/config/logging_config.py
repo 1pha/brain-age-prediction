@@ -22,7 +22,7 @@ logger_conf = {  # only used when 'user_wandb==False'
 
 
 def get_logger(conf=None):
-    
+
     import logging
     import logging.config
 

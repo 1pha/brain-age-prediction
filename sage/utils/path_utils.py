@@ -19,7 +19,6 @@ def _generate_name(model_args, data_args, training_args, misc_args):
 
 def set_path(model_args, data_args, training_args, misc_args):
 
-
     if misc_args.output_dir is None:
         misc_args.output_dir = _generate_name(
             model_args, data_args, training_args, misc_args
@@ -28,9 +27,7 @@ def set_path(model_args, data_args, training_args, misc_args):
     # Check if same name folder exists.
     output_fullpath = os.path.join(misc_args.output_path, misc_args.output_dir)
     if os.path.exists(output_fullpath):
-        print(
-            f"You're overwriting on a directory {output_fullpath}. Please check"
-        )
+        print(f"You're overwriting on a directory {output_fullpath}. Please check")
         if misc_args.overwrite_output:
             print(
                 f"Overwriting arguments checked to True. We will overwrite on the folder."

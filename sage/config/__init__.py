@@ -10,5 +10,5 @@ __all__ = [
     "DataArguments",
     "TrainingArguments",
     "MiscArguments",
-    "logger_conf"
+    "logger_conf",
 ]
