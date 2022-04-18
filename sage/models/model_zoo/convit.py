@@ -584,7 +584,7 @@ class ConvitArguments:
         },
     )
     embed_dim: int = field(
-        default=48,
+        default=96,
         metadata={
             "help": "Number of embedding dimension. Should be a multiplier of n_heads."
         },
@@ -652,13 +652,25 @@ class ConvitArguments:
         },
     )
 
-    @property
-    def config(self):
+    def to_dict(self):
         return vars(self)
+
+    def load_configurations(self, **kwargs):
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+def build_convit(model_args):
+
+    convitargs = ConvitArguments()
+    convitargs.load_configurations(**model_args.to_dict())
+    model = VisionTransformer(**convitargs.to_dict())
+    return model
 
 
 if __name__ == "__main__":
 
-    model = VisionTransformer(img_size=96, patch_size=16, in_chans=1, num_classes=1)
+    model = VisionTransformer(img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=192)
     sample_brain = torch.zeros(2, 1, 96, 96, 96)
     print(model(sample_brain))
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
