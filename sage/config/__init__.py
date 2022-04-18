@@ -1,6 +1,6 @@
 from .config import (DataArguments, MiscArguments, ModelArguments,
                      TrainingArguments)
-from .logging_config import get_logger
+from .logging_config import get_logger, logger_conf
 
 __all__ = [
     "argument_parser",
@@ -10,4 +10,5 @@ __all__ = [
     "DataArguments",
     "TrainingArguments",
     "MiscArguments",
+    "logger_conf"
 ]

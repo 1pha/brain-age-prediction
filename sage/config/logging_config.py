@@ -21,10 +21,12 @@ logger_conf = {  # only used when 'user_wandb==False'
 }
 
 
-def get_logger():
+def get_logger(conf=None):
+    
     import logging
     import logging.config
 
+    logger_conf = logger_conf if conf is None else conf
     logging.config.dictConfig(logger_conf)
     logger = logging.getLogger()
     return logger
