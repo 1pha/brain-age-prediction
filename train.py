@@ -1,4 +1,5 @@
 import os
+import math
 
 import wandb
 from sage.config import (DataArguments, MiscArguments, ModelArguments,
@@ -49,6 +50,11 @@ def run():
 
     # Build dataloaders
     train_dataloader = get_dataloader(data_args, misc_args, "train", logger)
+    if training_args.scheduler in ["linear_warmup", "cosine_linear_warmup"]:
+        training_args.warmup_steps = int(math.ceil(
+            len(train_dataloader.dataset) / data_args.batch_size)) * (
+        training_args.epochs)
+        training_args.warmup_steps = training_args.total_steps // 10
     valid_dataloader = get_dataloader(data_args, misc_args, "valid", logger)
     test_dataloader = get_dataloader(data_args, misc_args, "test", logger)
 
