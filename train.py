@@ -1,3 +1,4 @@
+import os
 import wandb
 from sage.config import (
     argument_parser,
@@ -33,12 +34,18 @@ def run():
     ) = parser.parse_args_into_dataclasses()
 
     seed_everything(misc_args.seed)
+    if misc_args.which_gpu != -1:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(misc_args.which_gpu)
+        print(misc_args.which_gpu)
     misc_args.output_dir = set_path(model_args, data_args, training_args, misc_args, logger)
+    wandb.init(
+        project="3dcnn_test"
+    )
 
     train_dataloader = get_dataloader(data_args, misc_args, "train", logger)
     valid_dataloader = get_dataloader(data_args, misc_args, "valid", logger)
     test_dataloader = get_dataloader(data_args, misc_args, "test", logger)
-    model = build_model(model_args)
+    model = build_model(model_args, logger)
 
     trainer = MRITrainer(
         model,
