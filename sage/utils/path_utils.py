@@ -14,15 +14,16 @@ def _generate_name(model_args, data_args, training_args, misc_args):
     dir_name = f"[{features['date']}]"
     dir_name += f"{features['model_name']}"
     dir_name += f"-{features['seed']}"
-    return dir_name
+    return dir_name, features
 
 
 def set_path(model_args, data_args, training_args, misc_args):
 
     if misc_args.output_dir is None:
-        misc_args.output_dir = _generate_name(
+        misc_args.output_dir, features = _generate_name(
             model_args, data_args, training_args, misc_args
         )
+        run_name = f'{features["model_name"]}-{features["seed"]}'
 
     # Check if same name folder exists.
     output_fullpath = os.path.join(misc_args.output_path, misc_args.output_dir)
@@ -32,7 +33,7 @@ def set_path(model_args, data_args, training_args, misc_args):
             print(
                 f"Overwriting arguments checked to True. We will overwrite on the folder."
             )
-            return output_fullpath
+            return output_fullpath, run_name
 
         else:
             print(f"Overwriting arguments checked to False. Stop training.")
@@ -40,4 +41,4 @@ def set_path(model_args, data_args, training_args, misc_args):
     else:
         os.makedirs(output_fullpath, exist_ok=True)
         print(f"No errors found in setting path.")
-        return output_fullpath
+        return output_fullpath, run_name

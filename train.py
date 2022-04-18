@@ -36,7 +36,7 @@ def run():
         os.environ["CUDA_VISIBLE_DEVICES"] = str(misc_args.which_gpu)
 
     # Set saving path
-    misc_args.output_dir = set_path(model_args, data_args, training_args, misc_args)
+    misc_args.output_dir, run_name = set_path(model_args, data_args, training_args, misc_args)
 
     # Set logger configuration. Change logger file to "/run.log"
     logger_conf["handlers"]["file_handler"]["filename"] = (
@@ -45,12 +45,12 @@ def run():
     logger = get_logger(logger_conf)
 
     # Initiate wandb
-    wandb.init(project="3dcnn_test")
+    wandb.init(project="3dcnn_test", name=run_name)
 
     # Build dataloaders
     train_dataloader = get_dataloader(data_args, misc_args, "train", logger)
     if training_args.scheduler in ["linear_warmup", "cosine_linear_warmup"]:
-        training_args.warmup_steps = int(
+        training_args.total_steps = int(
             math.ceil(len(train_dataloader.dataset) / data_args.batch_size)
         ) * (training_args.epochs)
         training_args.warmup_steps = training_args.total_steps // 10
