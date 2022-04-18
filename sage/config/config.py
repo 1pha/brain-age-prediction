@@ -125,6 +125,10 @@ class TrainingArguments(BaseArgument):
         default=0.9,
         metadata={"help": "Set momentum values for optimizers that needs them."},
     )
+    scheduler: str = field(
+        default=None,
+        metadata={"help": "Which scheduler to use. Currently 'plateau' is only supportable."}
+    )
     result_path: str = field(
         default="../result/",
         metadata={"help": "Where the checkpoints should be saved."},

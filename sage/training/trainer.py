@@ -13,6 +13,7 @@ import torch
 
 from .utils import save_checkpoint, walltime
 from .optimizer import construct_optimizer
+from .scheduler import construct_scheduler
 from .metrics import get_metric_fn
 
 
@@ -42,6 +43,7 @@ class MRITrainer:
 
         # Construct Optimizer
         self.optimizer = construct_optimizer(self.model, training_args)
+        self.scheduler = construct_scheduler(self.optimizer, training_args)
         self._set_fp16(training_args.fp16)
 
         # Construct Loss functions & Metrics
@@ -156,20 +158,23 @@ class MRITrainer:
             self.logger.info(f'EPOCH {e}/{epochs} | BEST MAE {best_mae:.3f}')
 
             if training_data is not None:
-                loss, metric = self.train(model, training_data)
+                train_loss, train_metric = self.train(model, training_data)
                 self.logger(f"Train {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}")
-                wandb.log({"train_loss": loss, "train_metric": metric}, commit=False)
+                wandb.log({"train_loss": train_loss, "train_metric": train_metric}, commit=False)
 
             if validation_data is not None:
-                loss, metric = self.valid(model, validation_data)
+                valid_loss, valid_metric = self.valid(model, validation_data)
                 self.logger(f"Valid {training_args.loss_fn.capitzlie()} {loss:.3f} | {training_args.metrics} {metric:.3f}")
-                wandb.log({"valid_loss": loss, "valid_metric": metric}, commit=False)
+                wandb.log({"valid_loss": valid_loss, "valid_metric": valid_metric}, commit=False)
+
+            if self.scheduler is not None:
+                self.scheduler.step(valid_loss)
 
             wandb.log({"epoch": e})
 
             # Check performance improvement
             model_name = f"ep{str(e).zfill(3)}.pt"
-            current_mae = metric
+            current_mae = valid_metric
             # Yes Improvement
             if current_mae < best_mae:
 
