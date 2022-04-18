@@ -26,4 +26,5 @@
 
 ### Minor Experiment Notes
 
-* MSE does not help converging below age 20 when augmentation + Naive Resnet was used. (Apr 18, 2022)
++ MSE does not help converging below age 20 when augmentation + Naive Resnet was used. (Apr 18, 2022)
++ Add "Linear warmup" to vit models.
