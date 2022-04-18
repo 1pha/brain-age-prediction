@@ -133,6 +133,10 @@ class TrainingArguments(BaseArgument):
             "help": "Which scheduler to use. Currently 'plateau' is only supportable."
         },
     )
+    lr_patience: int = field(
+        default=10,
+        metadata={"help": "Patience for learning rate scheduler."}
+    )
     result_path: str = field(
         default="../result/",
         metadata={"help": "Where the checkpoints should be saved."},
@@ -155,7 +159,7 @@ class TrainingArguments(BaseArgument):
         },
     )
     loss_fn: str = field(
-        default="mse", metadata={"help": "Designate loss functions as string."}
+        default="rmse", metadata={"help": "Designate loss functions as string. Note that MSE has too high value that makes model find hard to be optimized."}
     )
     # TODO: deal with multiple metrics
     metrics_fn: str = field(
