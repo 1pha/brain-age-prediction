@@ -20,16 +20,16 @@ def construct_scheduler(optimizer, training_args, logger=None):
 
         scheduler = get_cosine_schedule_warmup(
             optimizer,
-            num_warmup_steps=args.warmup_steps,
-            num_training_steps=args.total_steps,
+            num_warmup_steps=training_args.warmup_steps,
+            num_training_steps=training_args.total_steps,
         )
     elif name == "linear_warmup":
         from transformers import get_linear_schedule_with_warmup
 
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=args.warmup_steps,
-            num_training_steps=args.total_steps,
+            num_warmup_steps=training_args.warmup_steps,
+            num_training_steps=training_args.total_steps,
         )
 
     elif name is None:
