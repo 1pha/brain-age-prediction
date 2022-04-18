@@ -181,7 +181,7 @@ class MRITrainer:
             if self.scheduler is not None:
                 self.scheduler.step(valid_loss)
 
-            wandb.log({"epoch": e})
+            wandb.log({"epoch": e, "lr": self.optimizer.param_groups[0]["lr"]})
 
             # Check performance improvement
             model_name = f"ep{str(e).zfill(3)}.pt"
