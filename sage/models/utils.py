@@ -1,4 +1,5 @@
 import os
+import math
 
 import torch
 from torchsummary import summary
@@ -201,9 +202,27 @@ def multimodel_save_checkpoint(states, model_name, model_dir="./models/"):
     print("Saved Models")
 
 
-def build_model(model_args):
+def build_model(model_args, logger):
+    """
+    TODO:
+        It is just calling resnet directly without reading arguments.
+        Need additional changes for future usage.
+    """
 
+    model = build_resnet()
+    params = count_params(model)
+    logger.info(f"{model_args.model_name.capitalize()} has #params: {millify(params)}.")
     return build_resnet()
+
+
+millnames = ['',' K',' M',' B',' T']
+
+def millify(n):
+    n = float(n)
+    millidx = max(0,min(len(millnames)-1,
+                        int(math.floor(0 if n == 0 else math.log10(abs(n))/3))))
+
+    return '{:.0f}{}'.format(n / 10**(3 * millidx), millnames[millidx])
 
 
 if __name__ == "__main__":
