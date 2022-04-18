@@ -8,7 +8,7 @@ from sage.config import (
     TrainingArguments,
     MiscArguments,
 )
-from sage.data.dataloader import get_dataloader
+from sage.data import get_dataloader
 from sage.utils import seed_everything, set_path
 from sage.training.trainer import MRITrainer
 from sage.models import build_model
