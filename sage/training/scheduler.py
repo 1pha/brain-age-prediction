@@ -23,6 +23,8 @@ def construct_scheduler(optimizer, training_args, logger=None):
             num_warmup_steps=training_args.warmup_steps,
             num_training_steps=training_args.total_steps,
         )
+        return scheduler
+
     elif name == "linear_warmup":
         from transformers import get_linear_schedule_with_warmup
 
@@ -31,6 +33,7 @@ def construct_scheduler(optimizer, training_args, logger=None):
             num_warmup_steps=training_args.warmup_steps,
             num_training_steps=training_args.total_steps,
         )
+        return scheduler
 
     elif name is None:
         return None

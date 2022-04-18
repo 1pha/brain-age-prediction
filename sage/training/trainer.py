@@ -178,11 +178,8 @@ class MRITrainer:
                     commit=False,
                 )
 
-            if self.scheduler is not None:
-                if self.training_args.scheduler == "plateau":
-                    self.scheduler.step(valid_loss)
-                else:
-                    self.scheduler.step()
+            if self.training_args.scheduler == "plateau":
+                self.scheduler.step(valid_loss)
 
             wandb.log({"epoch": e, "lr": self.optimizer.param_groups[0]["lr"]})
 
@@ -371,6 +368,8 @@ class MRITrainer:
         self.scaler.step(optimizer)
         self.scaler.update()
         optimizer.zero_grad()
+        if self.training_args.scheduler not in [None, "plateau"]:
+            self.scheduler.step()
 
     def load_checkpoint(self, checkpoint) -> None:
 
