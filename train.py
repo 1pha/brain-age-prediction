@@ -37,7 +37,7 @@ def run():
     
     # Set saving path
     misc_args.output_dir = set_path(
-        model_args, data_args, training_args, misc_args, logger
+        model_args, data_args, training_args, misc_args
     )
 
     # Set logger configuration. Change logger file to "/run.log"
