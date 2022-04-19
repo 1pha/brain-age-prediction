@@ -1,7 +1,10 @@
 import math
 import os
 
-from .model_zoo import build_convit, build_convnext, build_resnet
+from .model_zoo import (
+    build_convit, convit_list,
+    build_convnext, build_resnet
+)
 
 
 def count_params(model):
@@ -19,7 +22,7 @@ def build_model(model_args, logger):
     if name == "resnet":
         model = build_resnet()
 
-    elif name == "convit":
+    elif name in convit_list:
         model = build_convit(model_args)
 
     elif name == "convnext":
