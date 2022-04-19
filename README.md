@@ -31,4 +31,4 @@
 
 + wandb: track best metric
 + wandb: namings
-+ better ways to scale them down?
++ lr scaling to 30~40 epochs ? after great descent might be fine.
