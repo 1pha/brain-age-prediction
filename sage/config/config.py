@@ -140,7 +140,7 @@ class TrainingArguments(BaseArgument):
         default="../result/",
         metadata={"help": "Where the checkpoints should be saved."},
     )
-    epochs: int = field(default=100, metadata={"help": "Set how much epochs to train."})
+    epochs: int = field(default=200, metadata={"help": "Set how much epochs to train."})
     checkpoint_period: int = field(
         default=5,
         metadata={"help": "How much epochs to be used as a period between savings."},
