@@ -248,16 +248,18 @@ class BrainAgeDataset(Dataset):
 
         self.logger.debug("Setting up augmentation.")
 
-        self._transform = {
-            "affine": tio.RandomAffine(),
-            "flip": tio.RandomFlip(axes=["left-right"]),
-            "elastic_deform": tio.RandomElasticDeformation(),
-        }
-        self.p = (
-            data_args.affine_proba,
-            data_args.flip_proba,
-            data_args.elasticdeform_proba,
-        )
+        self._transform = tio.Compose({
+            tio.RandomFlip(axes=["left-right"]),
+            tio.OneOf({
+                tio.RandomAffine(),
+                tio.RandomElasticDeformation(),
+            }),
+            tio.OneOf({
+                tio.RandomGamma((-0.5, 0.5)),
+                tio.RandomBiasField(.3),
+                tio.RandomBlur((0, 1)),
+            })
+        })
 
     def transform(self, x: torch.Tensor):  # -> torch.Tensor (1, W', H', D')
 
@@ -265,8 +267,7 @@ class BrainAgeDataset(Dataset):
         x must be given with torch.tensor with (1, W', H', D')
         """
 
-        aug_choice = np.random.choice(list(self._transform.keys()), p=self.p)
-        x = self._transform[aug_choice](x)
+        x = self._transform(x)
         return x
 
 

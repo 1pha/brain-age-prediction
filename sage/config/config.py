@@ -77,26 +77,6 @@ class DataArguments(BaseArgument):
             "help": "Choose which augmentation technique to use. It should be one of 'concat', 'replace' or 'false'"
         },
     )
-    affine_proba: float = field(
-        default=0.33, metadata={"help": "Proportion of affine transform"}
-    )
-    flip_proba: float = field(
-        default=0.33, metadata={"help": "Proportion of left-right flip transform"}
-    )
-    elasticdeform_proba: float = field(
-        default=0.33, metadata={"help": "Proportion of elastic deformation transform"}
-    )
-
-    def __post_init__(self):
-        self.affine_proba, self.flip_proba, self.elasticdeform_proba = self._normalize(
-            self.affine_proba, self.flip_proba, self.elasticdeform_proba
-        )
-
-    def _normalize(self, *e):
-        _list = [val for val in e]
-        norm = sum(_list)
-        new_list = list(map(lambda x: x / norm, _list))
-        return new_list
 
     def get_name(self):
         return "data_args"
