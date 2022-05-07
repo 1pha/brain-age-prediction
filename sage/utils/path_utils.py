@@ -24,6 +24,8 @@ def set_path(model_args, data_args, training_args, misc_args):
             model_args, data_args, training_args, misc_args
         )
         run_name = f'{features["model_name"]}-{features["seed"]}'
+    else:
+        run_name = misc_args.output_dir
 
     # Check if same name folder exists.
     output_fullpath = os.path.join(misc_args.output_path, misc_args.output_dir)
