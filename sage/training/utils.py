@@ -21,14 +21,11 @@ def save_checkpoint(
 
 
 def walltime(original_fn):
-    def wrapper_fn(*args, **kwargs):
+    def wrapper_fn(self, *args, **kwargs):
         start_time = time.time()
-
-        result = original_fn(*args, **kwargs)
-
+        result = original_fn(self, *args, **kwargs)
         end_time = time.time()
-        end = "" if original_fn.__name__ == "train" else "\n"
-        print(f"[{original_fn.__name__}] {end_time - start_time:.1f} sec ", end=end)
+        self.logger.info(f"[{original_fn.__name__}] {end_time - start_time:.1f} sec.")
         return result
 
     return wrapper_fn
