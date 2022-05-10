@@ -257,8 +257,10 @@ class MRITrainer:
         # TODO
         if test_data is not None:
             loss, metric = self.valid(model, test_data)
-            wandb.config.best_test = loss
-            wandb.config.best_metric = metric
+            wandb.config.best_test_loss = loss
+            wandb.config.best_test_metric = metric
+        wandb.config.best_valid_epoch = best_epoch
+        wandb.config.best_valid_metric = best_mae
 
         wandb.finish()
         self.save_configs(
