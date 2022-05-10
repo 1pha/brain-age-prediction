@@ -13,7 +13,11 @@ def _generate_name(model_args, data_args, training_args, misc_args):
     }
     dir_name = f"[{features['date']}]"
     dir_name += f"{features['model_name']}"
-    dir_name += f"-{features['seed']}"
+    """ Temporary names for testing"""
+    # dir_name += f"-{features['seed']}"
+    dir_name += f"lr{training_args.learning_rate}"
+    dir_name += f"warmup{int(training_args.warmup_ratio * 100)}%"
+
     return dir_name, features
 
 
