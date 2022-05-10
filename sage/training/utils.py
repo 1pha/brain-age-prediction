@@ -12,8 +12,8 @@ def save_checkpoint(
 ):
 
     try:
-        os.makedirs(os.path.join(output_dir, "/ckpts"), exist_ok=True)
-        fname = os.path.join(output_dir, "/ckpts/", model_name)
+        os.makedirs(os.path.join(output_dir, "ckpts"), exist_ok=True)
+        fname = os.path.join(output_dir, "ckpts", model_name)
         torch.save(model.state_dict(), fname)
         logger.info(f"Successfully saved model as {fname}.")
     except:
