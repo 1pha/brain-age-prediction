@@ -113,6 +113,10 @@ class TrainingArguments(BaseArgument):
             "help": "Which scheduler to use. Currently 'plateau' is only supportable."
         },
     )
+    warmup_ratio: float = field(
+        default=0.1,
+        metadata={"help": "Percentage of total epochs to be warmed up."}
+    )
     lr_patience: int = field(
         default=10, metadata={"help": "Patience for learning rate scheduler."}
     )
