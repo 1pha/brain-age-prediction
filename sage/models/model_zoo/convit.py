@@ -660,7 +660,9 @@ class ConvitArguments:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+
 convit_list = ["convit-tiny", "convit-small"]
+
 
 def build_convit(model_args):
 

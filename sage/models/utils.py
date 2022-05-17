@@ -1,10 +1,7 @@
 import math
 import os
 
-from .model_zoo import (
-    build_convit, convit_list,
-    build_convnext, build_resnet
-)
+from .model_zoo import build_convit, convit_list, build_convnext, build_resnet
 
 
 def count_params(model):
