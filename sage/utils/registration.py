@@ -55,8 +55,8 @@ class Registrator:
 
         ### CONFIGURATION FILE ###
         if cfg is None:
-            with open("utils/registration.yml", "r") as y:
-                cfg = yaml.load(y)
+            with open("sage/utils/registration.yml", "r") as y:
+                cfg = yaml.load(y, Loader=yaml.FullLoader)
 
         elif isinstance(cfg, str):
             with open(cfg, "r") as y:
@@ -117,10 +117,15 @@ class Registrator:
         else:
             self.set_template(template)
 
-        self.fname = moving.split("\\")[-1]
-        print(f"Working on: {self.fname}")
+        if isinstance(moving, str):
+            self.fname = moving.split("\\")[-1]
+            print(f"Working on: {self.fname}")
+            moving_img = nib.load(moving)
 
-        moving_img = nib.load(moving)
+        else:
+            self.fname = "sample_brain"
+            moving_img = moving
+
         self.moving_data, self.moving_affine = moving_img.get_fdata(), moving_img.affine
         self.organize_cfg()
         self.optimize(**kwargs)
