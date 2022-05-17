@@ -1,9 +1,10 @@
+from ast import Str
 import json
 import math
 import os
 import time
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, NewType, Tuple
+from typing import Any, Callable, Dict, List, NewType, Tuple, Union
 
 Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
@@ -170,7 +171,7 @@ class MRITrainer:
 
             self.logger.info(f"EPOCH {e}/{epochs} | BEST MAE {best_mae:.3f}")
 
-            if training_data is not None:
+            if training_data is not None and training_args.do_train:
                 train_loss, train_metric = self.train(model, training_data)
                 self.logger.info(
                     f"Train {training_args.loss_fn.capitalize()} {train_loss:.3f} | {training_args.metrics_fn} {train_metric:.3f}"
@@ -180,7 +181,7 @@ class MRITrainer:
                     commit=False,
                 )
 
-            if validation_data is not None:
+            if validation_data is not None and training_args.do_eval:
                 valid_loss, valid_metric = self.valid(model, validation_data)
                 self.logger.info(
                     f"Valid {training_args.loss_fn.capitalize()} {valid_loss:.3f} | {training_args.metrics_fn} {valid_metric:.3f}"
@@ -275,7 +276,7 @@ class MRITrainer:
         wandb.config.best_valid_metric = best_mae
 
         wandb.finish()
-        self.save_configs(misc_args.output_dir, data_args, training_args, misc_args)
+        self.save_configs(data_args=data_args, training_args=training_args, misc_args=misc_args)
 
     @walltime
     def train(
@@ -347,6 +348,41 @@ class MRITrainer:
         loss, metric = self.organize_result(losses, preds, dataloader)
         return loss, metric
 
+    @walltime
+    def inference(
+        self, model: str, dataloader: torch.utils.data.DataLoader
+    ) -> Tuple[List, List]:
+
+        losses, preds = [], []
+        assert isinstance(model, str), "Give model checkpoint."
+        # Note that model should be the class attribute beforehand.
+        # This is done in __init__ but just so you know.
+        self.load_checkpoint(model)
+        model = self.model
+
+        model.eval()
+        for i, (x, y) in enumerate(dataloader):
+
+            self.logger.debug(f"validation phase, {i}th batch.")
+
+            try:
+                x, y = map(lambda obj: obj.to(self.device), (x, y))
+            except FileNotFoundError as e:
+                self.logger.exception(e)
+                time.sleep(20)
+                self.loading_failures["valid"].append((e, i))
+                continue
+
+            with torch.no_grad():
+                loss, pred = self.step(x, y, model=model, update=False)
+                losses.append(float(loss.cpu().detach()))
+                preds.append(pred)
+
+            torch.cuda.empty_cache()
+
+        loss, metric = self.organize_result(losses, preds, dataloader)
+        return loss, metric, preds
+
     def step(
         self,
         x: torch.FloatTensor,
@@ -383,7 +419,7 @@ class MRITrainer:
         if self.training_args.scheduler not in [None, "plateau"]:
             self.scheduler.step()
 
-    def load_checkpoint(self, checkpoint) -> None:
+    def load_checkpoint(self, checkpoint: str) -> None:
 
         self.model.load_state_dict(torch.load(checkpoint))
         self.logger.info(f"Successfully loaded model.")

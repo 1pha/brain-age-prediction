@@ -6,7 +6,7 @@ from sage.config import get_logger, logger_conf, parse
 from sage.data import get_dataloader
 from sage.models import build_model
 from sage.training.trainer import MRITrainer
-from sage.utils import seed_everything, set_path
+from sage.utils import seed_everything
 
 
 def run():
@@ -26,7 +26,6 @@ def run():
     # Build dataloaders
     train_dataloader = get_dataloader(data_args, misc_args, "train", logger)
     valid_dataloader = get_dataloader(data_args, misc_args, "valid", logger)
-    test_dataloader = get_dataloader(data_args, misc_args, "test", logger)
 
     # Build Model
     model = build_model(training_args, logger)
@@ -44,7 +43,6 @@ def run():
 
     # Start Training
     trainer.run()
-
 
 if __name__ == "__main__":
     run()

@@ -1,7 +1,7 @@
 import os
 import sys
 
-from .misc import get_today
+from ..utils.misc import get_today
 
 
 def _generate_name(data_args, training_args, misc_args):
