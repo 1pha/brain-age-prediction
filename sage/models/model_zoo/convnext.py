@@ -75,10 +75,10 @@ class ConvNeXt(nn.Module):
 
     def __init__(
         self,
-        in_chans=3,
-        num_classes=1000,
-        depths=[3, 3, 9, 3],
-        dims=[96, 192, 384, 768],
+        in_chans=1,
+        num_classes=1,
+        depths=[1, 1, 3, 1],
+        dims=[48, 96, 192, 384],
         drop_path_rate=0.0,
         layer_scale_init_value=1e-6,
         head_init_scale=1.0,
@@ -176,9 +176,9 @@ class LayerNorm(nn.Module):
             return x
 
 
-def build_convnext(model_args):
+def build_convnext(training_args):
 
-    model = ConvNeXt(**model_args.to_dict())
+    model = ConvNeXt(**training_args.to_dict())
     return model
 
 

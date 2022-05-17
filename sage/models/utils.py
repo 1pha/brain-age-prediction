@@ -1,5 +1,5 @@
 import math
-import os
+import torch
 
 from .model_zoo import build_convit, build_convnext, build_resnet, convit_list
 
@@ -8,26 +8,28 @@ def count_params(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def build_model(model_args, logger):
+def build_model(training_args, logger):
     """
     TODO:
         It is just calling resnet directly without reading arguments.
         Need additional changes for future usage.
     """
 
-    name = model_args.model_name
+    name = training_args.model_name
     if name == "resnet":
         model = build_resnet()
 
     elif name in convit_list:
-        model = build_convit(model_args)
+        model = build_convit(training_args)
 
     elif name == "convnext":
-        model = build_convnext(model_args)
+        model = build_convnext(training_args)
 
     params = count_params(model)
-    logger.info(f"{model_args.model_name.capitalize()} has #params: {millify(params)}.")
-    return build_resnet()
+    if torch.cuda.is_available():
+        model = model.to("cuda")
+    logger.info(f"{training_args.model_name.capitalize()} has #params: {millify(params)}.")
+    return model
 
 
 millnames = ["", " K", " M", " B", " T"]
