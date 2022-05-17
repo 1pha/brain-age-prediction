@@ -29,6 +29,6 @@
 + MSE does not help converging below age 20 when augmentation + Naive Resnet was used. (Apr 18, 2022)
 + Add "Linear warmup" to vit models. (done)
 
-+ wandb: track best metric
+<!-- + wandb: track best metric -->
 + wandb: namings
 + lr scaling to 30~40 epochs ? after great descent might be fine.
