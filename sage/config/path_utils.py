@@ -4,11 +4,11 @@ import sys
 from .misc import get_today
 
 
-def _generate_name(model_args, data_args, training_args, misc_args):
+def _generate_name(data_args, training_args, misc_args):
 
     features = {
         "date": get_today(),
-        "model_name": model_args.model_name,
+        "model_name": training_args.model_name,
         "seed": str(misc_args.seed),
     }
     dir_name = f"[{features['date']}]"
@@ -21,11 +21,11 @@ def _generate_name(model_args, data_args, training_args, misc_args):
     return dir_name, features
 
 
-def set_path(model_args, data_args, training_args, misc_args):
+def set_path(data_args, training_args, misc_args):
 
     if misc_args.output_dir is None:
         misc_args.output_dir, features = _generate_name(
-            model_args, data_args, training_args, misc_args
+            data_args, training_args, misc_args
         )
         run_name = f'{features["model_name"]}-{features["seed"]}'
     else:

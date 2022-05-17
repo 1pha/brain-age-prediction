@@ -1,5 +1,10 @@
-from .config import (DataArguments, MiscArguments, ModelArguments,
-                     TrainingArguments)
+from .config import (
+    DataArguments,
+    MiscArguments,
+    ModelArguments,
+    TrainingArguments,
+    parse,
+)
 from .logging_config import get_logger, logger_conf
 
 __all__ = [
@@ -10,5 +15,6 @@ __all__ = [
     "DataArguments",
     "TrainingArguments",
     "MiscArguments",
+    "parse",
     "logger_conf",
 ]

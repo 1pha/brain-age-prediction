@@ -1,5 +1,3 @@
-__all__ = ["ModelArguments", "DataArguments", "TrainingArguments", "MiscArguments"]
-
 import json
 import os
 from dataclasses import dataclass, field
@@ -19,24 +17,6 @@ class BaseArgument:
 
     def get_name(self):
         raise NotImplementedError
-
-
-@dataclass
-class ModelArguments(BaseArgument):
-
-    """
-    Model arguments.
-    """
-
-    model_name: str = field(
-        default="resnet",
-        metadata={
-            "help": "Name of the model architecture or trained checkpoints that ends with '.pt' extension"
-        },
-    )
-
-    def get_name(self):
-        return "model_args"
 
 
 @dataclass
@@ -88,6 +68,12 @@ class TrainingArguments(BaseArgument):
     Configurations related to training setup.
     """
 
+    model_name: str = field(
+        default="resnet",
+        metadata={
+            "help": "Name of the model architecture or trained checkpoints that ends with '.pt' extension"
+        },
+    )
     fp16: bool = field(
         default=False,
         metadata={
@@ -110,12 +96,11 @@ class TrainingArguments(BaseArgument):
     scheduler: str = field(
         default=None,
         metadata={
-            "help": "Which scheduler to use. Currently 'plateau' is only supportable."
+            "help": "Which scheduler to use. Currently 'plateau', 'linear_warmup' and 'cosine_linear_warmup'."
         },
     )
     warmup_ratio: float = field(
-        default=0.1,
-        metadata={"help": "Percentage of total epochs to be warmed up."}
+        default=0.1, metadata={"help": "Percentage of total epochs to be warmed up."}
     )
     lr_patience: int = field(
         default=10, metadata={"help": "Patience for learning rate scheduler."}
@@ -152,9 +137,20 @@ class TrainingArguments(BaseArgument):
         default="mae",
         metadata={"help": "List of metrics to measure during the training."},
     )
+    do_train: bool = field(default=True, metadata={"help": "Whether to train or not."})
+    do_eval: bool = field(default=True, metadata={"help": "Whether to train or not."})
+    do_inference: bool = field(default=False, metadata={"help": "Infer test_data"})
 
     def get_name(self):
         return "train_args"
+
+    def __post_init__(self):
+
+        if self.do_inference:
+            if self.do_train:
+                self.do_train = False
+            if self.do_eval:
+                self.do_eval = False
 
 
 @dataclass
@@ -206,6 +202,12 @@ class MiscArguments(BaseArgument):
     def get_name(self):
         return "misc_args"
 
+    def __post_init__(self):
+
+        # Set GPU Device
+        if self.which_gpu != -1:
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(self.which_gpu)
+
 
 def arguments_to_dict(*args):
 
@@ -215,14 +217,39 @@ def arguments_to_dict(*args):
     return arguments
 
 
+def parse():
+
+    from .argument_parser import CustomParser
+
+    parser = CustomParser(
+        (
+            DataArguments,
+            TrainingArguments,
+            MiscArguments,
+        )
+    )
+    (
+        data_args,
+        training_args,
+        misc_args,
+    ) = parser.parse_args_into_dataclasses()
+
+    from .path_utils import set_path
+
+    misc_args.output_dir, misc_args.run_name = set_path(
+        data_args, training_args, misc_args
+    )
+    return data_args, training_args, misc_args
+
+
 if __name__ == "__main__":
 
     from argument_parser import CustomParser
 
-    parser = CustomParser((ModelArguments, MiscArguments))
-    model_args, misc_args = parser.parse_args_into_dataclasses()
+    # parser = CustomParser((ModelArguments, MiscArguments))
+    # model_args, misc_args = parser.parse_args_into_dataclasses()
     # print(arguments_to_dict(model_args, misc_args))
-    print(model_args.to_dict())
+    # print(model_args.to_dict())
     # for v in iter(model_args):
     # print(v)
     # print(vars(model_args[0]))

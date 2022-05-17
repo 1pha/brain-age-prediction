@@ -1,13 +1,13 @@
 import json
 import os
 import time
+import math
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, NewType, Tuple
 
 Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
-import numpy as np
 import torch
 
 import wandb
@@ -22,13 +22,12 @@ class MRITrainer:
 
     """ """
 
-    __version__ = 0.3
-    __date__ = "Apr 13. 2021"
+    __version__ = 0.4
+    __date__ = "May 17. 2022"
 
     def __init__(
         self,
         model: torch.nn.Module,
-        model_args: Arguments,
         data_args: Arguments,
         training_args: Arguments,
         misc_args: Arguments,
@@ -41,6 +40,21 @@ class MRITrainer:
         arguments = locals()
         arguments.pop("self")
         self._allocate(**arguments)
+        wandb.config.update(
+            self.get_configs(
+                training_args=training_args,
+                data_args=data_args,
+                misc_args=misc_args,
+            )
+        )
+        if training_args.do_train:
+            if training_args.scheduler in ["linear_warmup", "cosine_linear_warmup"]:
+                training_args.total_steps = int(
+                    math.ceil(len(training_data.dataset) / data_args.batch_size)
+                ) * (training_args.epochs)
+                training_args.warmup_steps = int(
+                    training_args.total_steps * training_args.warmup_ratio
+                )
 
         # Construct Optimizer
         self.optimizer = construct_optimizer(self.model, training_args, logger)
@@ -117,7 +131,6 @@ class MRITrainer:
     def run(
         self,
         model: torch.nn.Module = None,
-        model_args: Arguments = None,
         data_args: Arguments = None,
         training_args: Arguments = None,
         misc_args: Arguments = None,
@@ -139,7 +152,6 @@ class MRITrainer:
     def _run(
         self,
         model: torch.nn.Module,
-        model_args: Arguments,
         data_args: Arguments,
         training_args: Arguments,
         misc_args: Arguments,
@@ -263,9 +275,7 @@ class MRITrainer:
         wandb.config.best_valid_metric = best_mae
 
         wandb.finish()
-        self.save_configs(
-            misc_args.output_dir, model_args, data_args, training_args, misc_args
-        )
+        self.save_configs(misc_args.output_dir, data_args, training_args, misc_args)
 
     @walltime
     def train(
@@ -400,14 +410,19 @@ class MRITrainer:
     def get_ground_truth(self, dataloader: torch.utils.data.DataLoader) -> list:
         return dataloader.dataset.data_ages
 
+    def get_configs(self, **kwargs) -> None:
+
+        configs = {
+            a.get_name(): a.to_dict() for k, a in kwargs.items() if k.endswith("_args")
+        }
+        return configs
+
     def save_configs(self, **kwargs) -> None:
 
         output_dir = kwargs["misc_args"].output_dir
         os.makedirs(output_dir, exist_ok=True)
         fname = os.path.join(output_dir, "config.json")
-        configs = {
-            a.get_name(): a.to_dict() for k, a in kwargs.items() if k.endswith("_args")
-        }
+        configs = self.get_configs(**kwargs)
         with open(fname, "w") as f:
             json.dump(configs, f, indent=4, sort_keys=True)
         self.logger.info(f"Successfully saved configurations to {fname}")
