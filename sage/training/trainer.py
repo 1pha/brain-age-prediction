@@ -1,4 +1,3 @@
-from ast import Str
 import json
 import math
 import os
@@ -348,41 +347,6 @@ class MRITrainer:
         loss, metric = self.organize_result(losses, preds, dataloader)
         return loss, metric
 
-    @walltime
-    def inference(
-        self, model: str, dataloader: torch.utils.data.DataLoader
-    ) -> Tuple[List, List]:
-
-        losses, preds = [], []
-        assert isinstance(model, str), "Give model checkpoint."
-        # Note that model should be the class attribute beforehand.
-        # This is done in __init__ but just so you know.
-        self.load_checkpoint(model)
-        model = self.model
-
-        model.eval()
-        for i, (x, y) in enumerate(dataloader):
-
-            self.logger.debug(f"validation phase, {i}th batch.")
-
-            try:
-                x, y = map(lambda obj: obj.to(self.device), (x, y))
-            except FileNotFoundError as e:
-                self.logger.exception(e)
-                time.sleep(20)
-                self.loading_failures["valid"].append((e, i))
-                continue
-
-            with torch.no_grad():
-                loss, pred = self.step(x, y, model=model, update=False)
-                losses.append(float(loss.cpu().detach()))
-                preds.append(pred)
-
-            torch.cuda.empty_cache()
-
-        loss, metric = self.organize_result(losses, preds, dataloader)
-        return loss, metric, preds
-
     def step(
         self,
         x: torch.FloatTensor,
@@ -423,6 +387,7 @@ class MRITrainer:
 
         self.model.load_state_dict(torch.load(checkpoint))
         self.logger.info(f"Successfully loaded model.")
+        return self.model
 
     def organize_result(
         self,

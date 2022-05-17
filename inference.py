@@ -1,86 +1,45 @@
-import logging
-import os
-import warnings
-from glob import glob
-from pathlib import Path
-
-import yaml
-
-warnings.simplefilter("ignore", UserWarning)
-import torch
-
-from sage.config import load_config
+import wandb
+from sage.config import get_logger, logger_conf, parse
+from sage.data import get_dataloader
+from sage.models import build_model
 from sage.training.trainer import MRITrainer
-from sage.visualization.vistool import Assembled
-
-logging.basicConfig(
-    format="[%(asctime)s] %(levelname)s - %(name)s: %(message)s",
-    datefmt="%m/%d/%Y %H:%M:%S",
-    level=logging.INFO,
-)
-logger = logging.getLogger(__name__)
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-RESULT_DIR = "../result/models/"
-checkpoint_lists = sorted(glob(f"{RESULT_DIR}/*"))
-
-checkpoint = Path(checkpoint_lists[0])
+from sage.utils import seed_everything
 
 
-def load_model_ckpts(path: Path, epoch: int):
+def run():
 
-    epoch = str(epoch).zfill(3)
-    ckpts = dict()
-    for model_name in ("encoder", "regressor"):
+    data_args, training_args, misc_args = parse() # Parse Arguments
+    seed_everything(misc_args.seed) # Fixate Seed
 
-        ckpt = list(path.glob(f"./{model_name}/ep{epoch}*.pt"))
-        assert len(ckpt) == 1
-        ckpts[model_name] = ckpt[0]
+    # Set logger configuration. Change logger file to "/run.log"
+    logger_conf["handlers"]["file_handler"]["filename"] = (
+        misc_args.output_dir + "/run.log"
+    )
+    logger = get_logger(logger_conf)
 
-    mae = float(str(ckpt[0]).split("mae")[-1].split(".pt")[0])
+    # Initiate wandb
+    wandb.init(project="3dcnn_test", name=misc_args.run_name)
 
-    return ckpts, mae
+    # Build dataloaders
+    train_dataloader = get_dataloader(data_args, misc_args, "train", logger)
+    valid_dataloader = get_dataloader(data_args, misc_args, "valid", logger)
 
+    # Build Model
+    model = build_model(training_args, logger)
 
-def inference(checkpoint):
+    # Build Trainer
+    trainer = MRITrainer(
+        model,
+        data_args=data_args,
+        training_args=training_args,
+        misc_args=misc_args,
+        logger=logger,
+        training_data=train_dataloader,
+        validation_data=valid_dataloader,
+    )
 
-    checkpoint = Path(checkpoint)
-    cfg = load_config(Path(checkpoint, "config.yml"))
-    cfg.registration = "mni"
-    logger.info(f"Starting seed {cfg.seed}")
-
-    trainer = MRITrainer(cfg)
-    model = Assembled(trainer.models["encoder"], trainer.models["regressor"]).to("cuda")
-    test_results = {}
-    for e in range(151):
-        try:
-            ckpt_dict, mae = load_model_ckpts(checkpoint, e)
-            model.load_weight(ckpt_dict)
-            logger.info(f"Load checkpoint epoch={e} | mae={mae}")
-
-            test_preds = []
-            for x, y, _ in trainer.test_dataloader:
-                x, y = map(lambda x: x.to("cuda"), (x, y))
-                pred = model(x)
-                test_preds.append(pred)
-
-                del x, y
-                torch.cuda.empty_cache()
-
-            test_preds = torch.cat(test_preds).squeeze().tolist()
-            test_results[e] = test_preds
-
-        except Exception as e:
-            logger.exception(e)
-            # break
-            pass
-
-    with open(Path(checkpoint, "test.yml"), "w") as f:
-        yaml.dump(test_results, f)
-
+    # Start Training
+    trainer.run()
 
 if __name__ == "__main__":
-    for checkpoint in checkpoint_lists[-2:]:
-        inference(checkpoint)
-    # inference(checkpoint_lists[-1])
-    # print(checkpoint_lists[41])
+    run()
