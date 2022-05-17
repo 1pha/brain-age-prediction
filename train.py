@@ -2,11 +2,7 @@ import math
 import os
 
 import wandb
-from sage.config import (
-    parse,
-    get_logger,
-    logger_conf,
-)
+from sage.config import get_logger, logger_conf, parse
 from sage.data import get_dataloader
 from sage.models import build_model
 from sage.training.trainer import MRITrainer
