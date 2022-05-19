@@ -275,7 +275,9 @@ class MRITrainer:
         wandb.config.best_valid_metric = best_mae
 
         wandb.finish()
-        self.save_configs(data_args=data_args, training_args=training_args, misc_args=misc_args)
+        self.save_configs(
+            data_args=data_args, training_args=training_args, misc_args=misc_args
+        )
 
     @walltime
     def train(

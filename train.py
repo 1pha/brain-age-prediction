@@ -8,8 +8,8 @@ from sage.utils import seed_everything
 
 def run():
 
-    data_args, training_args, misc_args = parse() # Parse Arguments
-    seed_everything(misc_args.seed) # Fixate Seed
+    data_args, training_args, misc_args = parse()  # Parse Arguments
+    seed_everything(misc_args.seed)  # Fixate Seed
 
     # Set logger configuration. Change logger file to "/run.log"
     logger_conf["handlers"]["file_handler"]["filename"] = (
@@ -40,6 +40,7 @@ def run():
 
     # Start Training
     trainer.run()
+
 
 if __name__ == "__main__":
     run()

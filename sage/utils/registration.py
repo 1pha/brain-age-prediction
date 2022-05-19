@@ -14,13 +14,19 @@ plt.rcParams["image.cmap"] = "gray"
 plt.rcParams["image.interpolation"] = "nearest"
 
 import nibabel as nib
-from dipy.align.imaffine import (AffineMap, AffineRegistration,
-                                 MutualInformationMetric,
-                                 transform_centers_of_mass)
+from dipy.align.imaffine import (
+    AffineMap,
+    AffineRegistration,
+    MutualInformationMetric,
+    transform_centers_of_mass,
+)
 from dipy.align.imwarp import SymmetricDiffeomorphicRegistration
 from dipy.align.metrics import CCMetric
-from dipy.align.transforms import (AffineTransform3D, RigidTransform3D,
-                                   TranslationTransform3D)
+from dipy.align.transforms import (
+    AffineTransform3D,
+    RigidTransform3D,
+    TranslationTransform3D,
+)
 from dipy.viz import regtools
 from nilearn.datasets import load_mni152_template
 
