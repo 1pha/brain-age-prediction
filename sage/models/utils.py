@@ -1,7 +1,15 @@
+from ast import Name
 import math
+
 import torch
 
-from .model_zoo import build_convit, build_convnext, build_resnet, convit_list
+from .model_zoo import (
+    build_convit,
+    build_convnext,
+    build_resnet,
+    convit_list,
+    convnext_list,
+)
 
 
 def count_params(model):
@@ -16,19 +24,22 @@ def build_model(training_args, logger):
     """
 
     name = training_args.model_name
+    logger.info(f"{name.capitalize()} was chosen.")
     if name == "resnet":
         model = build_resnet()
 
     elif name in convit_list:
-        model = build_convit(training_args)
+        model = build_convit(Name)
 
-    elif name == "convnext":
-        model = build_convnext(training_args)
+    elif name in convnext_list:
+        model = build_convnext(name)
 
     params = count_params(model)
     if torch.cuda.is_available():
         model = model.to("cuda")
-    logger.info(f"{training_args.model_name.capitalize()} has #params: {millify(params)}.")
+    logger.info(
+        f"{name.capitalize()} has #params: {millify(params)}."
+    )
     return model
 
 

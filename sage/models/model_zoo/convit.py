@@ -664,16 +664,14 @@ class ConvitArguments:
 convit_list = ["convit-tiny", "convit-small"]
 
 
-def build_convit(model_args):
+def build_convit(model_name):
 
-    name = model_args.model_name
     convitargs = ConvitArguments()
-    if name == "convit-tiny":
-        embed_dim = 96
-        convitargs.embed_dim = embed_dim
-    elif name == "convit-small":
-        embed_dim = 192
-        convitargs.embed_dim = embed_dim
+    if model_name == "convit-tiny":
+        convitargs.embed_dim = 96
+        
+    elif model_name == "convit-small":
+        convitargs.embed_dim = 192
 
     # convitargs.load_configurations(**model_args.to_dict()) # currently not used.
     model = VisionTransformer(**convitargs.to_dict())

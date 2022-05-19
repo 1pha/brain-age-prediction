@@ -176,17 +176,50 @@ class LayerNorm(nn.Module):
             return x
 
 
-def build_convnext(training_args):
+convnext_list = [
+    "convnext-tiny",
+    "convnext-small-dim",
+    "convnext-small-depth",
+    "convnext-small",
+    "convnext-base",
+]
 
-    model = ConvNeXt(**training_args.to_dict())
+
+def build_convnext(model_name):
+
+    if model_name == "convnext-tiny":  # 3.3M
+        model = ConvNeXt(
+            depths=[1, 1, 3, 1],
+            dims=[48, 96, 192, 384],
+        )
+
+    elif (model_name == "convnext-small-dim") or (model_name == "convnext-small"):  # 12.5M
+        model = ConvNeXt(
+            depths=[1, 1, 3, 1],
+            dims=[96, 192, 384, 768],
+        )
+
+    elif model_name == "convnext-small-depth":  # 8.4M
+        model = ConvNeXt(
+            depths=[3, 3, 9, 3],
+            dims=[48, 96, 192, 384],
+        )
+
+    elif model_name == "convnext-base":
+        model = ConvNeXt(
+            depths=[3, 3, 9, 3],
+            dims=[96, 192, 384, 768],
+        )
+
     return model
 
 
 if __name__ == "__main__":
 
-    model = ConvNeXt(
-        in_chans=1, num_classes=1, depths=[1, 1, 3, 1], dims=[48, 96, 192, 384]
-    )
-    sample_brain = torch.zeros(2, 1, 96, 96, 96)
+    from torchsummary import summary
+
+    model = build_convnext("convnext-base")
+    sample_brain = torch.zeros(2, 1, 96, 96, 96).cuda()
+    print(summary(model=model.cuda(), input_size=(1, 96, 96, 96)))
     print(model(sample_brain))
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
