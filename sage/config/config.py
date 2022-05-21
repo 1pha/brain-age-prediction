@@ -18,6 +18,18 @@ class BaseArgument:
     def get_name(self):
         raise NotImplementedError
 
+    def load(self, config: dict):
+
+        for key, value in config.items():
+            setattr(self, key, value)
+
+    def load_json(self, config_file: str):
+
+        with open(config_file, "r") as f:
+            config = json.load(f)[self.get_name()]
+
+        self.load(config)
+
 
 @dataclass
 class DataArguments(BaseArgument):
@@ -57,6 +69,7 @@ class DataArguments(BaseArgument):
             "help": "Choose which augmentation technique to use. It should be one of 'concat', 'replace' or 'false'"
         },
     )
+    return_age_range: str = field(default="raw", metadata={"help": "Whether to use raw age or shrinked age. Use squash to divide by 100."})
 
     def get_name(self):
         return "data_args"
@@ -99,6 +112,10 @@ class TrainingArguments(BaseArgument):
             "help": "Which scheduler to use. Currently 'plateau', 'linear_warmup' and 'cosine_linear_warmup'."
         },
     )
+    gamma: float = field(
+        default=0.95,
+        metadata={"help": "Factor multipled to learning rate every epoch step when using exponential decay scheduler."}
+    )
     warmup_ratio: float = field(
         default=0.1, metadata={"help": "Percentage of total epochs to be warmed up."}
     )
@@ -127,7 +144,7 @@ class TrainingArguments(BaseArgument):
         },
     )
     loss_fn: str = field(
-        default="rmse",
+        default="mse",
         metadata={
             "help": "Designate loss functions as string. Note that MSE has too high value that makes model find hard to be optimized."
         },
@@ -142,7 +159,7 @@ class TrainingArguments(BaseArgument):
     do_inference: bool = field(default=False, metadata={"help": "Infer test_data"})
 
     def get_name(self):
-        return "train_args"
+        return "training_args"
 
     def __post_init__(self):
 
