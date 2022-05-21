@@ -14,7 +14,7 @@ import wandb
 
 from .metrics import get_metric_fn
 from .optimizer import construct_optimizer
-from .scheduler import construct_scheduler
+from .scheduler import construct_scheduler, step_on_batch_list
 from .utils import save_checkpoint, walltime
 
 
@@ -78,7 +78,7 @@ class MRITrainer:
 
         self.fp16 = fp16
         self.scaler = torch.cuda.amp.GradScaler(enabled=fp16)
-        self.logger.info(f"Fp16: {str(fp16)}")
+        self.logger.info(f"FP16: {str(fp16)}")
 
     def _force_cpu(self) -> None:
 
@@ -190,8 +190,15 @@ class MRITrainer:
                     commit=False,
                 )
 
-            if self.training_args.scheduler == "plateau":
+            scheduler_name = self.training_args.scheduler
+            if scheduler_name is None:
+                pass
+
+            elif scheduler_name == "plateau":
                 self.scheduler.step(valid_loss)
+            
+            elif scheduler_name not in step_on_batch_list:
+                self.scheduler.step()
 
             wandb.log({"epoch": e, "lr": self.optimizer.param_groups[0]["lr"]})
 
@@ -382,7 +389,7 @@ class MRITrainer:
         self.scaler.step(optimizer)
         self.scaler.update()
         optimizer.zero_grad()
-        if self.training_args.scheduler not in [None, "plateau"]:
+        if self.training_args.scheduler in step_on_batch_list:
             self.scheduler.step()
 
     def load_checkpoint(self, checkpoint: str) -> None:
@@ -402,6 +409,8 @@ class MRITrainer:
         loss = sum(losses) / len(losses)
         preds = torch.cat(preds).cpu().detach().squeeze()
         gt = torch.tensor(self.get_ground_truth(dataloader)).squeeze()
+        if self.data_args.return_age_range == "shrink":
+            preds *= 100
 
         if metrics_fn is not None and isinstance(metrics_fn, str):
             metrics_fn = get_metric_fn(metrics)
