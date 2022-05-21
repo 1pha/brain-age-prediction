@@ -196,7 +196,7 @@ class MRITrainer:
 
             elif scheduler_name == "plateau":
                 self.scheduler.step(valid_loss)
-            
+
             elif scheduler_name not in step_on_batch_list:
                 self.scheduler.step()
 

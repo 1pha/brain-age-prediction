@@ -69,7 +69,12 @@ class DataArguments(BaseArgument):
             "help": "Choose which augmentation technique to use. It should be one of 'concat', 'replace' or 'false'"
         },
     )
-    return_age_range: str = field(default="raw", metadata={"help": "Whether to use raw age or shrinked age. Use squash to divide by 100."})
+    return_age_range: str = field(
+        default="raw",
+        metadata={
+            "help": "Whether to use raw age or shrinked age. Use squash to divide by 100."
+        },
+    )
 
     def get_name(self):
         return "data_args"
@@ -114,7 +119,9 @@ class TrainingArguments(BaseArgument):
     )
     gamma: float = field(
         default=0.95,
-        metadata={"help": "Factor multipled to learning rate every epoch step when using exponential decay scheduler."}
+        metadata={
+            "help": "Factor multipled to learning rate every epoch step when using exponential decay scheduler."
+        },
     )
     warmup_ratio: float = field(
         default=0.1, metadata={"help": "Percentage of total epochs to be warmed up."}

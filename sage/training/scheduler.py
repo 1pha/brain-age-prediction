@@ -36,9 +36,7 @@ def construct_scheduler(optimizer, training_args, logger=None):
 
     elif name == "exp_decay":
 
-        scheduler = lr.ExponentialLR(
-            optimizer, gamma=training_args.gamma
-        )
+        scheduler = lr.ExponentialLR(optimizer, gamma=training_args.gamma)
 
     elif name is None:
         scheduler = None
