@@ -1,5 +1,7 @@
 import torch.optim.lr_scheduler as lr
 
+step_on_batch_list = ["cosine_linear_warmup", "linear_warmup"]
+
 
 def construct_scheduler(optimizer, training_args, logger=None):
 
@@ -35,7 +37,7 @@ def construct_scheduler(optimizer, training_args, logger=None):
     elif name == "exp_decay":
 
         scheduler = lr.ExponentialLR(
-            optimizer, gamma=training_args.gamma, last_epoch=training_args.last_epoch
+            optimizer, gamma=training_args.gamma
         )
 
     elif name is None:
