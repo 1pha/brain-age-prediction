@@ -118,6 +118,8 @@ class BrainAgeDataset(Dataset):
             == self.label_file.shape[0]
         ), f"Possible Paths: {sum(self.label_file['abs_path'].apply(os.path.exists))} != #Rows: {self.label_file.shape[0]}"
 
+        self.return_age_range = data_args.return_age_range
+
     def _split_data(self, data_args: Arguments, sampling: str, seed: int):
 
         self.logger.debug(f"Start spliting with seed {seed}")
@@ -203,7 +205,11 @@ class BrainAgeDataset(Dataset):
         if aug or self.augmentation == "replace":
             x = self.transform(x)  # 4D (1, W', H', D')
 
-        return (x, torch.tensor(self.data_ages[idx]).float())
+        y = torch.tensor(self.data_ages[idx]).float()
+        if self.return_age_range == "shrink":
+            y /= 100
+
+        return x, y
 
     def maxcut(self, x: torch.Tensor):
         """
