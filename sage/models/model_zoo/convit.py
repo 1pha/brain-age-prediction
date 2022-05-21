@@ -669,7 +669,7 @@ def build_convit(model_name):
     convitargs = ConvitArguments()
     if model_name == "convit-tiny":
         convitargs.embed_dim = 96
-        
+
     elif model_name == "convit-small":
         convitargs.embed_dim = 192
 

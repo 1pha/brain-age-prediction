@@ -193,7 +193,9 @@ def build_convnext(model_name):
             dims=[48, 96, 192, 384],
         )
 
-    elif (model_name == "convnext-small-dim") or (model_name == "convnext-small"):  # 12.5M
+    elif (model_name == "convnext-small-dim") or (
+        model_name == "convnext-small"
+    ):  # 12.5M
         model = ConvNeXt(
             depths=[1, 1, 3, 1],
             dims=[96, 192, 384, 768],

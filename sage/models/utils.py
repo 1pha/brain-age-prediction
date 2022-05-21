@@ -1,5 +1,5 @@
-from ast import Name
 import math
+from ast import Name
 
 import torch
 
@@ -29,7 +29,7 @@ def build_model(training_args, logger):
         model = build_resnet()
 
     elif name in convit_list:
-        model = build_convit(Name)
+        model = build_convit(name)
 
     elif name in convnext_list:
         model = build_convnext(name)
@@ -37,9 +37,8 @@ def build_model(training_args, logger):
     params = count_params(model)
     if torch.cuda.is_available():
         model = model.to("cuda")
-    logger.info(
-        f"{name.capitalize()} has #params: {millify(params)}."
-    )
+    logger.info(f"{name.capitalize()} has #params: {millify(params)}.")
+    training_args.num_params = params
     return model
 
 
