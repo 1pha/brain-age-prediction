@@ -13,7 +13,7 @@ from timm.models.layers import DropPath, trunc_normal_
 from timm.models.registry import register_model
 
 
-class Block(nn.Module):
+class LNBlock(nn.Module):
     r"""ConvNeXt Block. There are two equivalent implementations:
     (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
     (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
@@ -59,6 +59,52 @@ class Block(nn.Module):
         return x
 
 
+class BNBlock(nn.Module):
+    r"""ConvNeXt Block. There are two equivalent implementations:
+    (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
+    (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
+    We use (2) as we find it slightly faster in PyTorch
+
+    Args:
+        dim (int): Number of input channels.
+        drop_path (float): Stochastic depth rate. Default: 0.0
+        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
+    """
+
+    def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-6):
+        super().__init__()
+        self.dwconv = nn.Conv3d(
+            dim, dim, kernel_size=7, padding=3, groups=dim
+        )  # depthwise conv
+        self.norm = BatchNorm(dim, eps=1e-6)
+        self.pwconv1 = nn.Linear(
+            dim, 4 * dim
+        )  # pointwise/1x1 convs, implemented with linear layers
+        self.act = nn.GELU()
+        self.pwconv2 = nn.Linear(4 * dim, dim)
+        self.gamma = (
+            nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
+            if layer_scale_init_value > 0
+            else None
+        )
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+
+    def forward(self, x):
+        input = x
+        x = self.dwconv(x)
+        x = self.norm(x)
+        x = x.permute(0, 2, 3, 4, 1)  # (N, C, H, W) -> (N, H, W, C)
+        x = self.pwconv1(x)
+        x = self.act(x)
+        x = self.pwconv2(x)
+        if self.gamma is not None:
+            x = self.gamma * x
+        x = x.permute(0, 4, 1, 2, 3)  # (N, H, W, C) -> (N, C, H, W)
+
+        x = input + self.drop_path(x)
+        return x
+
+
 class ConvNeXt(nn.Module):
     r"""ConvNeXt
         A PyTorch impl of : `A ConvNet for the 2020s`  -
@@ -81,22 +127,30 @@ class ConvNeXt(nn.Module):
         dims=[48, 96, 192, 384],
         drop_path_rate=0.0,
         layer_scale_init_value=1e-6,
+        normalization="bn",
         head_init_scale=1.0,
         **kwargs,
     ):
         super().__init__()
+
+        if normalization == "bn":
+            Norm = BatchNorm
+            Block = BNBlock
+        elif normalization == "ln":
+            Norm = LayerNorm
+            Block = LNBlock
 
         self.downsample_layers = (
             nn.ModuleList()
         )  # stem and 3 intermediate downsampling conv layers
         stem = nn.Sequential(
             nn.Conv3d(in_chans, dims[0], kernel_size=4, stride=4),
-            LayerNorm(dims[0], eps=1e-6, data_format="channels_first"),
+            Norm(dims[0], eps=1e-6, data_format="channels_first"),
         )
         self.downsample_layers.append(stem)
         for i in range(3):
             downsample_layer = nn.Sequential(
-                LayerNorm(dims[i], eps=1e-6, data_format="channels_first"),
+                Norm(dims[i], eps=1e-6, data_format="channels_first"),
                 nn.Conv3d(dims[i], dims[i + 1], kernel_size=2, stride=2),
             )
             self.downsample_layers.append(downsample_layer)
@@ -121,6 +175,7 @@ class ConvNeXt(nn.Module):
             cur += depths[i]
 
         self.norm = nn.LayerNorm(dims[-1], eps=1e-6)  # final norm layer
+        self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
         self.head = nn.Linear(dims[-1], num_classes)
 
         self.apply(self._init_weights)
@@ -136,14 +191,21 @@ class ConvNeXt(nn.Module):
         for i in range(4):
             x = self.downsample_layers[i](x)
             x = self.stages[i](x)
-        return self.norm(
-            x.mean([-3, -2, -1])
-        )  # global average pooling, (N, C, H, W) -> (N, C)
+
+        x = self.avgpool(x).squeeze().squeeze().squeeze()
+        x = self.norm(x)
+        return x
 
     def forward(self, x):
         x = self.forward_features(x)
         x = self.head(x)
         return x
+
+class BatchNorm(nn.BatchNorm3d):
+
+    def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
+        super().__init__(normalized_shape, eps)
+        self.name = "bn"
 
 
 class LayerNorm(nn.Module):
@@ -162,6 +224,7 @@ class LayerNorm(nn.Module):
         if self.data_format not in ["channels_last", "channels_first"]:
             raise NotImplementedError
         self.normalized_shape = (normalized_shape,)
+        self.name = "ln"
 
     def forward(self, x):
         if self.data_format == "channels_last":
@@ -221,6 +284,8 @@ if __name__ == "__main__":
     from torchsummary import summary
 
     model = build_convnext("convnext-base")
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     sample_brain = torch.zeros(2, 1, 96, 96, 96).cuda()
     print(summary(model=model.cuda(), input_size=(1, 96, 96, 96)))
     print(model(sample_brain))
