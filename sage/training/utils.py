@@ -25,7 +25,6 @@ def walltime(original_fn):
         start_time = time.time()
         result = original_fn(self, *args, **kwargs)
         end_time = time.time()
-        self.logger.info(f"[{original_fn.__name__}] {end_time - start_time:.1f} sec.")
-        return result
+        return result, end_time - start_time
 
     return wrapper_fn
