@@ -151,7 +151,7 @@ class TrainingArguments(BaseArgument):
         },
     )
     loss_fn: str = field(
-        default="mse",
+        default="rmse",
         metadata={
             "help": "Designate loss functions as string. Note that MSE has too high value that makes model find hard to be optimized."
         },
@@ -175,6 +175,9 @@ class TrainingArguments(BaseArgument):
                 self.do_train = False
             if self.do_eval:
                 self.do_eval = False
+
+        if not self.scheduler.endswith("warmup"):
+            self.warmup_ratio = 0
 
 
 @dataclass
