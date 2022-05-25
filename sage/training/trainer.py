@@ -166,14 +166,19 @@ class MRITrainer:
 
         epochs = training_args.epochs
         stop_count, long_term_patience, elapsed_epoch_saved = 0, 0, 0
-        _loss_fn, _metrics_fn = training_args.loss_fn.upper(), training_args.metrics_fn.upper()
+        _loss_fn, _metrics_fn = (
+            training_args.loss_fn.upper(),
+            training_args.metrics_fn.upper(),
+        )
         wandb.watch(model)
         for e in range(epochs):
 
             self.logger.info(f"EPOCH {e}/{epochs} | BEST MAE {best_mae:.3f}")
 
             if training_data is not None and training_args.do_train:
-                (train_loss, train_metric), time_elapsed = self.train(model, training_data)
+                (train_loss, train_metric), time_elapsed = self.train(
+                    model, training_data
+                )
                 self.logger.info(
                     f"Train:: {time_elapsed:>5.1f} sec | {_loss_fn} {train_loss:>6.3f} | {_metrics_fn} {train_metric:>6.3f}"
                 )
@@ -183,7 +188,9 @@ class MRITrainer:
                 )
 
             if validation_data is not None and training_args.do_eval:
-                (valid_loss, valid_metric), time_elapsed = self.valid(model, validation_data)
+                (valid_loss, valid_metric), time_elapsed = self.valid(
+                    model, validation_data
+                )
                 self.logger.info(
                     f"Valid:: {time_elapsed:>5.1f} sec | {_loss_fn} {valid_loss:>6.3f} | {_metrics_fn} {valid_metric:>6.3f}"
                 )
