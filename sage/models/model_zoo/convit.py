@@ -646,7 +646,7 @@ class ConvitArguments:
         },
     )
     return_embed: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": "Whether to return a vector embedding instead of probability of classes"
         },
@@ -668,7 +668,8 @@ def build_convit(model_name):
 
     convitargs = ConvitArguments()
     if model_name == "convit-tiny":
-        convitargs.embed_dim = 96
+        convitargs.embed_dim = 192
+        convitargs.num_heads = 4
 
     elif model_name == "convit-small":
         convitargs.embed_dim = 192
@@ -680,9 +681,14 @@ def build_convit(model_name):
 
 if __name__ == "__main__":
 
-    model = VisionTransformer(
-        img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=192
-    )
+    # model = VisionTransformer(
+    #     img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=192
+    # )
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    model = build_convit("convit-tiny")
     sample_brain = torch.zeros(2, 1, 96, 96, 96)
-    print(model(sample_brain))
+    from torchsummary import summary
+    print(summary(model.cuda(), input_size=(1, 96, 96, 96)))
+    # print(model(sample_brain))
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
