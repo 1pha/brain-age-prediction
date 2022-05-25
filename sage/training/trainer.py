@@ -193,7 +193,7 @@ class MRITrainer:
                 )
 
             scheduler_name = self.training_args.scheduler
-            if scheduler_name is None:
+            if scheduler_name == "":
                 pass
 
             elif scheduler_name == "plateau":

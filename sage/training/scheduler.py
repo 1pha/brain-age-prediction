@@ -38,7 +38,7 @@ def construct_scheduler(optimizer, training_args, logger=None):
 
         scheduler = lr.ExponentialLR(optimizer, gamma=training_args.gamma)
 
-    elif name is None:
+    elif name is None or name == "":
         scheduler = None
 
     return scheduler
