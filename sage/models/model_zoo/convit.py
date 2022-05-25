@@ -9,17 +9,13 @@
 https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
 """
 
-from dataclasses import asdict, dataclass, field
-from functools import partial, reduce
+from dataclasses import dataclass, field
+from functools import reduce
 from typing import Any
 
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from timm.models.helpers import load_pretrained
 from timm.models.layers import DropPath, to_3tuple, trunc_normal_
-from timm.models.registry import register_model
 
 
 class Mlp(nn.Module):
@@ -685,10 +681,12 @@ if __name__ == "__main__":
     #     img_size=96, patch_size=16, in_chans=1, num_classes=1, embed_dim=192
     # )
     import os
+
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     model = build_convit("convit-tiny")
     sample_brain = torch.zeros(2, 1, 96, 96, 96)
     from torchsummary import summary
+
     print(summary(model.cuda(), input_size=(1, 96, 96, 96)))
     # print(model(sample_brain))
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

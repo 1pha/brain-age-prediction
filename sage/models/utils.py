@@ -4,9 +4,11 @@ from ast import Name
 import torch
 
 from .model_zoo import (
+    build_cait,
     build_convit,
     build_convnext,
     build_resnet,
+    cait_list,
     convit_list,
     convnext_list,
 )
@@ -33,6 +35,9 @@ def build_model(training_args, logger):
 
     elif name in convnext_list:
         model = build_convnext(name)
+
+    elif name in cait_list:
+        model = build_cait(name)
 
     params = count_params(model)
     if torch.cuda.is_available():

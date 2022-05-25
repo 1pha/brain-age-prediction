@@ -324,6 +324,7 @@ def build_resnet():
 if __name__ == "__main__":
 
     import os
+
     model = build_resnet()
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     sample_brain = torch.zeros(2, 1, 96, 96, 96).cuda()

@@ -201,8 +201,8 @@ class ConvNeXt(nn.Module):
         x = self.head(x)
         return x
 
-class BatchNorm(nn.BatchNorm3d):
 
+class BatchNorm(nn.BatchNorm3d):
     def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
         super().__init__(normalized_shape, eps)
         self.name = "bn"
@@ -285,6 +285,7 @@ if __name__ == "__main__":
 
     model = build_convnext("convnext-base")
     import os
+
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     sample_brain = torch.zeros(2, 1, 96, 96, 96).cuda()
     print(summary(model=model.cuda(), input_size=(1, 96, 96, 96)))
