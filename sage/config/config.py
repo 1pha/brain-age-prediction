@@ -112,7 +112,7 @@ class TrainingArguments(BaseArgument):
         metadata={"help": "Set momentum values for optimizers that needs them."},
     )
     scheduler: str = field(
-        default=None,
+        default="",
         metadata={
             "help": "Which scheduler to use. Currently 'plateau', 'linear_warmup' and 'cosine_linear_warmup'."
         },
