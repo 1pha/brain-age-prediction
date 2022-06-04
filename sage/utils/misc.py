@@ -63,7 +63,7 @@ def stratified_sample_df(df, col, n_samples):
     return df_
 
 
-label = pd.read_csv("../rsc/age_ixidlbsoas13.csv", index_col=0)
+# label = pd.read_csv("../rsc/age_ixidlbsoas13.csv", index_col=0)
 
 
 def path_maker(row):
@@ -82,4 +82,4 @@ def path_maker(row):
     return path if os.path.exists(path) else brain_id
 
 
-FNAMES = stratified_sample_df(label, "src", 3).apply(path_maker, axis=1).values
+# FNAMES = stratified_sample_df(label, "src", 3).apply(path_maker, axis=1).values
