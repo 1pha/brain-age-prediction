@@ -663,6 +663,7 @@ convit_list = ["convit-tiny", "convit-small"]
 def build_convit(model_name):
 
     convitargs = ConvitArguments()
+    convitargs.patch_size = 12
     if model_name == "convit-tiny":
         convitargs.embed_dim = 192
         convitargs.num_heads = 4
