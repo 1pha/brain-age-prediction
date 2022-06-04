@@ -9,6 +9,10 @@ Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
 import torch
+if torch.backends.mps.is_available():
+    # Ignore warnings when accelerated through M1
+    import warnings
+    warnings.filterwarnings("ignore")
 
 import wandb
 
