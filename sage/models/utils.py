@@ -8,6 +8,7 @@ from .model_zoo import (
     build_convit,
     build_convnext,
     build_resnet,
+    build_repvgg,
     cait_list,
     convit_list,
     convnext_list,
@@ -30,6 +31,9 @@ def build_model(training_args, logger):
     if name == "resnet":
         model = build_resnet()
 
+    elif name == "repvgg":
+        model = build_repvgg(name)
+
     elif name in convit_list:
         model = build_convit(name)
 
@@ -41,7 +45,7 @@ def build_model(training_args, logger):
 
     params = count_params(model)
     if torch.cuda.is_available():
-        model = model.to("cuda")
+        model = model.to("mps")
     logger.info(f"{name.capitalize()} has #params: {millify(params)}.")
     training_args.num_params = params
     return model

@@ -401,7 +401,7 @@ class VisionTransformer(nn.Module):
     def __init__(
         self,
         img_size=96,
-        patch_size=16,
+        patch_size=12,
         in_chans=1,
         num_classes=1,
         embed_dim=48,
@@ -683,11 +683,11 @@ if __name__ == "__main__":
     # )
     import os
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     model = build_convit("convit-tiny")
     sample_brain = torch.zeros(2, 1, 96, 96, 96)
     from torchsummary import summary
 
-    print(summary(model.cuda(), input_size=(1, 96, 96, 96)))
+    print(summary(model.to("cpu"), input_size=(1, 96, 96, 96)))
     # print(model(sample_brain))
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

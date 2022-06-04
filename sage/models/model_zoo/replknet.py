@@ -156,7 +156,7 @@ class RepLKBlock(nn.Module):
         self.lk_nonlinear = nn.ReLU()
         self.prelkb_bn = get_bn(in_channels)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        print('drop path:', self.drop_path)
+        # print('drop path:', self.drop_path)
 
     def forward(self, x):
         out = self.prelkb_bn(x)
@@ -203,10 +203,10 @@ class RepLKNetStage(nn.Module):
 class RepLKNet(nn.Module):
 
     def __init__(self, large_kernel_sizes, layers, channels, drop_path_rate, small_kernel,
-                 dw_ratio=1, ffn_ratio=4, in_channels=3, num_classes=1000, out_indices=None,
+                 dw_ratio=1, ffn_ratio=4, in_channels=1, num_classes=1, out_indices=None,
                  use_checkpoint=False,
                  small_kernel_merged=False,
-                 use_sync_bn=True,
+                 use_sync_bn=False,
                  norm_intermediate_features=False       # for RepLKNet-XL on COCO and ADE20K, use an extra BN to normalize the intermediate feature maps then feed them into the heads
                  ):
         super().__init__()
@@ -337,11 +337,15 @@ def create_RepLKNetXL(drop_path_rate=0.3, num_classes=1000, use_checkpoint=True,
                     small_kernel_merged=small_kernel_merged)
 
 if __name__ == '__main__':
-    model = create_RepLKNet31B(small_kernel_merged=False)
+
+    device = "mps"
+    model = create_RepLKNet31B(small_kernel_merged=False).to(device)
+    from torchsummary import summary
+    print(summary(model.to("cpu"), input_size=(1, 224, 224)))
     model.eval()
     print('------------------- training-time model -------------')
     print(model)
-    x = torch.randn(2, 3, 224, 224)
+    x = torch.randn(2, 3, 224, 224).to(device)
     origin_y = model(x)
     model.structural_reparam()
     print('------------------- after re-param -------------')
