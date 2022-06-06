@@ -47,9 +47,10 @@ def build_model(training_args, logger):
         device = "cuda"
         model = model.to(device)
 
-    if torch.backends.mps.is_available():
-        device = "mps"
-        model = model.to(device)
+    if torch.__version__.startswith("1.13"):
+        if torch.backends.mps.is_available():
+            device = "mps"
+            model = model.to(device)
 
     logger.info(f"{name.capitalize()} has #params: {millify(params)}.")
     training_args.num_params = params
