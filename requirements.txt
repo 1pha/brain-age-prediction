@@ -5,3 +5,4 @@ nilearn
 numpy
 sklearn
 timm
+wandb
