@@ -4,7 +4,6 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchsummary import summary
 
 
 def get_inplanes(start_channels=16):
@@ -324,6 +323,8 @@ def build_resnet():
 if __name__ == "__main__":
 
     import os
+    from torchsummary import summary
+
 
     model = build_resnet()
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"

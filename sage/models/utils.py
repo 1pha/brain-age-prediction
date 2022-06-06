@@ -1,5 +1,4 @@
 import math
-from ast import Name
 
 import torch
 
@@ -45,7 +44,13 @@ def build_model(training_args, logger):
 
     params = count_params(model)
     if torch.cuda.is_available():
-        model = model.to("mps")
+        device = "cuda"
+        model = model.to(device)
+
+    if torch.backends.mps.is_available():
+        device = "mps"
+        model = model.to(device)
+
     logger.info(f"{name.capitalize()} has #params: {millify(params)}.")
     training_args.num_params = params
     return model
@@ -64,3 +69,11 @@ def millify(n):
     )
 
     return "{:.0f}{}".format(n / 10 ** (3 * millidx), millnames[millidx])
+
+
+if __name__=="__main__":
+
+    model = build_resnet().to("mps")
+    # model.to("mps")
+    device = next(model.parameters()).device
+    print(device)
