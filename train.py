@@ -18,11 +18,28 @@ def run():
     logger = get_logger(logger_conf)
 
     # Initiate wandb
-    wandb.init(project="3dcnn_test", name=misc_args.run_name)
+    wandb.init(
+        project="3dcnn_test",
+        name=misc_args.run_name,
+        config={"best_valid_mae": 100, "best_valid_epoch": 0},
+    )
 
     # Build dataloaders
-    train_dataloader = get_dataloader(data_args, misc_args, "train", logger)
-    valid_dataloader = get_dataloader(data_args, misc_args, "valid", logger)
+    train_dataloader = (
+        get_dataloader(data_args, misc_args, "train", logger)
+        if training_args.do_train
+        else None
+    )
+    valid_dataloader = (
+        get_dataloader(data_args, misc_args, "valid", logger)
+        if training_args.do_eval
+        else None
+    )
+    test_dataloader = (
+        get_dataloader(data_args, misc_args, "test", logger)
+        if training_args.do_inference
+        else None
+    )
 
     # Build Model
     model = build_model(training_args, logger)
@@ -36,6 +53,7 @@ def run():
         logger=logger,
         training_data=train_dataloader,
         validation_data=valid_dataloader,
+        test_data=test_dataloader,
     )
 
     # Start Training
