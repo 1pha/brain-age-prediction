@@ -9,12 +9,14 @@ Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
 import torch
-if torch.backends.mps.is_available():
-    # Ignore warnings when accelerated through M1
-    import warnings
-    warnings.filterwarnings("ignore")
+if torch.__version__.startswith("1.13"):
+    if torch.backends.mps.is_available():
+        # Ignore warnings when accelerated through M1
+        import warnings
+        warnings.filterwarnings("ignore")
 
 import wandb
+from tqdm import tqdm
 
 from .metrics import get_metric_fn
 from .optimizer import construct_optimizer
@@ -316,7 +318,7 @@ class MRITrainer:
         losses, preds = [], []
         model.train()
         with torch.autograd.set_detect_anomaly(True):
-            for i, (x, y) in enumerate(dataloader):
+            for i, (x, y) in enumerate(tqdm(dataloader)):
 
                 self.logger.debug(f"train phase, {i}th batch.")
 
@@ -347,7 +349,7 @@ class MRITrainer:
 
         losses, preds = [], []
         model.eval()
-        for i, (x, y) in enumerate(dataloader):
+        for i, (x, y) in enumerate(tqdm(dataloader)):
 
             self.logger.debug(f"validation phase, {i}th batch.")
 

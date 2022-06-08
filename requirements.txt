@@ -1,0 +1,9 @@
+torch
+torchio
+nibabel
+nilearn
+numpy
+sklearn
+timm
+wandb
+tqdm
