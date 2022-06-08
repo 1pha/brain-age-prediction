@@ -254,22 +254,29 @@ class BrainAgeDataset(Dataset):
 
         self.logger.debug("Setting up augmentation.")
 
-        self._transform = tio.Compose(
+        # self._transform = tio.Compose(
+        #     {
+        #         tio.RandomFlip(axes=["left-right"]),
+        #         tio.OneOf(
+        #             {
+        #                 tio.RandomAffine(),
+        #                 tio.RandomElasticDeformation(),
+        #             }
+        #         ),
+        #         tio.OneOf(
+        #             {
+        #                 tio.RandomGamma((-0.5, 0.5)),
+        #                 tio.RandomBiasField(0.3),
+        #                 tio.RandomBlur((0, 1)),
+        #             }
+        #         ),
+        #     }
+        # )
+        self._transform = tio.OneOf(
             {
+                tio.RandomAffine(),
                 tio.RandomFlip(axes=["left-right"]),
-                tio.OneOf(
-                    {
-                        tio.RandomAffine(),
-                        tio.RandomElasticDeformation(),
-                    }
-                ),
-                tio.OneOf(
-                    {
-                        tio.RandomGamma((-0.5, 0.5)),
-                        tio.RandomBiasField(0.3),
-                        tio.RandomBlur((0, 1)),
-                    }
-                ),
+                tio.RandomElasticDeformation(),
             }
         )
 
