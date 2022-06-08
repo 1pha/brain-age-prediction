@@ -325,7 +325,6 @@ if __name__ == "__main__":
     import os
     from torchsummary import summary
 
-
     model = build_resnet()
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     sample_brain = torch.zeros(2, 1, 96, 96, 96).cuda()

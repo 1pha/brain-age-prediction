@@ -72,7 +72,7 @@ def millify(n):
     return "{:.0f}{}".format(n / 10 ** (3 * millidx), millnames[millidx])
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
     model = build_resnet().to("mps")
     # model.to("mps")

@@ -170,12 +170,6 @@ class TrainingArguments(BaseArgument):
 
     def __post_init__(self):
 
-        if self.do_inference:
-            if self.do_train:
-                self.do_train = False
-            if self.do_eval:
-                self.do_eval = False
-
         if not self.scheduler.endswith("warmup"):
             self.warmup_ratio = 0
 
@@ -266,8 +260,6 @@ def parse():
     misc_args.output_dir, misc_args.run_name = set_path(
         data_args, training_args, misc_args
     )
-    if training_args.do_inference:
-        data_args.batch_size = 1
     return data_args, training_args, misc_args
 
 
