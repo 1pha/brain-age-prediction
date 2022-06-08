@@ -21,7 +21,6 @@ def run():
     wandb.init(
         project="3d_smri",
         name=misc_args.run_name,
-        config={"best_valid_mae": 100, "best_valid_epoch": 0},
     )
 
     # Build dataloaders
