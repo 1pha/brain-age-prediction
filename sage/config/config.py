@@ -129,13 +129,9 @@ class TrainingArguments(BaseArgument):
     lr_patience: int = field(
         default=10, metadata={"help": "Patience for learning rate scheduler."}
     )
-    result_path: str = field(
-        default="../result/",
-        metadata={"help": "Where the checkpoints should be saved."},
-    )
     epochs: int = field(default=200, metadata={"help": "Set how much epochs to train."})
     checkpoint_period: int = field(
-        default=5,
+        default=1,
         metadata={"help": "How much epochs to be used as a period between savings."},
     )
     early_patience: int = field(
@@ -201,7 +197,7 @@ class MiscArguments(BaseArgument):
         metadata={"help": "Designate number/ratio of the total data when debug."},
     )
     output_path: str = field(
-        default="../result/", metadata={"help": "Root directory for results."}
+        default="../repvgg_result/", metadata={"help": "Root directory for results."}
     )
     output_dir: str = field(
         default=None,
