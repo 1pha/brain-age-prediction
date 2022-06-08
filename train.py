@@ -19,7 +19,7 @@ def run():
 
     # Initiate wandb
     wandb.init(
-        project="3dcnn_test",
+        project="3d_smri",
         name=misc_args.run_name,
         config={"best_valid_mae": 100, "best_valid_epoch": 0},
     )
