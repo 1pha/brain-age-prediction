@@ -1,4 +1,5 @@
 import json
+import pickle
 import math
 import os
 import time
@@ -9,11 +10,14 @@ Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
 import torch
-if torch.__version__.startswith("1.13"):
-    if torch.backends.mps.is_available():
-        # Ignore warnings when accelerated through M1
-        import warnings
-        warnings.filterwarnings("ignore")
+
+if (torch.__version__.startswith("1.13") and torch.backends.mps.is_available()) or (
+    not torch.cuda.is_available()
+):
+    # Ignore warnings when accelerated through M1
+    import warnings
+
+    warnings.filterwarnings("ignore")
 
 import wandb
 from tqdm import tqdm
@@ -177,6 +181,7 @@ class MRITrainer:
             training_args.metrics_fn.upper(),
         )
         wandb.watch(model)
+        result = defaultdict(dict)
         for e in range(epochs):
 
             self.logger.info(f"EPOCH {e}/{epochs} | BEST MAE {best_mae:.3f}")
@@ -185,25 +190,35 @@ class MRITrainer:
                 (train_loss, train_metric), time_elapsed = self.train(
                     model, training_data
                 )
+                train_result = {"train_loss": train_loss, "train_metric": train_metric}
                 self.logger.info(
                     f"Train:: {time_elapsed:>5.1f} sec | {_loss_fn} {train_loss:>6.3f} | {_metrics_fn} {train_metric:>6.3f}"
                 )
                 wandb.log(
-                    {"train_loss": train_loss, "train_metric": train_metric},
+                    train_result,
                     commit=False,
                 )
+                result[e].update(train_result)
 
             if validation_data is not None and training_args.do_eval:
                 (valid_loss, valid_metric), time_elapsed = self.valid(
                     model, validation_data
                 )
+                valid_result = {"valid_loss": valid_loss, "valid_metric": valid_metric}
                 self.logger.info(
                     f"Valid:: {time_elapsed:>5.1f} sec | {_loss_fn} {valid_loss:>6.3f} | {_metrics_fn} {valid_metric:>6.3f}"
                 )
-                wandb.log(
-                    {"valid_loss": valid_loss, "valid_metric": valid_metric},
-                    commit=False,
+                wandb.log(valid_result, commit=False)
+                result[e].update(valid_result)
+
+            if test_data is not None and training_args.do_inference:
+                (test_loss, test_metric), time_elapsed = self.valid(model, test_data)
+                test_result = {"test_loss": test_loss, "test_metric": test_metric}
+                self.logger.info(
+                    f"Test :: {time_elapsed:>5.1f} sec | {_loss_fn} {test_loss:>6.3f} | {_metrics_fn} {test_metric:>6.3f}"
                 )
+                wandb.log(test_result, commit=False)
+                result[e].update(test_result)
 
             scheduler_name = self.training_args.scheduler
             if scheduler_name == "":
@@ -219,7 +234,7 @@ class MRITrainer:
 
             # Check performance improvement
             model_name = f"ep{str(e).zfill(3)}.pt"
-            current_mae = valid_metric
+            current_mae = valid_result["valid_metric"]
             # Yes Improvement
             if current_mae < best_mae:
 
@@ -287,19 +302,18 @@ class MRITrainer:
             else:
                 elapsed_epoch_saved += 1
 
-        # Finish training
-        # TODO
-        if test_data is not None:
-            loss, metric = self.valid(model, test_data)
-            wandb.config.best_test_loss = loss
-            wandb.config.best_test_metric = metric
-        wandb.config.best_valid_epoch = best_epoch
-        wandb.config.best_valid_metric = best_mae
+            wandb.config.update(
+                {"best_valid_epoch": best_epoch, "best_valid_metric": best_mae}, allow_val_change=True
+            )
 
+        # Finish training
         wandb.finish()
+        training_args.best_valid_metric = best_mae
+        training_args.best_valid_epoch = best_epoch
         self.save_configs(
             data_args=data_args, training_args=training_args, misc_args=misc_args
         )
+        self.save_result(result)
 
     @walltime
     def train(
@@ -431,7 +445,7 @@ class MRITrainer:
             metrics_fn = get_metric_fn(metrics)
         else:
             metrics_fn = self.metrics_fn
-        metrics = metrics_fn(preds, gt)
+        metrics = float(metrics_fn(preds, gt))
         return loss, metrics
 
     def get_ground_truth(self, dataloader: torch.utils.data.DataLoader) -> list:
@@ -453,3 +467,12 @@ class MRITrainer:
         with open(fname, "w") as f:
             json.dump(configs, f, indent=4, sort_keys=True)
         self.logger.info(f"Successfully saved configurations to {fname}")
+
+    def save_result(self, result, misc_args=None) -> None:
+
+        misc_args = misc_args or self.misc_args
+        output_dir = misc_args.output_dir
+        os.makedirs(output_dir, exist_ok=True)
+        fname = os.path.join(output_dir, "result.pkl")
+        with open(fname, "wb") as f:
+            pickle.dump(result, f)
