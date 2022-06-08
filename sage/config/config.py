@@ -220,7 +220,7 @@ class MiscArguments(BaseArgument):
         metadata={"help": "If set to True, allow output directory to be overwritten."},
     )
     which_gpu: int = field(
-        default=-1,
+        default=1,
         metadata={
             "help": "Choose which gpu to use. -1 if you can deviate all of them."
         },
