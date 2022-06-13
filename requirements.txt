@@ -7,3 +7,4 @@ sklearn
 timm
 wandb
 tqdm
+dipy
