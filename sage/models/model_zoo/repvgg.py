@@ -264,6 +264,8 @@ class RepVGG(nn.Module):
         super(RepVGG, self).__init__()
 
         assert len(width_multiplier) == 4
+        self.conv_layers = []
+        self.find_conv(self)
 
         self.deploy = deploy
         self.override_groups_map = override_groups_map or dict()
@@ -329,6 +331,18 @@ class RepVGG(nn.Module):
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         return out
+
+    def find_conv(self, module):
+
+        for name, layer in module.named_children():
+            if name.startswith("conv"):
+                self.conv_layers.append(layer)
+            elif list(layer.named_children()) == []:
+                self.find_conv(layer)
+            else:
+                self.find_conv(layer)
+        else:
+            return
 
 
 def build_repvgg(name):
