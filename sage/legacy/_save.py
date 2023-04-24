@@ -16,7 +16,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from tqdm import tqdm
 
 from sage.config import load_config
-from sage.training.trainer import MRITrainer
+from sage.training._trainer import MRITrainer
 from sage.visualization.vistool import Assembled
 
 logging.basicConfig(

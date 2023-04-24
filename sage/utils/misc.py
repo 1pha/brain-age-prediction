@@ -1,19 +1,80 @@
 __all__ = ["get_today"]
 
 import os
-import random
 import time
+import random
+import logging
+import importlib
+from pathlib import Path
 from datetime import datetime as dt
+from typing import FrozenSet
 
+import hydra
 import numpy as np
-import pandas as pd
+import omegaconf
 import torch
+from torch import nn
+
+
+def get_logger(name: str = None, filehandler: bool = False):
+    name = name or __name__
+    logging.basicConfig()
+    logger = logging.getLogger(name=name)
+    logger.setLevel(logging.INFO)
+    if filehandler:
+        fname = f"{time.strftime('%Y%m%d-%H%M', time.localtime())}.log"
+        logger.addHandler(logging.FileHandler(filename=fname))
+    return logger
+
+
+def check_exists(path: str | Path) -> str | Path:
+    assert os.path.exists(path), f"{path} does not exist."
+    return path
+
+
+def count_parameters(model: nn.Module):
+    # Reference
+    # https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325/8
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def seed_everything(seed):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    # torch.use_deterministic_algorithms(True)
+    # If the above line is uncommented, we get the following RuntimeError:
+    #  max_pool3d_with_indices_backward_cuda does not have a deterministic implementation
+    torch.backends.cudnn.benchmark = False
+
+
+def parse_hydra(config: omegaconf, **kwargs):
+    """ Sometimes hydra.utils.instantiate does not work.
+    Use this function to instantiate a new class
+    """
+    _cfg: list = config.pop("_target_").split(".")
+    lib, cls_ = ".".join(_cfg[:-1]), _cfg[-1]
+    cls_ = importlib.import_module(lib)
+    cls_ = getattr(lib, cls_)
+    config.update(kwargs)
+    inst = cls_(**config)
+    return inst
+
+
+def load_hydra(config_name: str,
+               config_path: str = "config",
+               overrides: FrozenSet[str] = None):
+    with hydra.initialize(config_path=config_path, version_base="1.3"):
+        cfg = hydra.compose(config_name=config_name, overrides=overrides)
+    return cfg
 
 
 def get_today():
-
     td = dt.today()
-
     return (
         str(td.year)
         + str(td.month).zfill(2)
@@ -22,17 +83,6 @@ def get_today():
         + str(td.hour).zfill(2)
         + str(td.minute).zfill(2)
     )
-
-
-def seed_everything(seed=42):
-
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
 
 
 def logging_time(original_fn):
@@ -50,8 +100,7 @@ def logging_time(original_fn):
 
 
 def stratified_sample_df(df, col, n_samples):
-    """
-    For stratified sampling by columns
+    """ For stratified sampling by columns
     Just put -
         df       : pandas.DataFrame
         col      : string of the column,
@@ -62,12 +111,9 @@ def stratified_sample_df(df, col, n_samples):
     df_.index = df_.index.droplevel(0)
     return df_
 
-
 # label = pd.read_csv("../rsc/age_ixidlbsoas13.csv", index_col=0)
 
-
 def path_maker(row):
-
     brain_id = row.id
     src = row.src
 

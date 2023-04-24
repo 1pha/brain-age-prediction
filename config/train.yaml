@@ -1,0 +1,88 @@
+hydra:
+  job:
+    chdir: False  # keep hydra = 1.1 change directory behavior
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${logger.name}
+
+defaults:
+  - _self_
+  - model: resnet
+  - dataset: biobank
+  - scheduler: torch_cosine
+
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 16
+  num_workers: 4
+  dataset: ${dataset}
+
+optim:
+  _target_: torch.optim.AdamW
+  lr: 1e-4
+  weight_decay: 1e-6
+  eps: 1e-8
+
+misc:
+  seed: 42
+  debug: False
+  modes: [ train, valid ]
+
+module:
+  _target_: sage.trainer.PLModule
+  _recursive_: False
+  separate_lr:
+
+metrics:
+  mae:
+    _target_: torchmetrics.MeanAbsoluteError
+  rmse:
+    _target_: torchmetrics.MeanSquaredError
+    squared: False
+  corr:
+    _target_: torchmetrics.PearsonCorrCoef
+  r2:
+    _target_: torchmetrics.R2Score
+
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  project: brain-age
+  entity: 1pha
+  name: 
+
+# https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 100
+  devices: 1
+  accelerator: gpu
+  gradient_clip_val: 1
+  log_every_n_steps: 50
+  # DEBUGGING FLAGS. TODO: Split
+  # limit_train_batches: 0.001
+  # limit_val_batches: 0.01
+
+callbacks:
+  # https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.ModelCheckpoint.html
+  checkpoint:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    dirpath: ${hydra:run.dir}
+    filename: "{step}-valid_mse{epoch/valid_mse:.3f}"
+    monitor: epoch/valid_mse
+    mode: max
+    save_top_k: 1
+    save_last: True
+    # Is useful to set it to False when metric names contain / as this will result in extra folders
+    auto_insert_metric_name: False
+
+  # https://pytorch-lightning.readthedocs.io/en/stable/common/early_stopping.html
+  early_stop:
+    _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
+    monitor: epoch/valid_mse
+    mode: max
+    patience: 10
+
+  # https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.LearningRateMonitor.html
+  lr_monitor:
+    _target_: pytorch_lightning.callbacks.LearningRateMonitor
+    logging_interval: step
+    log_momentum: False

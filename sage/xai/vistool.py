@@ -7,7 +7,7 @@ from IPython.display import clear_output
 
 from ..config import load_config
 from ..data.dataloader import get_dataloader
-from ..training.trainer import MRITrainer
+from ..training._trainer import MRITrainer
 from .auggrad import AugGrad
 from .cams import CAM
 from .smoothgrad import SmoothGrad

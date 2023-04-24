@@ -19,24 +19,19 @@ class BaseArgument:
         raise NotImplementedError
 
     def load(self, config: dict):
-
         for key, value in config.items():
             setattr(self, key, value)
 
     def load_json(self, config_file: str):
-
         with open(config_file, "r") as f:
             config = json.load(f)[self.get_name()]
-
         self.load(config)
 
 
 @dataclass
 class DataArguments(BaseArgument):
+    """ Configurations related to data/dataloader/augmentation
     """
-    Configurations related to data/dataloader/augmentation
-    """
-
     batch_size: int = field(
         default=16, metadata={"help": "Control batch size. Default=16"}
     )
@@ -82,10 +77,8 @@ class DataArguments(BaseArgument):
 
 @dataclass
 class TrainingArguments(BaseArgument):
+    """ Configurations related to training setup.
     """
-    Configurations related to training setup.
-    """
-
     model_name: str = field(
         default="resnet",
         metadata={

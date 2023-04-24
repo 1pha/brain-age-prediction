@@ -1,0 +1,6 @@
+_target_: sage.data.dataloader.UKBDataset
+root: biobank/h5
+label_name: ukb_age_label.csv
+mode: train
+valid_ratio: 0.1
+seed: ${misc.seed}

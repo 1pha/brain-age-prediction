@@ -3,8 +3,12 @@ torchio
 nibabel
 nilearn
 numpy
-sklearn
+scikit-learn
 timm
 wandb
 tqdm
 dipy
+pytorch-lightning
+jupyter
+ipykernel
+monai
