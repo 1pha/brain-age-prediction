@@ -40,7 +40,7 @@ class PLModule(pl.LightningModule):
                                                     num_training_steps=num_training_steps)
 
         # Metrics Configuration: iterate through dict: {_target_: ...}
-        metrics = MetricCollection([
+        metrics = MetricCollection(metrics=[
             hydra.utils.instantiate(metrics[m]) for m in metrics.keys() if "_target_" in metrics[m]
         ])
         self.train_metrics = metrics.clone(prefix="train_")
