@@ -11,7 +11,7 @@ class ModelBase(nn.Module):
         self.criterion = criterion
     
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
-        pred = self.backbone(brain)
+        pred = self.backbone(brain).squeeze()
         loss = self.criterion(pred, age)
         
         return dict(loss=loss,

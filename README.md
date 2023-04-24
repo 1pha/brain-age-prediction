@@ -1,5 +1,15 @@
 # MRI Data 3D Brain Convolution
 
+### Setup
+
+Make a softlink for biobank
+
+```bash
+conda create -n age python=3.10 -y
+conda activate age
+pip install -r requirements.txt
+```
+
 ### TODO
 + Change config.debug+print to logger.debug
 + Change every print functions to logger

@@ -12,3 +12,4 @@ pytorch-lightning
 jupyter
 ipykernel
 monai
+hydra-core

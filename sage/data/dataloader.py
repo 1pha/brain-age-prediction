@@ -295,7 +295,7 @@ class BrainAgeDataset(Dataset):
     
 class UKBDataset(Dataset):
     def __init__(self,
-                 root: Path | str = "./biobank/h5",
+                 root: Path | str = "./biobank",
                  label_name: str = "ukb_age_label.csv",
                  mode: str = "train",
                  valid_ratio: float = 0.1,
@@ -304,7 +304,7 @@ class UKBDataset(Dataset):
         root = Path(root)
         self.files = list(root.rglob("*.h5"))
         self._split_data(valid_ratio=valid_ratio, seed=seed, mode=mode)
-        logger.info("Total %s files of h5 exist", len(self.files))
+        logger.info("Total %s files of %s h5 exist", len(self.files), mode)
         
         self.labels = pd.read_csv(root / label_name)
         
@@ -315,8 +315,6 @@ class UKBDataset(Dataset):
         # Data split, used fixated seed
         trn, tst = train_test_split(self.files, test_size=0.1, random_state=42)
         trn, val = train_test_split(trn, test_size=valid_ratio, random_state=seed)
-
-        logger.info("Successfully setup %s brains for %s", len(self), mode.capitalize())
         self.files = {"train": trn,
                       "valid": val,
                       "test": tst}.get(mode, None)

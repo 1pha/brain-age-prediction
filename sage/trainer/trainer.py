@@ -43,8 +43,8 @@ class PLModule(pl.LightningModule):
         metrics = MetricCollection(metrics=[
             hydra.utils.instantiate(metrics[m]) for m in metrics.keys() if "_target_" in metrics[m]
         ])
-        self.train_metrics = metrics.clone(prefix="train_")
-        self.valid_metrics = metrics.clone(prefix="valid_")
+        self.train_metric = metrics.clone(prefix="train_")
+        self.valid_metric = metrics.clone(prefix="valid_")
 
         if load_from_checkpoint:
             logger.info("Load checkpoint from %s", load_from_checkpoint)
@@ -136,6 +136,7 @@ class PLModule(pl.LightningModule):
             """
             # 5d-tensor
             batch["brain"] = self.augmentor(batch["brain"]).unsqueeze(dim=1)
+            batch["age"] = batch["age"].float()
             result: dict = self.model(**batch)
             return result
         except RuntimeError as e:
@@ -144,28 +145,40 @@ class PLModule(pl.LightningModule):
             logger.exception(e)
             breakpoint()
             raise e
+        
+    def log_result(self, output: dict, unit: str = "step"):
+        output = {f"{unit}/{k}": float(v) for k, v in output.items()}
+        self.log_dict(dictionary=output,
+                      on_step=unit == "step",
+                      on_epoch=unit =="epoch")
 
     def training_step(self, batch, batch_idx, optimizer_idx=None):
         result: dict = self.forward(batch)
-        output: dict = self.train_metrics(result["reg_pred", "reg_target"])
-        self.log_dict(output)
+        self.log(name="train_loss", value=result["loss"])
+        
+        output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
+        self.log_result(output, unit="step")
+        
         self.training_step_outputs.append(result)
         return result["loss"]
 
     def on_train_epoch_end(self):
         output: dict = self.train_metric.compute()
-        self.log_dict(output)
+        self.log_result(output, unit="epoch")
         self.training_step_outputs.clear()
 
     def validation_step(self, batch, batch_idx):
         result: dict = self.forward(batch)
-        output: dict = self.valid_metric(result["reg_pred", "reg_target"])
-        self.log_dict(output)
+        self.log(name="valid_loss", value=result["loss"])
+        
+        output: dict = self.valid_metric(result["reg_pred"], result["reg_target"])
+        self.log_result(output, unit="step")
+        
         self.validation_step_outputs.append(result)
 
     def on_validation_epoch_end(self):
         output: dict = self.valid_metric.compute()
-        self.log_dict(output)
+        self.log_result(output, unit="epoch")
         self.validation_step_outputs.clear()
 
 
