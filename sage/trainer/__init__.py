@@ -1,1 +1,1 @@
-from .trainer import train, PLModule
+from .trainer import train, inference, PLModule

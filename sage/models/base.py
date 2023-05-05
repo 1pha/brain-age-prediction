@@ -21,3 +21,11 @@ class ModelBase(nn.Module):
     @property
     def num_params(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    def load_from_checkpoint(self, ckpt: str):
+        ckpt = torch.load(ckpt)["state_dict"]
+        def parse_ckpt(s: str):
+            s = ".".join(s.split(".")[1:])
+            return s
+        ckpt = {parse_ckpt(k): v for k, v in ckpt.items()}
+        self.load_state_dict(ckpt)

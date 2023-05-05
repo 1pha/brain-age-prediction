@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import numpy as np
 import hydra
 import omegaconf
 import pytorch_lightning as pl
@@ -20,6 +23,9 @@ class PLModule(pl.LightningModule):
                  valid_loader: torch.utils.data.DataLoader,
                  optimizer: omegaconf.DictConfig,
                  metrics: dict,
+                 mask: Path | str | torch.Tensor = None,
+                 mask_threshold: float = 0.1,
+                 augmentation: mt.compose.Compose = None,
                  scheduler: omegaconf.DictConfig = None,
                  load_from_checkpoint: str = None,
                  separate_lr: dict = None):
@@ -53,10 +59,17 @@ class PLModule(pl.LightningModule):
         self.training_step_outputs = []
         self.validation_step_outputs = []
         
-        self.augmentor = mt.Compose([
-            mt.Resize(spatial_size=(96, 96, 96)),
-            mt.ScaleIntensity(),
-        ])
+        if mask is not None:
+            if isinstance(mask, Path | str):
+                mask = np.load(mask)
+            elif isinstance(mask, np.ndarray):
+                mask = mask
+            mask = torch.nn.functional.interpolate(input=torch.tensor(mask)[None, None, ...],
+                                                   size=(96, 96, 96), mode="trilinear")
+            mask = mask < (mask_threshold or 0.1)
+        
+        self.augmentor = sage.data.no_augment() if augmentation is None\
+                        else hydra.utils.instantiate(augmentation, mask=mask.to(self.device))
 
     def train_dataloader(self):
         return self.train_loader
@@ -135,7 +148,7 @@ class PLModule(pl.LightningModule):
             }
             """
             # 5d-tensor
-            batch["brain"] = self.augmentor(batch["brain"]).unsqueeze(dim=1)
+            batch["brain"] = self.augmentor(batch["brain"])
             batch["age"] = batch["age"].float()
             result: dict = self.model(**batch)
             return result
@@ -154,7 +167,7 @@ class PLModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx=None):
         result: dict = self.forward(batch)
-        self.log(name="train_loss", value=result["loss"])
+        self.log(name="train_loss", value=result["loss"], prog_bar=True)
         
         output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
         self.log_result(output, unit="step")
@@ -169,7 +182,7 @@ class PLModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         result: dict = self.forward(batch)
-        self.log(name="valid_loss", value=result["loss"])
+        self.log(name="valid_loss", value=result["loss"], prog_bar=True)
         
         output: dict = self.valid_metric(result["reg_pred"], result["reg_target"])
         self.log_result(output, unit="step")
@@ -196,12 +209,12 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 
     logger.info("Start instantiating Pytorch-Lightning Trainer")
     module = hydra.utils.instantiate(config.module,
-                                      model=model,
-                                      optimizer=config.optim,
-                                      metrics=config.metrics,
-                                      scheduler=config.scheduler,
-                                      train_loader=dataloaders["train"],
-                                      valid_loader=dataloaders["valid"])
+                                     model=model,
+                                     optimizer=config.optim,
+                                     metrics=config.metrics,
+                                     scheduler=config.scheduler,
+                                     train_loader=dataloaders["train"],
+                                     valid_loader=dataloaders["valid"])
     return module, dataloaders
 
 
@@ -224,3 +237,11 @@ def train(config: omegaconf.DictConfig) -> None:
     trainer.fit(model=module,
                 train_dataloaders=dataloaders["train"],
                 val_dataloaders=dataloaders["valid"])
+    
+
+def inference(config: omegaconf.DictConfig) -> None:
+    module, dataloaders = setup_trainer(config)
+    breakpoint()
+    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
+    prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
+    breakpoint()

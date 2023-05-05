@@ -12,8 +12,9 @@ defaults:
 
 dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 16
+  batch_size: 64
   num_workers: 4
+  pin_memory: True
   dataset: ${dataset}
 
 optim:
@@ -30,6 +31,11 @@ misc:
 module:
   _target_: sage.trainer.PLModule
   _recursive_: False
+  augmentation:
+    _target_: sage.data.augment
+    spatial_size: [ 96, 96, 96 ]
+  mask: biobank-test-saliency/mask.npy
+  mask_threshold: 0.1
   separate_lr:
 
 metrics:
@@ -68,7 +74,7 @@ callbacks:
     dirpath: ${hydra:run.dir}
     filename: "{step}-valid_mae{epoch/valid_MeanAbsoluteError:.3f}"
     monitor: epoch/valid_MeanAbsoluteError
-    mode: max
+    mode: min
     save_top_k: 1
     save_last: True
     # Is useful to set it to False when metric names contain / as this will result in extra folders
@@ -78,7 +84,7 @@ callbacks:
   early_stop:
     _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
     monitor: epoch/valid_MeanAbsoluteError
-    mode: max
+    mode: min
     patience: 10
 
   # https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.LearningRateMonitor.html
