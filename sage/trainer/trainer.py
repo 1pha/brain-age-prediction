@@ -67,7 +67,8 @@ class PLModule(pl.LightningModule):
             mask = torch.nn.functional.interpolate(input=torch.tensor(mask)[None, None, ...],
                                                    size=(96, 96, 96), mode="trilinear")
             mask = mask < (mask_threshold or 0.1)
-        
+
+        # Highly likely that this won't work in multiple GPU environment
         self.augmentor = sage.data.no_augment() if augmentation is None\
                         else hydra.utils.instantiate(augmentation, mask=mask.to(self.device))
 
@@ -208,13 +209,23 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     model = hydra.utils.instantiate(config.model)
 
     logger.info("Start instantiating Pytorch-Lightning Trainer")
-    module = hydra.utils.instantiate(config.module,
-                                     model=model,
-                                     optimizer=config.optim,
-                                     metrics=config.metrics,
-                                     scheduler=config.scheduler,
-                                     train_loader=dataloaders["train"],
-                                     valid_loader=dataloaders["valid"])
+    if "load_from_checkpoint" in config.module:
+        ckpt = config.module["load_from_checkpoint"]
+        module = PLModule.load_from_checkpoint(ckpt,
+                                               model=model,
+                                               optimizer=config.optim,
+                                               metrics=config.metrics,
+                                               scheduler=config.scheduler,
+                                               train_loader=dataloaders["train"],
+                                               valid_loader=dataloaders["valid"])
+    else:
+        module = hydra.utils.instantiate(config.module,
+                                         model=model,
+                                         optimizer=config.optim,
+                                         metrics=config.metrics,
+                                         scheduler=config.scheduler,
+                                         train_loader=dataloaders["train"],
+                                         valid_loader=dataloaders["valid"])
     return module, dataloaders
 
 
@@ -225,9 +236,13 @@ def train(config: omegaconf.DictConfig) -> None:
     logger = hydra.utils.instantiate(config.logger)
     logger.watch(module)
     # Hard-code config uploading
-    wandb.config.update(
-        omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
-    )
+    if "version" in config.logger:
+        # Skip config update when using resume checkpoint
+        pass
+    else:
+        wandb.config.update(
+            omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+        )
 
     # Callbacks
     callbacks: dict = hydra.utils.instantiate(config.callbacks)
