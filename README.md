@@ -10,35 +10,22 @@ conda activate age
 pip install -r requirements.txt
 ```
 
-### TODO
-+ Change config.debug+print to logger.debug
-+ Change every print functions to logger
-+ Multiple GPU handling code
-+ Smarter ways for multiple metrics.
-+ Parcellate/Encapsulate/Separate functions in dataloader & trainer.
-+ Move out save directory to `train.py` from `trainer.py` and add `logging.FileHandler`
+### Commands
+Confusing configs.
 
-### Main Task
-+ Age Prediction with 1.4k structural MRI data from 4 sources
-+ Unlearning through confusion loss (nearly failure)
-+ Saliency map to find brain age biomarker
-### Trainer Information
-+ Models
-  + Vanilla CNN
-  + [Resnet]()
-  + [EfficientNet]()
-  + [ConViT: Improving Vision Transformers with Soft Convolutional Inductive Biases](https://arxiv.org/abs/2103.10697)
-### Related Works
-+ Deep Learning approach to Age Prediction
-  + [Levakov et al.](https://onlinelibrary.wiley.com/doi/pdf/10.1002/hbm.25011)
-  + [Brain MRI-based 3D Convolutional Neural Networks for Classification of Schizophrenia and Controls
-](https://arxiv.org/abs/2003.08818)
+* Note that `module.load_model_ckpt` and `module.load_from_checkpoint` is different.
+  - The former only calls models weights
+  - While the latter recalls every configurations including optimizers and others.
+#### Train
+```
+HYDRA_FULL_ERROR=1 CUDA_VISIBLE_DEVICES=0 python train.py logger.name="ResNet10t-masked"
+```
 
-### Minor Experiment Notes
+#### Inference
+```
+HYDRA_FULL_ERROR=1 CUDA_VISIBLE_DEVICES=0 python inference.py module.load_model_ckpt=AA.CKPT
+```
 
-+ MSE does not help converging below age 20 when augmentation + Naive Resnet was used. (Apr 18, 2022)
-+ Add "Linear warmup" to vit models. (done)
-
-<!-- + wandb: track best metric -->
-+ wandb: namings
-+ lr scaling to 30~40 epochs ? after great descent might be fine.
+#### Resume Training
+```
+HYDRA_FULL_ERROR=1 CUDA_VISIBLE_DEVICES=0 python train.py **+logger.version=HASH +logger.resume=must** module.load_from_checkpoint=AA.CKPT

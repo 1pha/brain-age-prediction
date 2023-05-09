@@ -5,10 +5,12 @@ from torch import nn
 class ModelBase(nn.Module):
     def __init__(self,
                  backbone: nn.Module,
-                 criterion: nn.Module,):
+                 criterion: nn.Module,
+                 name: str):
         super().__init__()
         self.backbone = backbone
         self.criterion = criterion
+        self.NAME = name
     
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         pred = self.backbone(brain).squeeze()

@@ -9,3 +9,5 @@ backbone:
   num_heads: [3, 6, 12, 24]
 criterion:
   _target_: torch.nn.MSELoss
+name: swin_vit
+pretrained: True

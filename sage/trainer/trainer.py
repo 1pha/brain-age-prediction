@@ -1,6 +1,8 @@
 from pathlib import Path
+from typing import Any
+import random
+import subprocess
 
-import numpy as np
 import hydra
 import omegaconf
 import pytorch_lightning as pl
@@ -11,6 +13,8 @@ import wandb
 from monai import transforms as mt
 
 import sage
+from sage.xai.nilearn_plots import plot_brain
+from .utils import load_mask, finalize_inference, tune_logging_interval
 
 
 logger = sage.utils.get_logger(name=__name__)
@@ -25,16 +29,21 @@ class PLModule(pl.LightningModule):
                  metrics: dict,
                  mask: Path | str | torch.Tensor = None,
                  mask_threshold: float = 0.1,
-                 augmentation: mt.compose.Compose = None,
+                 test_loader: torch.utils.data.DataLoader = None,
+                 predict_loader: torch.utils.data.DataLoader = None,
+                 augmentation: omegaconf.DictConfig = None,
                  scheduler: omegaconf.DictConfig = None,
-                 load_from_checkpoint: str = None,
+                 load_model_ckpt: str = None,
+                 load_from_checkpoint: str = None, # unused params but requires for instantiation
                  separate_lr: dict = None):
         super().__init__()
         self.model = model
 
         # Dataloaders
-        self.train_loader = train_loader
-        self.valid_loader = valid_loader
+        self.train_dataloader = train_loader
+        self.valid_dataloader = valid_loader
+        self.test_dataloader = test_loader
+        self.predict_dataloader = predict_loader
         # num_training_steps for linear warmup scheduler from transformers
         # Fix n_epochs to 100
         num_training_steps = round(len(train_loader) * 100)
@@ -52,31 +61,39 @@ class PLModule(pl.LightningModule):
         self.train_metric = metrics.clone(prefix="train_")
         self.valid_metric = metrics.clone(prefix="valid_")
 
-        if load_from_checkpoint:
-            logger.info("Load checkpoint from %s", load_from_checkpoint)
-            self.load_from_checkpoint(load_from_checkpoint)
+        if load_model_ckpt:
+            logger.info("Load checkpoint from %s", load_model_ckpt)
+            self.model.load_from_checkpoint(load_model_ckpt)
 
         self.training_step_outputs = []
         self.validation_step_outputs = []
+
+        self.aug_config = augmentation
+        self.mask = mask
+        self.mask_threshold = mask_threshold
         
-        if mask is not None:
-            if isinstance(mask, Path | str):
-                mask = np.load(mask)
-            elif isinstance(mask, np.ndarray):
-                mask = mask
-            mask = torch.nn.functional.interpolate(input=torch.tensor(mask)[None, None, ...],
-                                                   size=(96, 96, 96), mode="trilinear")
-            mask = mask < (mask_threshold or 0.1)
-
-        # Highly likely that this won't work in multiple GPU environment
-        self.augmentor = sage.data.no_augment() if augmentation is None\
-                        else hydra.utils.instantiate(augmentation, mask=mask.to(self.device))
-
-    def train_dataloader(self):
-        return self.train_loader
-
-    def valid_dataloader(self):
-        return self.valid_loader
+    def setup(self, stage):
+        
+        mask = load_mask(mask_path=self.mask,
+                         mask_threshold=self.mask_threshold)
+        self.no_augment = sage.data.no_augment(mask=mask)
+        self.augmentor = hydra.utils.instantiate(self.aug_config, mask=mask)
+        try:
+            self.log_brain()
+        except:
+            logger.info("Not using wandb. Skip logging brain")
+        
+    def log_brain(self):
+        """ Logs sample brain to check how augmentation is applied. """
+        ds = self.train_dataloader.dataset
+        idx: int = random.randint(a=0, b=len(ds))
+        brain: torch.Tensor = ds[idx]["brain"]
+        brain = self.augmentor(brain[None, ...])
+        
+        tmp = "tmp.png"
+        plot_brain(brain, save=tmp)
+        wandb.log({"sample": wandb.Image(tmp)})
+        subprocess.run(args=["rm", tmp])
 
     def _configure_optimizer(self,
                              optimizer: omegaconf.DictConfig,
@@ -139,7 +156,7 @@ class PLModule(pl.LightningModule):
     def configure_optimizers(self) -> torch.optim.Optimizer | dict:
         return self.opt_config
 
-    def forward(self, batch):
+    def forward(self, batch, mode: str = "train"):
         try:
             """ model should return dict of
             {
@@ -149,7 +166,11 @@ class PLModule(pl.LightningModule):
             }
             """
             # 5d-tensor
-            batch["brain"] = self.augmentor(batch["brain"])
+            # augmentor = self.configure_augmentation(config=self.aug_config,
+            #                                         mask=self.mask,
+            #                                         mode=mode)
+            augmentor = self.augmentor if mode == "train" else self.no_augment
+            batch["brain"] = augmentor(batch["brain"])
             batch["age"] = batch["age"].float()
             result: dict = self.model(**batch)
             return result
@@ -167,7 +188,7 @@ class PLModule(pl.LightningModule):
                       on_epoch=unit =="epoch")
 
     def training_step(self, batch, batch_idx, optimizer_idx=None):
-        result: dict = self.forward(batch)
+        result: dict = self.forward(batch, mode="train")
         self.log(name="train_loss", value=result["loss"], prog_bar=True)
         
         output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
@@ -182,7 +203,7 @@ class PLModule(pl.LightningModule):
         self.training_step_outputs.clear()
 
     def validation_step(self, batch, batch_idx):
-        result: dict = self.forward(batch)
+        result: dict = self.forward(batch, mode="valid")
         self.log(name="valid_loss", value=result["loss"], prog_bar=True)
         
         output: dict = self.valid_metric(result["reg_pred"], result["reg_target"])
@@ -194,6 +215,10 @@ class PLModule(pl.LightningModule):
         output: dict = self.valid_metric.compute()
         self.log_result(output, unit="epoch")
         self.validation_step_outputs.clear()
+        
+    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
+        result: dict = self.forward(batch, mode="test")
+        return result
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
@@ -209,7 +234,7 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     model = hydra.utils.instantiate(config.model)
 
     logger.info("Start instantiating Pytorch-Lightning Trainer")
-    if "load_from_checkpoint" in config.module:
+    if config.module.get("load_from_checkpoint"):
         ckpt = config.module["load_from_checkpoint"]
         module = PLModule.load_from_checkpoint(ckpt,
                                                model=model,
@@ -217,7 +242,10 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
                                                metrics=config.metrics,
                                                scheduler=config.scheduler,
                                                train_loader=dataloaders["train"],
-                                               valid_loader=dataloaders["valid"])
+                                               valid_loader=dataloaders["valid"],
+                                               test_loader=dataloaders["test"],
+                                               predict_loader=dataloaders["test"],
+                                               **config.module)
     else:
         module = hydra.utils.instantiate(config.module,
                                          model=model,
@@ -225,21 +253,25 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
                                          metrics=config.metrics,
                                          scheduler=config.scheduler,
                                          train_loader=dataloaders["train"],
-                                         valid_loader=dataloaders["valid"])
+                                         valid_loader=dataloaders["valid"],
+                                         test_loader=dataloaders["test"],
+                                         predict_loader=dataloaders["test"])
     return module, dataloaders
 
 
 def train(config: omegaconf.DictConfig) -> None:
+    config.trainer.log_every_n_steps = tune_logging_interval(logging_interval=config.trainer.log_every_n_steps,
+                                                             batch_size=config.dataloader.batch_size)
+    logger = hydra.utils.instantiate(config.logger)
     module, dataloaders = setup_trainer(config)
 
     # Logger Setup
-    logger = hydra.utils.instantiate(config.logger)
     logger.watch(module)
-    # Hard-code config uploading
     if "version" in config.logger:
         # Skip config update when using resume checkpoint
         pass
     else:
+        # Hard-code config uploading
         wandb.config.update(
             omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
         )
@@ -252,11 +284,16 @@ def train(config: omegaconf.DictConfig) -> None:
     trainer.fit(model=module,
                 train_dataloaders=dataloaders["train"],
                 val_dataloaders=dataloaders["valid"])
+    if dataloaders["test"]:
+        prediction = trainer.test(ckpt_path="best", dataloaders=dataloaders["test"])
+        finalize_inference(prediction=prediction,
+                           name=config.logger.name)
     
 
 def inference(config: omegaconf.DictConfig) -> None:
     module, dataloaders = setup_trainer(config)
-    breakpoint()
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
+    logger.info("Start prediction")
     prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
-    breakpoint()
+    finalize_inference(prediction=prediction,
+                       name=config.logger.name)

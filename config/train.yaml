@@ -34,8 +34,10 @@ module:
   augmentation:
     _target_: sage.data.augment
     spatial_size: [ 96, 96, 96 ]
-  mask: biobank-test-saliency/mask.npy
+  mask: assets/mask.npy
   mask_threshold: 0.1
+  load_from_checkpoint: # for lightning
+  load_model_ckpt: # For model checkpoint only
   separate_lr:
 
 metrics:
@@ -92,3 +94,4 @@ callbacks:
     _target_: pytorch_lightning.callbacks.LearningRateMonitor
     logging_interval: step
     log_momentum: False
+  
