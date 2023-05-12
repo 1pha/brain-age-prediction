@@ -191,8 +191,8 @@ class PLModule(pl.LightningModule):
         result: dict = self.forward(batch, mode="train")
         self.log(name="train_loss", value=result["loss"], prog_bar=True)
         
-        output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
-        self.log_result(output, unit="step")
+        # output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
+        # self.log_result(output, unit="step")
         
         self.training_step_outputs.append(result)
         return result["loss"]
