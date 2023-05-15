@@ -14,7 +14,7 @@ from monai import transforms as mt
 
 import sage
 from sage.xai.nilearn_plots import plot_brain
-from .utils import load_mask, finalize_inference, tune_logging_interval
+from .utils import load_mask, finalize_inference, tune_logging_interval, tune_lr_interval
 
 
 logger = sage.utils.get_logger(name=__name__)
@@ -31,6 +31,7 @@ class PLModule(pl.LightningModule):
                  mask_threshold: float = 0.1,
                  test_loader: torch.utils.data.DataLoader = None,
                  predict_loader: torch.utils.data.DataLoader = None,
+                 log_train_metrics: bool = False,
                  augmentation: omegaconf.DictConfig = None,
                  scheduler: omegaconf.DictConfig = None,
                  load_model_ckpt: str = None,
@@ -65,6 +66,7 @@ class PLModule(pl.LightningModule):
             logger.info("Load checkpoint from %s", load_model_ckpt)
             self.model.load_from_checkpoint(load_model_ckpt)
 
+        self.log_train_metrics = log_train_metrics
         self.training_step_outputs = []
         self.validation_step_outputs = []
 
@@ -73,17 +75,12 @@ class PLModule(pl.LightningModule):
         self.mask_threshold = mask_threshold
         
     def setup(self, stage):
-        
         mask = load_mask(mask_path=self.mask,
                          mask_threshold=self.mask_threshold)
         self.no_augment = sage.data.no_augment(mask=mask)
         self.augmentor = hydra.utils.instantiate(self.aug_config, mask=mask)
-        try:
-            self.log_brain()
-        except:
-            logger.info("Not using wandb. Skip logging brain")
         
-    def log_brain(self):
+    def log_brain(self, return_path: bool = False):
         """ Logs sample brain to check how augmentation is applied. """
         ds = self.train_dataloader.dataset
         idx: int = random.randint(a=0, b=len(ds))
@@ -92,8 +89,15 @@ class PLModule(pl.LightningModule):
         
         tmp = "tmp.png"
         plot_brain(brain, save=tmp)
-        wandb.log({"sample": wandb.Image(tmp)})
-        subprocess.run(args=["rm", tmp])
+        try:
+            wandb.log({"sample": wandb.Image(tmp)})
+        except:
+            logger.info("Not using wandb. Skip logging brain")
+        
+        if return_path:
+            return tmp
+        else:
+            subprocess.run(args=["rm", tmp])
 
     def _configure_optimizer(self,
                              optimizer: omegaconf.DictConfig,
@@ -165,10 +169,6 @@ class PLModule(pl.LightningModule):
                 cls_target:
             }
             """
-            # 5d-tensor
-            # augmentor = self.configure_augmentation(config=self.aug_config,
-            #                                         mask=self.mask,
-            #                                         mode=mode)
             augmentor = self.augmentor if mode == "train" else self.no_augment
             batch["brain"] = augmentor(batch["brain"])
             batch["age"] = batch["age"].float()
@@ -191,16 +191,18 @@ class PLModule(pl.LightningModule):
         result: dict = self.forward(batch, mode="train")
         self.log(name="train_loss", value=result["loss"], prog_bar=True)
         
-        # output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
-        # self.log_result(output, unit="step")
-        
-        self.training_step_outputs.append(result)
+        if self.log_train_metrics:
+            output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
+            self.log_result(output, unit="step")
+            
+            self.training_step_outputs.append(result)
         return result["loss"]
 
     def on_train_epoch_end(self):
-        output: dict = self.train_metric.compute()
-        self.log_result(output, unit="epoch")
-        self.training_step_outputs.clear()
+        if self.log_train_metrics:
+            output: dict = self.train_metric.compute()
+            self.log_result(output, unit="epoch")
+            self.training_step_outputs.clear()
 
     def validation_step(self, batch, batch_idx):
         result: dict = self.forward(batch, mode="valid")
@@ -215,6 +217,9 @@ class PLModule(pl.LightningModule):
         output: dict = self.valid_metric.compute()
         self.log_result(output, unit="epoch")
         self.validation_step_outputs.clear()
+    
+    # def on_predict_start(self) -> None:
+    #     return super().on_predict_start()
         
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
         result: dict = self.forward(batch, mode="test")
@@ -259,9 +264,23 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     return module, dataloaders
 
 
+def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
+    batch_size = config.dataloader.batch_size
+    logging_interval = config.trainer.log_every_n_steps
+    lr_frequency = config.scheduler.frequency
+    
+    # Tune logging interval
+    config.trainer.log_every_n_steps = tune_logging_interval(logging_interval=logging_interval,
+                                                             batch_size=batch_size)
+    
+    # Tune learning rate stepper
+    config.scheduler.frequency = tune_lr_interval(lr_frequency=lr_frequency,
+                                                  batch_size=batch_size)
+    return config
+
+
 def train(config: omegaconf.DictConfig) -> None:
-    config.trainer.log_every_n_steps = tune_logging_interval(logging_interval=config.trainer.log_every_n_steps,
-                                                             batch_size=config.dataloader.batch_size)
+    config: omegaconf.DictConfig = tune(config)
     logger = hydra.utils.instantiate(config.logger)
     module, dataloaders = setup_trainer(config)
 
@@ -290,10 +309,19 @@ def train(config: omegaconf.DictConfig) -> None:
                            name=config.logger.name)
     
 
-def inference(config: omegaconf.DictConfig) -> None:
+def inference(config: omegaconf.DictConfig,
+              root_dir: Path = None) -> None:
     module, dataloaders = setup_trainer(config)
+    module.setup(stage=None)
+    brain = module.log_brain(return_path=True)
+    subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
+    
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     logger.info("Start prediction")
     prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
+    
+    if root_dir is None:
+        root_dir = Path(config.callbacks.checkpoint.dirpath)
     finalize_inference(prediction=prediction,
-                       name=config.logger.name)
+                       name=config.logger.name,
+                       root_dir=root_dir)

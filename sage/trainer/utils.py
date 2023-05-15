@@ -17,20 +17,40 @@ logger = get_logger(name=__file__)
 
 def tune_logging_interval(logging_interval: int = 50,
                           batch_size: int = 64) -> int:
-    """ Tune logging interval to log same number for varying batch sizes """
+    """ Tune logging interval to log same number for varying batch sizes
+    BASE: with batch size 64, logging_interval 50
+    i.e. with a given batch size 4, freq step should increase to 16
+    """
     BASE_BATCH = 64
     BASE_INTERVAL = 50
     if batch_size == BASE_BATCH and logging_interval == BASE_INTERVAL:
         return logging_interval
     else:
-        ratio = batch_size / BASE_BATCH
+        ratio = BASE_BATCH / batch_size
         logging_interval = round(BASE_INTERVAL * ratio)
         return logging_interval
+    
+    
+def tune_lr_interval(lr_frequency: int = 1,
+                     batch_size: int = 64) -> int:
+    """ Tune learning rate stepping frequency
+    to step same number for varying batch sizes (logging)
+    BASE: with batch size 64, steps 1
+    i.e. with a given batch size 4, freq step should increase to 16
+    """
+    BASE_FREQ = 1
+    BASE_BATCH = 50
+    if lr_frequency == BASE_FREQ and batch_size == BASE_BATCH:
+        return lr_frequency
+    else:
+        ratio = BASE_BATCH / batch_size
+        lr_frequency = round(BASE_FREQ * ratio)
+        return lr_frequency
         
 
 def load_mask(mask_path: str | Path = None,
               mask_threshold: float = 0.1):
-    if not mask_path:
+    if (not mask_path) or mask_path in ["False", "None"]:
         return None
     else:
         if isinstance(mask_path, Path | str):
@@ -64,12 +84,14 @@ def _sort_outputs(outputs):
 
 
 def finalize_inference(prediction: list,
-                       name: str) -> None:
+                       name: str,
+                       root_dir: Path = Path(".")) -> None:
     """ Takes non-sorted prediction (=list of dicts)
         1. Flatten predictions into dict
         2. Saves & Logs prediction
         3. Plot prediction with jointplot / kde plot and save plots
     """
+    root_dir = Path(root_dir)
     
     # 1. Sort Prediction
     prediction = _sort_outputs(prediction)
@@ -77,7 +99,7 @@ def finalize_inference(prediction: list,
     # 2. Save PRediction
     save_name = f"{name}.pkl"
     logger.info("Save prediction as %s", save_name)
-    with open(save_name, "wb") as f:
+    with open(root_dir / save_name, "wb") as f:
         pickle.dump(prediction, f)
         
     # 2. Log Predictions
@@ -102,11 +124,11 @@ def finalize_inference(prediction: list,
                       xlim=[43, 87], ylim=[43, 87])
     p.fig.suptitle(run_name)
     p.fig.tight_layout()
-    p.savefig(f"{run_name}-joint.png")
+    p.savefig(root_dir / f"{run_name}-joint.png")
     
     # 3. Plot KDE plot
     fig, ax = plt.subplots(figsize=(5, 5))
     sns.kdeplot(data=data, ax=ax)
-    fig.title(run_name)
+    fig.suptitle(run_name)
     fig.tight_layout()
-    fig.savefig(f"{run_name}-kde.png")
+    fig.savefig(root_dir / f"{run_name}-kde.png")
