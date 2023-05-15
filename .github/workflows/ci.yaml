@@ -11,7 +11,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run flake8 and pytest
         run: |
-          ln -s ${{ secrets.DATA_DIR }} data
           chmod +x setup.sh
           ./setup.sh
           flake8 .
