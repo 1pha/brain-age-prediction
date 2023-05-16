@@ -1,7 +1,8 @@
-from pathlib import Path
-from typing import Any
+import os
 import random
 import subprocess
+from typing import Any
+from pathlib import Path
 
 import numpy as np
 import hydra
@@ -13,7 +14,7 @@ from torchmetrics import MetricCollection
 import wandb
 
 import sage
-from sage.xai.nilearn_plots import plot_brain
+from sage.xai.nilearn_plots import plot_overlay, plot_glass_brain, plot_brain
 from .utils import load_mask, finalize_inference, tune_logging_interval, tune_lr_interval
 
 
@@ -320,12 +321,24 @@ def inference(config: omegaconf.DictConfig,
     if root_dir is None:
         root_dir = Path(config.callbacks.checkpoint.dirpath)
         
-    if isinstance(prediction, dict):
+    task = config.module._target_
+    # Infer Metrics
+    if task == "sage.trainer.PLModule":
         finalize_inference(prediction=prediction,
                            name=config.logger.name,
                            root_dir=root_dir)
 
-    elif isinstance(prediction, np.ndarray):
-        breakpoint()
-        np.save(file=root_dir / "xai.npy",
-                arr=prediction)
+    elif task == "sage.xai.trainer.XPLModule":
+        attr: np.ndarray = module.attr
+        top_indiv = module.top_individual
+        top_k = module.top_k_percentile
+        postfix = module.xai_method + (f"-indiv-k{top_k}" if top_indiv else "-total")
+        root_dir = root_dir / postfix
+        os.makedirs(name=root_dir, exist_ok=True)
+        
+        # Save attr
+        np.save(file=root_dir / "attrs.npy", arr=attr)
+        
+        # Save plots
+        plot_glass_brain(arr=attr, save=root_dir / "glass.png")
+        plot_overlay(arr=attr, scale_factor=1, save=root_dir / "anat.png")

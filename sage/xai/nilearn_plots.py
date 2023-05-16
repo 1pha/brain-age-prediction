@@ -43,6 +43,8 @@ def plot_overlay(arr: torch.Tensor | np.ndarray,
     nifti = _mni if use_mni else _nifti
     display = nilp.plot_anat(anat_img=load_mni152_template(), **kwargs)
     display.add_overlay(nifti(arr), alpha=alpha)
+    if save is not None:
+        display.savefig(save)
     return display, save
 
 

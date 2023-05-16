@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument("--infer_xai", type=str, default="False", help="Infer xai or not")
     parser.add_argument("--top_individual", type=str, default="True", help="Whehter to fetch xai for each top-k percentile")
     parser.add_argument("--top_k", type=float, default=0.99, help="")
+    parser.add_argument("--xai_method", type=str, default="gbp", help="Which explainability method to use")
     
     args = parser.parse_args()
     return args
@@ -48,6 +49,7 @@ def main(args):
             "module._target_=sage.xai.trainer.XPLModule",
             f"+module.top_individual={args.top_individual}",
             f"+module.top_k_percentile={args.top_k}",
+            f"+module.xai_method={args.xai_method}",
             "+trainer.inference_mode=False"
         ]
     else:

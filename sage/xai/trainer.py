@@ -1,10 +1,11 @@
 from pathlib import Path
+from typing import Callable
 
 import omegaconf
 import numpy as np
 import torch
 from torch import nn
-from captum.attr import LayerGradCam, LayerAttribution
+from captum.attr import LayerGradCam, LayerAttribution, GuidedBackprop
 
 import sage
 from sage.trainer import PLModule
@@ -26,6 +27,7 @@ class XPLModule(PLModule):
                  target_layer_index: int = 1,
                  top_individual: bool = True,
                  top_k_percentile: float = 0.95,
+                 xai_method: str = "gbp",
                  ############################
                  mask: Path | str | torch.Tensor = None,
                  mask_threshold: float = 0.1,
@@ -64,13 +66,31 @@ class XPLModule(PLModule):
         self.target_layer_index = target_layer_index
         self.top_individual = sage.utils.parse_bool(top_individual)
         self.top_k_percentile = top_k_percentile
+        self.xai_method = xai_method
         
         self.configure_xai(model=self.model, target_layer_index=target_layer_index)
         
-    def configure_xai(self, model: nn.Module, target_layer_index: int = 1) -> None:
+    def _configure_xai(self,
+                       model: nn.Module | Callable,
+                       xai_method: str = "gbp",
+                       target_layer_index: int = -1):
+        if xai_method == "gcam":
+            xai = LayerGradCam(forward_func=model,
+                               layer=model.conv_layers()[target_layer_index])
+        elif xai_method == "gbp":
+            xai = GuidedBackprop(model=model)
+        return xai
+        
+    def configure_xai(self,
+                      model: nn.Module,
+                      xai_method: str = "gbp",
+                      target_layer_index: int = -1) -> None:
+        
         if model.NAME == "resnet10t":
             self.model = model.backbone
-            self.xai = LayerGradCam(self.model, self.model.conv_layers()[target_layer_index])
+            self.xai = self._configure_xai(model=self.model,
+                                           xai_method=xai_method,
+                                           target_layer_index=target_layer_index)
 
         elif model.NAME == "swin_vit":
             pass
@@ -136,5 +156,4 @@ class XPLModule(PLModule):
         return torch.zeros(size=(1,), requires_grad=True)
 
     def on_predict_end(self) -> np.ndarray:
-        attr = self.attr / len(self.predict_loader)
-        return attr
+        self.attr /= len(self.predict_dataloader)
