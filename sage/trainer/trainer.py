@@ -3,6 +3,7 @@ from typing import Any
 import random
 import subprocess
 
+import numpy as np
 import hydra
 import omegaconf
 import pytorch_lightning as pl
@@ -10,7 +11,6 @@ import torch
 from torch import nn
 from torchmetrics import MetricCollection
 import wandb
-from monai import transforms as mt
 
 import sage
 from sage.xai.nilearn_plots import plot_brain
@@ -218,9 +218,6 @@ class PLModule(pl.LightningModule):
         self.log_result(output, unit="epoch")
         self.validation_step_outputs.clear()
     
-    # def on_predict_start(self) -> None:
-    #     return super().on_predict_start()
-        
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
         result: dict = self.forward(batch, mode="test")
         return result
@@ -322,6 +319,13 @@ def inference(config: omegaconf.DictConfig,
     
     if root_dir is None:
         root_dir = Path(config.callbacks.checkpoint.dirpath)
-    finalize_inference(prediction=prediction,
-                       name=config.logger.name,
-                       root_dir=root_dir)
+        
+    if isinstance(prediction, dict):
+        finalize_inference(prediction=prediction,
+                           name=config.logger.name,
+                           root_dir=root_dir)
+
+    elif isinstance(prediction, np.ndarray):
+        breakpoint()
+        np.save(file=root_dir / "xai.npy",
+                arr=prediction)

@@ -1,6 +1,7 @@
 __all__ = ["get_today"]
 
 import os
+import ast
 import time
 import random
 import logging
@@ -14,6 +15,15 @@ import numpy as np
 import omegaconf
 import torch
 from torch import nn
+
+
+def parse_bool(s: str) -> bool:
+    if s in ["true", "t", "y", 1, "1"]:
+        return True
+    elif s in ["false", "f", "no", "n", "0", 0]:
+        return False
+    elif s in ["True", "False"]:
+        return ast.literal_eval(s)
 
 
 def get_logger(name: str = None, filehandler: bool = False):

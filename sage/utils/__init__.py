@@ -1,3 +1,3 @@
-from .misc import seed_everything, get_logger
+from .misc import seed_everything, get_logger, parse_bool
 
-__all__ = ["seed_everything", "get_logger"]
+__all__ = ["seed_everything", "get_logger", "parse_bool"]

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 import nibabel
 import numpy as np
@@ -7,6 +9,27 @@ from captum.attr import LayerAttribution
 
 MNI_AFFINE = load_mni152_template().affine
 MNI_SHAPE = load_mni152_brain_mask().get_fdata().shape
+
+
+def load_np(fname: str | np.ndarray | Path):
+    if isinstance(fname, Path | str):
+        arr = np.abs(np.load(fname))
+    elif isinstance(fname, np.ndarray):
+        arr = np.abs(fname)
+
+    while arr.ndim > 3:
+        arr = arr[0]
+    return arr
+
+
+def top_q(arr: np.ndarray, q=0.95, return_bool: bool = False):
+    arr = load_np(arr)
+
+    mask = ~np.isnan(arr)
+    arr = arr * mask
+
+    mask = arr > np.nanquantile(arr, q=q)
+    return mask.astype(np.int32) if return_bool else arr * mask
 
 
 def z_norm(tensor):
@@ -32,6 +55,12 @@ def average(tensor, dim=0):
 
 
 def margin_mni_mask():
+    """ This loads smaller brain mask of mni
+    Why do we need smaller mask?
+        - Since some models watch dura maters on the edges
+          or some brains not having proper skull-stripping,
+          it was critical to delete some of margins (2 voxels) from edge 
+    """
     mask = load_mni152_brain_mask().get_fdata()
     mni_shape = mask.shape
     _int = 1
@@ -44,6 +73,7 @@ def margin_mni_mask():
                                                 interpolate_mode="trilinear")[0][0].numpy()
     smaller_mask[smaller_mask < 0.5] = np.nan
     smaller_mask[smaller_mask > 0.5] = 1.
+    return smaller_mask
 
 
 _nifti = lambda arr: nibabel.nifti1.Nifti1Image(arr, np.eye(4))

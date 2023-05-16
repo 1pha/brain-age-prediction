@@ -44,3 +44,12 @@ def plot_overlay(arr: torch.Tensor | np.ndarray,
     display = nilp.plot_anat(anat_img=load_mni152_template(), **kwargs)
     display.add_overlay(nifti(arr), alpha=alpha)
     return display, save
+
+
+def plot_glass_brain(arr: torch.Tensor | np.ndarray,
+                     scale_factor: float = 1,
+                     save: str = None, **kwargs):
+    arr = np.abs(_tensorfy(arr)) * scale_factor
+    display = nilp.plot_glass_brain(_mni(arr), output_file=save, **kwargs)
+    return display, save
+    
