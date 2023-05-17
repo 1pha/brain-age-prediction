@@ -7,6 +7,9 @@ path=${path}
 read -p "--xai_method=" xai
 xai=${xai:-gbp}
 
+read -p "--top_k=" k
+k=${k:-0.99}
+
 CUDA_VISIBLE_DEVICES=${device}
 HYDRA_FULL_ERROR=1
 
@@ -20,7 +23,7 @@ python infer_ckpt.py --path=${path}\
                      --batch_size=1\
                      --infer_xai=True\
                      --top_individual=True\
-                     --top_k=0.99
+                     --top_k=${k}
 
 python infer_ckpt.py --path=${path}\
                      --xai_method=${xai}\
@@ -28,7 +31,7 @@ python infer_ckpt.py --path=${path}\
                      --batch_size=1\
                      --infer_xai=True\
                      --top_individual=False\
-                     --top_k=0.99
+                     --top_k=${k}
 
 python infer_ckpt.py --path=${path}\
                      --xai_method=${xai}\
@@ -36,7 +39,7 @@ python infer_ckpt.py --path=${path}\
                      --batch_size=1\
                      --infer_xai=True\
                      --top_individual=True\
-                     --top_k=0.99
+                     --top_k=${k}
 
 python infer_ckpt.py --path=${path}\
                      --xai_method=${xai}\
@@ -44,4 +47,4 @@ python infer_ckpt.py --path=${path}\
                      --batch_size=1\
                      --infer_xai=True\
                      --top_individual=False\
-                     --top_k=0.99
+                     --top_k=${k}
