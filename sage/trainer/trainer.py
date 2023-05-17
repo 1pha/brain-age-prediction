@@ -270,10 +270,6 @@ def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
     # Tune logging interval
     config.trainer.log_every_n_steps = tune_logging_interval(logging_interval=logging_interval,
                                                              batch_size=batch_size)
-    
-    # Tune learning rate stepper
-    config.scheduler.frequency = tune_lr_interval(lr_frequency=lr_frequency,
-                                                  batch_size=batch_size)
     return config
 
 

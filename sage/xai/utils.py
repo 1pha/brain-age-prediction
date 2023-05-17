@@ -22,13 +22,16 @@ def load_np(fname: str | np.ndarray | Path):
     return arr
 
 
-def top_q(arr: np.ndarray, q=0.95, return_bool: bool = False):
+def top_q(arr: np.ndarray,
+          q: float = 0.95,
+          use_abs: bool = True,
+          return_bool: bool = False):
     arr = load_np(arr)
 
     mask = ~np.isnan(arr)
     arr = arr * mask
 
-    mask = arr > np.nanquantile(arr, q=q)
+    mask = arr > np.nanquantile(np.abs(arr) if use_abs else arr, q=q)
     return mask.astype(np.int32) if return_bool else arr * mask
 
 

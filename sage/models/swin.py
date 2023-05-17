@@ -46,12 +46,16 @@ class SwinViT(ModelBase):
         self.backbone.load_state_dict(ckpt)
         logger.info("Successfully loaded checkpoint")
         
-    def forward(self, brain: torch.Tensor, age: torch.Tensor):
+    def forward(self, brain: torch.Tensor, age: torch.Tensor = None):
         # Resulting image: (batch_size, num_channels, 3, 3, 3)
         x_out = self.backbone(brain)[-1]
         pred = self.pool(x_out).squeeze()
-        loss = self.criterion(pred, age)
-        
-        return dict(loss=loss,
-                    reg_pred=pred.detach().cpu(),
-                    reg_target=age.detach().cpu())
+        if age is None:
+            # For GuidedBackprop
+            return pred.unsqueeze(dim=0)
+        else:
+            loss = self.criterion(pred, age)
+            
+            return dict(loss=loss,
+                        reg_pred=pred.detach().cpu(),
+                        reg_target=age.detach().cpu())

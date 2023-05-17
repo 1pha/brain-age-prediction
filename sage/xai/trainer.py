@@ -93,7 +93,12 @@ class XPLModule(PLModule):
                                            target_layer_index=target_layer_index)
 
         elif model.NAME == "swin_vit":
-            pass
+            if xai_method != "gcam":
+                self.xai = self._configure_xai(model=self.model,
+                                               xai_method=xai_method,
+                                               target_layer_index=target_layer_index)
+            else:
+                breakpoint()
     
     def upsample(self,
                  tensor: torch.Tensor,
@@ -112,7 +117,7 @@ class XPLModule(PLModule):
         upsampled = LayerAttribution.interpolate(layer_attribution=tensor,
                                                  interpolate_dims=target_shape,
                                                  interpolate_mode=interpolate_mode)
-        upsampled = upsampled.cpu().detach()
+        upsampled = upsampled.cpu().detach().squeeze()
         if return_np:
             upsampled = upsampled.numpy()
         if apply_margin_mask:
@@ -132,7 +137,13 @@ class XPLModule(PLModule):
                                              interpolate_mode="trilinear",
                                              return_np=True, apply_margin_mask=True)
             if self.top_individual:
-                attr: np.ndarray = top_q(arr=attr, q=self.top_k_percentile, return_bool=False)
+                attr: np.ndarray = top_q(arr=attr,
+                                         q=self.top_k_percentile,
+                                         use_abs=True,
+                                         return_bool=False)
+            else:
+                while attr.ndim > 3:
+                    attr = attr[0]
             return attr
 
         except RuntimeError as e:
