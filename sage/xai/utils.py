@@ -35,7 +35,7 @@ def top_q(arr: np.ndarray,
     return mask.astype(np.int32) if return_bool else arr * mask
 
 
-def z_norm(tensor):
+def z_norm(tensor) -> torch.Tensor:
     if tensor.ndim == 5: # (N, 1, 96, 96, 96)
         z_normed = torch.cat([_z_norm(t[0])[None, None, ...] for t in tensor], dim=0)
     elif tensor.ndim == 4: # (1, 96, 96, 96)
@@ -45,7 +45,13 @@ def z_norm(tensor):
     return z_normed
 
 
-def _z_norm(tensor):
+def _z_norm(tensor: torch.tensor):
+    mu = torch.nanmean(tensor)
+    sigma = torch.std(tensor)
+    return (tensor - mu) / sigma
+
+
+def __z_norm(tensor):
     assert tensor.ndim == 3, f"Give 3-dimensional tensor. Given {tensor.shape}."
     mu = np.nanmean(tensor)
     sigma = np.nanstd(tensor)

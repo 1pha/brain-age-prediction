@@ -60,7 +60,7 @@ class PLModule(pl.LightningModule):
         metrics = MetricCollection(metrics=[
             hydra.utils.instantiate(metrics[m]) for m in metrics.keys() if "_target_" in metrics[m]
         ])
-        self.train_metric = metrics.clone(prefix="train_")
+        self.in_metric = metrics.clone(prefix="train_")
         self.valid_metric = metrics.clone(prefix="valid_")
 
         if load_model_ckpt:
@@ -80,6 +80,7 @@ class PLModule(pl.LightningModule):
                          mask_threshold=self.mask_threshold)
         self.no_augment = sage.data.no_augment(mask=mask)
         self.augmentor = hydra.utils.instantiate(self.aug_config, mask=mask)
+        self.log_brain(return_path=False)
         
     def log_brain(self, return_path: bool = False):
         """ Logs sample brain to check how augmentation is applied. """
@@ -331,6 +332,7 @@ def inference(config: omegaconf.DictConfig,
         postfix = module.xai_method + (f"-indiv-k{top_k}" if top_indiv else "-total")
         root_dir = root_dir / postfix
         os.makedirs(name=root_dir, exist_ok=True)
+        logger.info("Start saving here %s", root_dir)
         
         # Save attr
         np.save(file=root_dir / "attrs.npy", arr=attr)
