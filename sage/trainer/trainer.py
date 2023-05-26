@@ -281,7 +281,8 @@ def train(config: omegaconf.DictConfig) -> None:
 
     # Logger Setup
     logger.watch(module)
-    if "version" in config.logger:
+    config_update: bool = "version" in config.logger or config.trainer.devices > 1
+    if config_update:
         # Skip config update when using resume checkpoint
         pass
     else:
@@ -302,6 +303,8 @@ def train(config: omegaconf.DictConfig) -> None:
         prediction = trainer.test(ckpt_path="best", dataloaders=dataloaders["test"])
         finalize_inference(prediction=prediction,
                            name=config.logger.name)
+    if config_update:
+        wandb.config.update(omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True))
     
 
 def inference(config: omegaconf.DictConfig,
