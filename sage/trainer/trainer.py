@@ -327,16 +327,22 @@ def inference(config: omegaconf.DictConfig,
 
     elif task == "sage.xai.trainer.XPLModule":
         attr: np.ndarray = module.attr
-        top_indiv = module.top_individual
-        top_k = module.top_k_percentile
-        postfix = module.xai_method + (f"-indiv-k{top_k}" if top_indiv else "-total")
+        top_attr: np.ndarray = module.top_attr
+        
+        top_k: float = module.top_k_percentile
+        postfix = module.xai_method + f"k{top_k:.2f}"
+        
         root_dir = root_dir / postfix
         os.makedirs(name=root_dir, exist_ok=True)
         logger.info("Start saving here %s", root_dir)
         
-        # Save attr
+        # Save attrs
         np.save(file=root_dir / "attrs.npy", arr=attr)
+        np.save(file=root_dir / "top_attr.npy", arr=top_attr)
         
         # Save plots
-        plot_glass_brain(arr=attr, save=root_dir / "glass.png")
-        plot_overlay(arr=attr, scale_factor=1, save=root_dir / "anat.png")
+        plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png")
+        plot_overlay(arr=attr, scale_factor=1, save=root_dir / "attr_anat.png")
+        
+        plot_glass_brain(arr=attr, save=root_dir / "top_glass.png")
+        plot_overlay(arr=attr, scale_factor=1, save=root_dir / "top_anat.png")

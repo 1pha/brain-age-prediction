@@ -16,6 +16,8 @@ def load_np(fname: str | np.ndarray | Path):
         arr = np.abs(np.load(fname))
     elif isinstance(fname, np.ndarray):
         arr = np.abs(fname)
+    elif fname is False:
+        return None
 
     while arr.ndim > 3:
         arr = arr[0]

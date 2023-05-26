@@ -13,3 +13,4 @@ jupyter
 ipykernel
 monai
 hydra-core
+matplotlib

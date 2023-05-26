@@ -34,7 +34,7 @@ module:
   augmentation:
     _target_: sage.data.augment
     spatial_size: [ 96, 96, 96 ]
-  mask: assets/mask.npy
+  mask: assets/masks/resnet10t-aug-nomask-ig0.99-0.995-sigma0.5.npy
   mask_threshold: 0.1
   load_from_checkpoint: # for lightning
   load_model_ckpt: # For model checkpoint only

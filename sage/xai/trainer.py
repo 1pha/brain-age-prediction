@@ -5,12 +5,18 @@ import omegaconf
 import numpy as np
 import torch
 from torch import nn
-from captum.attr import LayerGradCam, LayerAttribution, GuidedBackprop, IntegratedGradients
+from captum.attr import (
+    LayerAttribution,
+    GuidedBackprop,
+    IntegratedGradients,
+    LayerGradCam,
+    LRP
+)
 
 import sage
 from sage.trainer import PLModule
 from sage.constants import MNI_SHAPE
-from .utils import margin_mni_mask, z_norm, top_q
+from .utils import margin_mni_mask, z_norm, top_q, load_np
 
 
 logger = sage.utils.get_logger(name=__name__)
@@ -25,9 +31,9 @@ class XPLModule(PLModule):
                  metrics: dict,
                  ### Additional Arguments ###
                  target_layer_index: int = -2,
-                 top_individual: bool = True,
                  top_k_percentile: float = 0.95,
                  xai_method: str = "gbp",
+                 baseline: bool = False,
                  ############################
                  mask: Path | str | torch.Tensor = None,
                  mask_threshold: float = 0.1,
@@ -64,13 +70,18 @@ class XPLModule(PLModule):
 
         self.smaller_mask = margin_mni_mask()
         self.target_layer_index = target_layer_index
-        self.top_individual = sage.utils.parse_bool(top_individual)
         self.top_k_percentile = top_k_percentile
         self.xai_method = xai_method
+        self.baseline = load_np(fname=baseline)
         
         self.configure_xai(model=self.model,
                            xai_method=xai_method,
                            target_layer_index=target_layer_index)
+
+    def setup(self, stage):
+        super().setup(stage)
+        if self.baseline is not None and isinstance(self.baseline, np.ndarray):
+            self.baseline = torch.tensor(self.no_augment(self.baseline[None, ...]))
         
     def _configure_xai(self,
                        model: nn.Module | Callable,
@@ -81,9 +92,12 @@ class XPLModule(PLModule):
                                layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gbp":
             xai = GuidedBackprop(model=model)
-        
         elif xai_method == "ig":
             xai = IntegratedGradients(forward_func=model)
+        elif xai_method == "lrp":
+            xai = LRP(model=model)
+        else:
+            breakpoint()
         return xai
         
     def configure_xai(self,
@@ -104,7 +118,7 @@ class XPLModule(PLModule):
                                                target_layer_index=target_layer_index)
             else:
                 breakpoint()
-    
+                
     def upsample(self,
                  tensor: torch.Tensor,
                  target_shape: tuple = None,
@@ -130,26 +144,33 @@ class XPLModule(PLModule):
             upsampled *= self.smaller_mask
         return upsampled
         
-    def forward(self, batch: dict, mode: str = "test") -> np.ndarray:
+    def forward(self, batch: dict, mode: str = "test") -> dict:
         try:
             augmentor = self.augmentor if mode == "train" else self.no_augment
             brain = torch.tensor(augmentor(batch["brain"]))
+            if self.xai_method == "ig" and self.baseline is not None:
+                attr_kwargs = dict(baselines=self.baseline.to(self.device))
+            else:
+                attr_kwargs = dict()
             
-            attr: torch.Tensor = self.xai.attribute(brain)
+            attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
             attr: torch.Tensor = z_norm(attr)
             attr: np.ndarray = self.upsample(tensor=attr,
                                              target_shape=MNI_SHAPE,
                                              interpolate_mode="trilinear",
                                              return_np=True, apply_margin_mask=True)
-            if self.top_individual:
-                attr: np.ndarray = top_q(arr=attr,
+            top_attr: np.ndarray = top_q(arr=attr,
                                          q=self.top_k_percentile,
                                          use_abs=True,
                                          return_bool=False)
-            else:
-                while attr.ndim > 3:
-                    attr = attr[0]
-            return attr
+            while attr.ndim > 3:
+                attr = attr[0]
+            while top_attr.ndim > 3:
+                top_attr = top_attr[0]
+            return {
+                "attr": attr,
+                "top_attr": top_attr
+            }
 
         except RuntimeError as e:
             # For CUDA Device-side asserted error
@@ -161,15 +182,18 @@ class XPLModule(PLModule):
     def on_predict_start(self) -> None:
         """ Initialize attribute """
         self.attr = np.zeros(shape=self.smaller_mask.shape)
+        self.top_attr = np.zeros(shape=self.smaller_mask.shape)
         
     def predict_step(self,
                      batch: dict,
                      batch_idx: int,
                      dataloader_idx: int = 0) -> np.ndarray:
-        attr: np.ndarray = self.forward(batch, mode="test")
-        self.attr += attr
+        attrs: np.ndarray = self.forward(batch, mode="test")
+        self.attr += attrs["attr"]
+        self.top_attr += attrs["top_attr"]
         # This is a hack to make lightning work
         return torch.zeros(size=(1,), requires_grad=True)
 
     def on_predict_end(self) -> np.ndarray:
         self.attr /= len(self.predict_dataloader)
+        self.top_attr /= len(self.predict_dataloader)
