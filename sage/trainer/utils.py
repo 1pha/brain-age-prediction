@@ -61,7 +61,7 @@ def load_mask(mask_path: str | Path = None,
             raise
         # 4D-tensor: applied before channel unsqueezing
         mask = torch.tensor(mask)[None, None, ...].float()
-        mask = torch.nn.functional.interpolate(input=,
+        mask = torch.nn.functional.interpolate(input=mask,
                                                 size=(96, 96, 96), mode="trilinear").squeeze(dim=0)
         mask = mask < (mask_threshold or 0.1)
         return mask
