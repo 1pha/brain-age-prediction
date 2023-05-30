@@ -30,7 +30,12 @@ def load_imgs(root: Path = Path("assets/weights"),
     imgs = []
     for _path in path:
         img_path: Path = root / _path / mask / leaf_name
-        imgs.extend(list(img_path.glob(f"{img_type}.png")))
+        _imgs = list(img_path.glob(f"{img_type}*.png"))
+        if len(_imgs) == 0:
+            leaf_name = f"{method}k{top_k}"
+            img_path: Path = root / _path / mask / leaf_name
+            _imgs = list(img_path.glob(f"top_{img_type}.png"))
+        imgs.extend(_imgs)
     return imgs
 
 

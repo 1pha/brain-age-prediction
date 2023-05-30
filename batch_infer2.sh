@@ -6,7 +6,7 @@ path=${path}
 
 # read -p "--xai_method=" xai
 # xai=${xai:-gcam}
-xai='gbp'
+xai='ig'
 
 # read -p "--top_k=" k
 # k=${k:-0.99}

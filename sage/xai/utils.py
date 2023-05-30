@@ -87,5 +87,26 @@ def margin_mni_mask():
     return smaller_mask
 
 
+def upsample(arr: np.ndarray | torch.Tensor,
+             return_mni: bool = True,
+             target_shape: tuple = MNI_SHAPE,
+             interpolate_mode="trilinear") -> np.ndarray:
+    """ If you're translating atlas, it is recommended to use 'nearest' as interpolation_mode"""
+    if isinstance(arr, np.ndarray):
+        arr = torch.from_numpy(arr)
+        
+    while arr.ndim > 3:
+        arr = arr[0]
+    
+    if return_mni:
+        target_shape = MNI_SHAPE
+    
+    arr = torch.tensor(arr)
+    arr = LayerAttribution.interpolate(layer_attribution=arr[None, None, ...],
+                                       interpolate_dims=MNI_SHAPE,
+                                       interpolate_mode="nearest")[0][0].numpy()
+    return arr
+
+
 _nifti = lambda arr: nibabel.nifti1.Nifti1Image(arr, np.eye(4))
 _mni = lambda arr: nibabel.nifti1.Nifti1Image(arr, MNI_AFFINE)
