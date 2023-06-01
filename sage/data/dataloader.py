@@ -299,14 +299,25 @@ class UKBDataset(Dataset):
                  label_name: str = "ukb_age_label.csv",
                  mode: str = "train",
                  valid_ratio: float = 0.1,
+                 exclusion_fname: str = "exclusion.csv",
                  seed: int = 42,):
         logger.info("Setting up UKBiobank Dataset")
         root = Path(root)
         self.files = list(root.rglob("*.h5"))
         self._split_data(valid_ratio=valid_ratio, seed=seed, mode=mode)
+        
+        self.files = self._exclude_data(lst=self.files, root=root, exclusion_fname=exclusion_fname)
         logger.info("Total %s files of %s h5 exist", len(self.files), mode)
         
         self.labels = pd.read_csv(root / label_name)
+        
+    def _exclude_data(self,
+                      lst: pd.DataFrame,
+                      root: Path,
+                      exclusion_fname: str = "exclusion.csv",):
+        exclusion = set(pd.read_csv(root / exclusion_fname, header=None).values.flatten().tolist())
+        lst = [f for f in lst if f not in exclusion]
+        return lst
         
     def _split_data(self,
                     valid_ratio: float = 0.1,
