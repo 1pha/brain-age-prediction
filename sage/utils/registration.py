@@ -1,13 +1,13 @@
-import os
 import time
+import pickle
 from glob import glob
+from pathlib import Path
 
 import numpy as np
 
 np.set_printoptions(precision=4, suppress=True)
 
 import matplotlib.pyplot as plt
-import pandas as pd
 import yaml
 
 plt.rcParams["image.cmap"] = "gray"
@@ -15,7 +15,6 @@ plt.rcParams["image.interpolation"] = "nearest"
 
 import nibabel as nib
 from dipy.align.imaffine import (
-    AffineMap,
     AffineRegistration,
     MutualInformationMetric,
     transform_centers_of_mass,
@@ -343,23 +342,30 @@ class Registrator:
         return self.reg_cfg
 
 
-def compare_brains(left, right, left_title="A", right_title="B"):
+def compare_brains(left, right, left_title="Template", title="Moving"):
     """
     left, right brains should be in the form of np.ndarray with same dimensions
     """
-
     regtools.overlay_slices(left, right, None, 0, left_title, right_title)
     regtools.overlay_slices(left, right, None, 1, left_title, right_title)
     regtools.overlay_slices(left, right, None, 2, left_title, right_title)
 
 
 def load_config(path=None):
-
     if path is None:
         path = "utils/registration.yml"
-
     with open(path, "r") as y:
-        return yaml.load(y)
+        config = yaml.load(y)
+    return config
+
+
+def register_bb2mni(arr: np.ndarray,
+                    root: Path | str = Path("assets"),
+                    registrator: str = "affine_bb2mni.pkl"):
+    with open(file=root / registrator, mode="rb") as f:
+        registrator = pickle.load(f)
+    arr = registrator.transform(arr)
+    return arr
 
 
 if __name__ == "__main__":

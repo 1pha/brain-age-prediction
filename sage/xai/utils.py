@@ -60,6 +60,11 @@ def __z_norm(tensor):
     return (tensor - mu) / sigma
 
 
+def boolify(arr: np.ndarray) -> np.ndarray:
+    bool_mask = ~np.isnan(arr) & (arr > 0)
+    return bool_mask
+
+
 def average(tensor, dim=0):
     N = tensor.shape[dim]
     return tensor.sum(dim) / N
