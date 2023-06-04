@@ -109,7 +109,7 @@ def upsample(arr: np.ndarray | torch.Tensor,
     arr = torch.tensor(arr)
     arr = LayerAttribution.interpolate(layer_attribution=arr[None, None, ...],
                                        interpolate_dims=MNI_SHAPE,
-                                       interpolate_mode="nearest")[0][0].numpy()
+                                       interpolate_mode=interpolate_mode)[0][0].numpy()
     return arr
 
 

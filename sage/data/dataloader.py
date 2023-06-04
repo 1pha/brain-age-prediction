@@ -300,8 +300,10 @@ class UKBDataset(Dataset):
                  mode: str = "train",
                  valid_ratio: float = 0.1,
                  exclusion_fname: str = "exclusion.csv",
+                 return_tensor: bool = True,
                  seed: int = 42,):
         logger.info("Setting up UKBiobank Dataset")
+        self.return_tensor = return_tensor
         root = Path(root)
         self.files = list(root.rglob("*.h5"))
         self._split_data(valid_ratio=valid_ratio, seed=seed, mode=mode)
@@ -337,6 +339,9 @@ class UKBDataset(Dataset):
         fname = self.files[idx]
         arr, meta = open_h5(fname)
         age = self.labels.query(f"fname == '{fname.stem}'").age.iloc[0]
+        if self.return_tensor:
+            arr = torch.tensor(arr, dtype=torch.float32)
+            age = torch.tensor(age, dtype=torch.long)
         return {
             "brain": arr,
             "age": age,

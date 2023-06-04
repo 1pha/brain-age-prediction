@@ -346,9 +346,9 @@ def compare_brains(left, right, left_title="Template", title="Moving"):
     """
     left, right brains should be in the form of np.ndarray with same dimensions
     """
-    regtools.overlay_slices(left, right, None, 0, left_title, right_title)
-    regtools.overlay_slices(left, right, None, 1, left_title, right_title)
-    regtools.overlay_slices(left, right, None, 2, left_title, right_title)
+    regtools.overlay_slices(left, right, None, 0, left_title, title)
+    regtools.overlay_slices(left, right, None, 1, left_title, title)
+    regtools.overlay_slices(left, right, None, 2, left_title, title)
 
 
 def load_config(path=None):
