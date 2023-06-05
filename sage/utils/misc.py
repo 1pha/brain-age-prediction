@@ -24,6 +24,8 @@ def parse_bool(s: str) -> bool:
         return False
     elif s in ["True", "False"]:
         return ast.literal_eval(s)
+    else:
+        return s
 
 
 def get_logger(name: str = None, filehandler: bool = False):

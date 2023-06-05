@@ -83,12 +83,12 @@ class PLModule(pl.LightningModule):
         self.augmentor = hydra.utils.instantiate(self.aug_config, mask=mask)
         self.log_brain(return_path=False)
         
-    def log_brain(self, return_path: bool = False):
+    def log_brain(self, return_path: bool = False, augment: bool = True):
         """ Logs sample brain to check how augmentation is applied. """
         ds = self.train_dataloader.dataset
         idx: int = random.randint(a=0, b=len(ds))
         brain: torch.Tensor = ds[idx]["brain"]
-        brain = self.augmentor(brain[None, ...])
+        brain = self.augmentor(brain[None, ...]) if augment else self.no_augment(brain[None, ...])
         
         tmp = "tmp.png"
         plot_brain(brain, save=tmp)
@@ -310,18 +310,18 @@ def train(config: omegaconf.DictConfig) -> None:
 
 def inference(config: omegaconf.DictConfig,
               root_dir: Path = None) -> None:
-    module, dataloaders = setup_trainer(config)
-    module.setup(stage=None)
-    brain = module.log_brain(return_path=True)
-    subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
-    
-    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
-    logger.info("Start prediction")
-    prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
-    
     if root_dir is None:
         root_dir = Path(config.callbacks.checkpoint.dirpath)
         
+    module, dataloaders = setup_trainer(config)
+    module.setup(stage=None)
+    brain = module.log_brain(return_path=True, augment=False)
+    subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
+
+    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
+    logger.info("Start prediction")
+    prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
+
     task = config.module._target_
     # Infer Metrics
     if task == "sage.trainer.PLModule":
@@ -348,5 +348,5 @@ def inference(config: omegaconf.DictConfig,
         plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png")
         plot_overlay(arr=attr, scale_factor=1, save=root_dir / "attr_anat.png")
         
-        plot_glass_brain(arr=attr, save=root_dir / "top_glass.png")
-        plot_overlay(arr=attr, scale_factor=1, save=root_dir / "top_anat.png")
+        plot_glass_brain(arr=top_attr, save=root_dir / "top_glass.png")
+        plot_overlay(arr=top_attr, scale_factor=1, save=root_dir / "top_anat.png")
