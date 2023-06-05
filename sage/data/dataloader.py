@@ -26,6 +26,7 @@ except:
     pass
 
 from sage.utils import get_logger
+import sage.constants as sc
 
 
 logger = get_logger(name=__name__)
@@ -50,6 +51,21 @@ def open_h5(fname: str) -> Tuple[np.ndarray, dict]:
         except:
             meta = None
     return arr, meta
+
+
+def open_h5_nifti(fname: str) -> nib.nifti1.Nifti1Image:
+    with h5py.File(name=fname, mode="r") as hf:
+        arr = hf["volume"][:]
+        try:
+            meta = dict(hf.attrs)
+            
+            affine_last = np.array([0, 0, 0, 1], dtype=np.float32)
+            affine = np.stack([meta["srow_x"], meta["srow_y"], meta["srow_z"], affine_last])
+        except:
+            meta = None
+            affine = sc.BIOBANK_AFFINE
+    nii = nib.nifti1.Nifti1Image(dataobj=arr, affine=affine)
+    return nii
 
 
 def get_scaler(scaler: str):
