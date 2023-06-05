@@ -29,6 +29,8 @@ from dipy.align.transforms import (
 from dipy.viz import regtools
 from nilearn.datasets import load_mni152_template
 
+import sage.constants as sc
+from sage.data.dataloader import open_h5_nifti
 
 def inform(original_fn):
     def wrapper_fn(*args, **kwargs):
@@ -366,6 +368,132 @@ def register_bb2mni(arr: np.ndarray,
         registrator = pickle.load(f)
     arr = registrator.transform(arr)
     return arr
+
+
+def register(template: nib.nifti1.Nifti1Image,
+             moving: nib.nifti1.Nifti1Image,
+             do_nonlinear: bool = False):
+    """
+    """
+    # Loading Data
+    # Set template
+    if isinstance(template, np.ndarray):
+        template_data = template.copy()
+        
+        mni = load_mni152_template()
+        template_affine = mni.affine
+        template_img = nib.nifti1.Nifti1Image(dataobj=template_data,
+                                              affine=template_affine)
+    
+    elif isinstance(template, str):
+        if template == "mni":
+            template_img = load_mni152_template()
+            template_data, template_affine = template_img.get_fdata(), template_img.affine
+        else:
+            template_img = open_h5_nifti(template)
+    else:
+        template_img = template
+        template_data, template_affine = template_img.get_fdata(), template_img.affine()
+            
+    # Set Moving
+    if isinstance(moving, np.ndarray):
+        moving_data = moving.copy()
+        moving_affine = sc.BIOBANK_AFFINE
+        moving_img = nib.nifti1.Nifti1Image(dataobj=moving_data, affine=moving_affine)
+    
+    elif isinstance(moving, nib.nift1i.Nifti1Image):
+        moving_img = moving
+        moving_data, moving_affine = moving_img.get_fdata(), moving_img.affine
+    
+    elif isinstance(moving, str):
+        moving_img = open_h5_nifti(fname=moving)
+        moving_data, moving_affine = moving_img.get_fdata(), moving_img.affine
+        
+    # Set params
+    nbins = 32
+    sampling_prop = None
+    metric = MutualInformationMetric(nbins, sampling_prop)
+
+    # The optimization strategy
+    level_iters = [10, 10, 5]
+    sigmas = [3.0, 1.0, 0.0]
+    factors = [4, 2, 1]
+    
+    transforms = dict()
+
+    # 01. Define Affine Registration
+    affreg = AffineRegistration(
+        metric=metric, level_iters=level_iters, sigmas=sigmas, factors=factors
+    )
+
+    c_of_mass = transform_centers_of_mass(
+        template_data, template_img, moving_data, moving_img
+    )
+    starting_affine = c_of_mass.affine
+    transforms["0_c_of_mass"] = c_of_mass
+    
+    # 02. Registration
+    # 02-1. Translation
+    print("1. Translation Optimization")
+    transform = TranslationTransform3D()
+    params0 = None
+    translation = affreg.optimize(
+        template_data,
+        moving_data,
+        transform,
+        params0,
+        template_affine,
+        moving_affine,
+        starting_affine=starting_affine,
+    )
+    transforms["1_translation"] = translation
+
+    # 02-2. Rigid
+    print("2. Rigid Optimization")
+    transform = RigidTransform3D()
+    rigid = affreg.optimize(
+        template_data,
+        moving_data,
+        transform,
+        params0,
+        template_affine,
+        moving_affine,
+        starting_affine=translation.affine,
+    )
+    transforms["2_rigid"] = rigid
+
+    # 02-3. Affine
+    print("3. Affine Optimization")
+    transform = AffineTransform3D()
+    # Bump up the iterations to get an more exact fit
+    affreg.level_iters = [1000, 1000, 100]
+    affine = affreg.optimize(
+        template_data,
+        moving_data,
+        transform,
+        params0,
+        template_affine,
+        moving_affine,
+        starting_affine=rigid.affine,
+    )
+    transforms["3_affine"] = affine
+
+    if do_nonlinear:
+        # 02-4. SymmetricDiffeomorphicRegistration
+        print("4. SDR Optimization")
+        # The mismatch metric
+        metric = CCMetric(3)
+        # The optimization strategy:
+        level_iters = [10, 10, 5]
+        # Registration object
+        sdr = SymmetricDiffeomorphicRegistration(metric, level_iters)
+        mapping = sdr.optimize(
+            template_data, moving_data, template_affine, moving_affine, affine.affine
+        )
+        transforms["4_sdr"] = mapping
+    
+    return transforms, 
+    
 
 
 if __name__ == "__main__":
