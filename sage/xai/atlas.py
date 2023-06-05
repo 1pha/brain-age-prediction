@@ -1,4 +1,5 @@
 import ast
+from pathlib import Path
 from typing import Tuple, TypeVar
 
 import numpy as np
@@ -21,6 +22,7 @@ def get_atlas(atlas_name: str,
     atlas_map, indices, labels = {
         "aal": _get_aal(),
         "oxford": _get_ho(**atlas_kwargs),
+        "cerebra": _get_cerebra(),
     }[atlas_name]
     
     if return_mni:
@@ -54,8 +56,11 @@ def _literal_eval(lst: list):
         return s
     lst = list(map(le, lst))
     return lst
-    
-    
+
+
+def _get_cerebra():
+    pass
+
     
 def _get_ho(atlas_name="cortl-maxprob-thr50-1mm") -> Tuple[nii, list, list]:
     atlas = fetch_atlas_harvard_oxford(atlas_name=atlas_name)
