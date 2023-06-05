@@ -317,8 +317,13 @@ class UKBDataset(Dataset):
                       lst: pd.DataFrame,
                       root: Path,
                       exclusion_fname: str = "exclusion.csv",):
-        exclusion = set(pd.read_csv(root / exclusion_fname, header=None).values.flatten().tolist())
-        lst = [f for f in lst if f not in exclusion]
+        try:
+            exc = pd.read_csv(root / exclusion_fname, header=None)
+            exclusion = set(exc.values.flatten().tolist())
+            lst = [f for f in lst if f not in exclusion]
+        except:
+            logger.info("No exclusion file found. %s", root / exclusion_fname)
+            pass
         return lst
         
     def _split_data(self,
