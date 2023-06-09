@@ -316,7 +316,6 @@ def inference(config: omegaconf.DictConfig,
     module, dataloaders = setup_trainer(config)
     module.setup(stage=None)
     brain = module.log_brain(return_path=True, augment=False)
-    subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
 
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     logger.info("Start prediction")
@@ -332,12 +331,13 @@ def inference(config: omegaconf.DictConfig,
     elif task == "sage.xai.trainer.XPLModule":
         attr: np.ndarray = module.attr
         top_attr: np.ndarray = module.top_attr
-        
         top_k: float = module.top_k_percentile
-        postfix = module.xai_method + f"k{top_k:.2f}"
         
+        postfix = module.xai_method + f"k{top_k:.2f}"
         root_dir = root_dir / postfix
+        subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
         os.makedirs(name=root_dir, exist_ok=True)
+        
         logger.info("Start saving here %s", root_dir)
         
         # Save attrs
@@ -346,7 +346,7 @@ def inference(config: omegaconf.DictConfig,
         
         # Save plots
         plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png")
-        plot_overlay(arr=attr, scale_factor=1, save=root_dir / "attr_anat.png")
+        plot_overlay(arr=attr, save=root_dir / "attr_anat.png")
         
         plot_glass_brain(arr=top_attr, save=root_dir / "top_glass.png")
-        plot_overlay(arr=top_attr, scale_factor=1, save=root_dir / "top_anat.png")
+        plot_overlay(arr=top_attr, save=root_dir / "top_anat.png")
