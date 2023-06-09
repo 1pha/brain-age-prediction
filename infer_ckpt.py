@@ -11,6 +11,8 @@ import sage
 
 logger = sage.utils.get_logger(name=__name__)
 
+MASK_DIR = Path("assets/masks")
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -36,16 +38,17 @@ def main(args):
     root = Path(args.root) / args.path
     weight = sorted(root.glob("*.ckpt"))[int(args.weight == "last")]
     
+    mask = sage.utils.parse_bool(args.mask)
     overrides = ["misc.modes=[train,valid,test]",
-                 "+module.target_layer_index=-1",
                  f"module.load_model_ckpt={weight}",
                  f"dataloader.batch_size={args.batch_size}",
-                 f"module.mask={'assets/mask.npy' if args.mask == 'mask' else 'False'}"]
+                 f"module.mask={MASK_DIR/mask if mask else 'False'}"]
     
     infer_xai: bool = sage.utils.parse_bool(args.infer_xai)
     if infer_xai:
         logger.info("Infer XAI map")
         overrides += [
+            "+module.target_layer_index=-1",
             "module._target_=sage.xai.trainer.XPLModule",
             f"+module.top_k_percentile={args.top_k}",
             f"+module.xai_method={args.xai_method}",
@@ -60,7 +63,7 @@ def main(args):
         config = hydra.compose(config_name="config.yaml", overrides=overrides)
 
     logger.info("Start Inference")
-    root = root / ("mask" if args.mask == "mask" else "no-mask")
+    root = root / ("mask" if mask else "no-mask")
     os.makedirs(root, exist_ok=True)
     sage.trainer.inference(config, root_dir=root)
 
