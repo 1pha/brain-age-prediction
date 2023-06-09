@@ -1,4 +1,8 @@
 from pathlib import Path
+import copy
+import gc
+from pathlib import Path
+from warnings import warn
 
 import torch
 import nibabel
@@ -108,10 +112,64 @@ def upsample(arr: np.ndarray | torch.Tensor,
     
     arr = torch.tensor(arr)
     arr = LayerAttribution.interpolate(layer_attribution=arr[None, None, ...],
-                                       interpolate_dims=MNI_SHAPE,
+                                       interpolate_dims=target_shape,
                                        interpolate_mode=interpolate_mode)[0][0].numpy()
     return arr
 
 
-_nifti = lambda arr: nibabel.nifti1.Nifti1Image(arr, np.eye(4))
+def _get_data(img):
+    # copy-pasted from
+    # https://github.com/nipy/nibabel/blob/de44a105c1267b07ef9e28f6c35b31f851d5a005/nibabel/dataobj_images.py#L204 # noqa
+    #
+    # get_data is removed from nibabel because:
+    # see https://github.com/nipy/nibabel/wiki/BIAP8
+    if img._data_cache is not None:
+        return img._data_cache
+    data = np.asanyarray(img._dataobj)
+    img._data_cache = data
+    return data
+
+
+def _safe_get_data(img, ensure_finite=False, copy_data=False):
+    """Get the data in the image without having a side effect \
+    on the Nifti1Image object.
+
+    Parameters
+    ----------
+    img: Nifti image/object
+        Image to get data.
+
+    ensure_finite: bool
+        If True, non-finite values such as (NaNs and infs) found in the
+        image will be replaced by zeros.
+
+    copy_data: bool, default is False
+        If true, the returned data is a copy of the img data.
+
+    Returns
+    -------
+    data: numpy array
+        nilearn.image.get_data return from Nifti image.
+    """
+    if copy_data:
+        img = copy.deepcopy(img)
+
+    # typically the line below can double memory usage
+    # that's why we invoke a forced call to the garbage collector
+    gc.collect()
+
+    data = _get_data(img)
+    if ensure_finite:
+        non_finite_mask = np.logical_not(np.isfinite(data))
+        if non_finite_mask.sum() > 0:  # any non_finite_mask values?
+            warn(
+                "Non-finite values detected. "
+                "These values will be replaced with zeros."
+            )
+            data[non_finite_mask] = 0
+
+    return data
+
+
+_nifti = lambda arr, affine=np.eye(4): nibabel.nifti1.Nifti1Image(arr, affine)
 _mni = lambda arr: nibabel.nifti1.Nifti1Image(arr, MNI_AFFINE)

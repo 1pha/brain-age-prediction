@@ -1,13 +1,45 @@
 import torch
 import numpy as np
 import nilearn.plotting as nilp
+import nibabel as nib
 from nilearn.datasets import load_mni152_template
 
 from sage.utils import get_logger
 from .utils import _mni, _nifti
+from .atlas import get_atlas
 
 
 logger = get_logger(name=__file__)
+
+
+def load_affine(target_affine: str | np.ndarray = "cerebra") -> np.ndarray:
+    if isinstance(target_affine, str):
+        atlas = get_atlas(atlas_name=target_affine,
+                          return_mni=False if target_affine == "cerebra" else True)
+        target_affine = atlas.nii.affine
+    elif isinstance(target_affine, np.ndarray):
+        assert target_affine.ndim == 2, "`target_affine` should be 2-dimensional 4*4 matrix"
+        assert target_affine.shape == (4, 4), "`target_affine` should be 2-dimensional 4*4 matrix"
+    return target_affine
+
+
+def check_nii(arr: np.ndarray | torch.Tensor | nib.nifti1.Nifti1Image,
+              target_mni: bool = True,
+              target_affine: np.ndarray = None):
+    """ Returns nii for a given array """
+    if isinstance(arr, np.ndarray | torch.Tensor):
+        arr = _tensorfy(arr=arr)
+        if target_mni and target_affine is None:
+            # If target_affine is given, this should be ignored
+            nifti = _mni(arr)
+        else:
+            assert target_affine is not None, f"Please provide target_affine. Given {target_affine}"
+            nifti = _nifti(arr=arr, affine=target_affine)
+    elif isinstance(arr, nib.nifti1.Nifti1Image):
+        nifti = arr
+    else:
+        raise
+    return nifti
 
 
 def _tensorfy(arr: torch.Tensor | np.ndarray) -> np.ndarray:
@@ -37,21 +69,40 @@ def plot_brain(arr: torch.Tensor | np.ndarray,
 
 
 def plot_overlay(arr: torch.Tensor | np.ndarray,
-                 use_mni: bool = True, scale_factor: float = 1e+5,
-                 save: str = None, alpha: float = 0.7, **kwargs):
-    arr = np.abs(_tensorfy(arr)) * scale_factor
-    nifti = _mni if use_mni else _nifti
-    display = nilp.plot_anat(anat_img=load_mni152_template(), **kwargs)
-    display.add_overlay(nifti(arr), alpha=alpha)
+                 use_mni: bool = True,
+                 target_affine: np.ndarray = None,
+                 bg: np.ndarray | nib.nifti1.Nifti1Image = None,
+                 display_mode: str = "ortho",
+                 save: str = None, alpha: float = 0.7, **kwargs):    
+    """ Works similar with `nilp.plot_roi`
+    However this first plots an original brain
+    and overlays with `nilp.add_overlay`. """
+    arr = check_nii(arr=arr, target_mni=use_mni, target_affine=target_affine)
+    if bg is None:
+        bg = load_mni152_template()
+    display = nilp.plot_anat(anat_img=bg, display_mode=display_mode)
+    display.add_overlay(arr, alpha=alpha, **kwargs)
     if save is not None:
         display.savefig(save)
     return display, save
 
 
 def plot_glass_brain(arr: torch.Tensor | np.ndarray,
-                     scale_factor: float = 1,
+                     use_mni: bool = True,
+                     target_affine: np.ndarray = None,
                      save: str = None, **kwargs):
-    arr = np.abs(_tensorfy(arr)) * scale_factor
-    display = nilp.plot_glass_brain(_mni(arr), output_file=save, **kwargs)
+    arr = check_nii(arr=arr, target_mni=use_mni, target_affine=target_affine)
+    display = nilp.plot_glass_brain(arr, output_file=save, **kwargs)
     return display, save
+
+
+def plot_roi(roi_img: np.ndarray | nib.nifti1.Nifti1Image,
+             bg_img: np.ndarray | nib.nifti1.Nifti1Image,
+             target_affine: str | np.ndarray = "cerebra",
+             display_mode: str = "mosaic", **kwargs):
+    target_affine = load_affine(target_affine=target_affine)
+    roi_img = check_nii(roi_img, target_affine=target_affine)
+    bg_img = check_nii(bg_img, target_affine=target_affine)
     
+    dp = nilp.plot_roi(roi_img=roi_img, bg_img=bg_img, display_mode=display_mode, **kwargs)
+    return dp

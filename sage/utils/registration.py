@@ -351,6 +351,7 @@ def compare_brains(left, right, left_title="Template", title="Moving"):
     regtools.overlay_slices(left, right, None, 0, left_title, title)
     regtools.overlay_slices(left, right, None, 1, left_title, title)
     regtools.overlay_slices(left, right, None, 2, left_title, title)
+    plt.show()
 
 
 def load_config(path=None):
@@ -370,10 +371,17 @@ def register_bb2mni(arr: np.ndarray,
     return arr
 
 
-def register(template: nib.nifti1.Nifti1Image,
-             moving: nib.nifti1.Nifti1Image,
-             do_nonlinear: bool = False):
+def register(moving: nib.nifti1.Nifti1Image,
+             template: nib.nifti1.Nifti1Image = "mni", 
+             do_nonlinear: bool = False,
+             do_visualize: bool = False):
     """
+    Registers "moving" nifti image to "template" image.
+    Note the following cases
+    1. np.ndarray given:
+        -> MNI affine will be used
+    2. str given:
+        -> MNI: directly calls `load_mni_152_template`
     """
     # Loading Data
     # Set template
@@ -393,7 +401,7 @@ def register(template: nib.nifti1.Nifti1Image,
             template_img = open_h5_nifti(template)
     else:
         template_img = template
-        template_data, template_affine = template_img.get_fdata(), template_img.affine()
+        template_data, template_affine = template_img.get_fdata(), template_img.affine
             
     # Set Moving
     if isinstance(moving, np.ndarray):
@@ -401,7 +409,7 @@ def register(template: nib.nifti1.Nifti1Image,
         moving_affine = sc.BIOBANK_AFFINE
         moving_img = nib.nifti1.Nifti1Image(dataobj=moving_data, affine=moving_affine)
     
-    elif isinstance(moving, nib.nift1i.Nifti1Image):
+    elif isinstance(moving, nib.nifti1.Nifti1Image):
         moving_img = moving
         moving_data, moving_affine = moving_img.get_fdata(), moving_img.affine
     
@@ -422,13 +430,13 @@ def register(template: nib.nifti1.Nifti1Image,
     transforms = dict()
 
     # 01. Define Affine Registration
-    affreg = AffineRegistration(
-        metric=metric, level_iters=level_iters, sigmas=sigmas, factors=factors
-    )
+    affreg = AffineRegistration(metric=metric,
+                                level_iters=level_iters,
+                                sigmas=sigmas,
+                                factors=factors)
 
-    c_of_mass = transform_centers_of_mass(
-        template_data, template_img, moving_data, moving_img
-    )
+    c_of_mass = transform_centers_of_mass(template_data, template_affine,
+                                          moving_data, moving_affine)
     starting_affine = c_of_mass.affine
     transforms["0_c_of_mass"] = c_of_mass
     
@@ -447,6 +455,10 @@ def register(template: nib.nifti1.Nifti1Image,
         starting_affine=starting_affine,
     )
     transforms["1_translation"] = translation
+    if do_visualize:
+        compare_brains(left=template_data,
+                       right=translation.transform(moving_data),
+                       title="Translation")
 
     # 02-2. Rigid
     print("2. Rigid Optimization")
@@ -461,6 +473,10 @@ def register(template: nib.nifti1.Nifti1Image,
         starting_affine=translation.affine,
     )
     transforms["2_rigid"] = rigid
+    if do_visualize:
+        compare_brains(left=template_data,
+                       right=rigid.transform(moving_data),
+                       title="Rigid")
 
     # 02-3. Affine
     print("3. Affine Optimization")
@@ -477,6 +493,11 @@ def register(template: nib.nifti1.Nifti1Image,
         starting_affine=rigid.affine,
     )
     transforms["3_affine"] = affine
+    output = affine.transform(moving_data)
+    if do_visualize:
+        compare_brains(left=template_data,
+                       right=output,
+                       title="Affine")
 
     if do_nonlinear:
         # 02-4. SymmetricDiffeomorphicRegistration
@@ -491,9 +512,14 @@ def register(template: nib.nifti1.Nifti1Image,
             template_data, moving_data, template_affine, moving_affine, affine.affine
         )
         transforms["4_sdr"] = mapping
+        output = mapping.transform(moving_data)
+        if do_visualize:
+            compare_brains(left=template_data,
+                          right=output,
+                          title="SDR")
     
-    return transforms, 
-    
+    return output, transforms
+
 
 
 if __name__ == "__main__":
