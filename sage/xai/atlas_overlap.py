@@ -38,7 +38,9 @@ def load_sal(path: str = "resnet10t-aug",
     """ Loads saliency and their metadata
     Given arguments will be used as follows
     Loads attr.npy from following dir
-    root / $path / $mask / $xai$top_k / $load_top_attr.npy """
+    root / $path / $mask / $xai$top_k / $load_top_attr.npy 
+    - $mask: e.g. mask, no-mask, sigma=0.5, sigma=1.0
+    """
     
     npy_dir = root_dir / \
               path / \
@@ -64,7 +66,10 @@ def resample_sal(arr: np.ndarray,
     
 def calculate_overlaps(arr: np.ndarray,
                        atlas: Bunch,
+                       title: str = "",
                        use_abs: bool = True,
+                       vmin: float = None, vmax: float = None,
+                       plot_raw_sal: bool = True,
                        plot_bargraph: bool = True,
                        plot_brains: bool = True) -> dict:
     ### Setups ###
@@ -84,6 +89,11 @@ def calculate_overlaps(arr: np.ndarray,
         logger.info("Overlaps with absolute values")
     else:
         logger.info("Overlaps with raw values")
+        
+    if plot_raw_sal and plot_brains:
+        _title = f"{title}_RAW Mask"
+        nilp_.plot_glass_brain(arr=mask_, target_affine=atlas.nii.affine,
+                               colorbar=True, title=_title, plot_abs=False) # Always draw raw
 
     # 1. Calculate values over regions
     xai_dict = dict()
@@ -98,7 +108,7 @@ def calculate_overlaps(arr: np.ndarray,
         xai_dict[label] = roi_val / num_nonzero
     
     if plot_bargraph:
-        brain_barplot(xai_dict=xai_dict)
+        brain_barplot(xai_dict=xai_dict, title=title)
         
     # 2. Map dict on brain
     agg_saliency = np.zeros_like(atlas.array)
@@ -111,25 +121,26 @@ def calculate_overlaps(arr: np.ndarray,
         agg_saliency[np.where(atlas.array == int(idx))] = val
         
     if plot_brains:
+        nilp_.plot_glass_brain(arr=agg_saliency,
+                               target_affine=atlas.nii.affine, title=title,
+                               vmin=vmin, vmax=vmax,
+                               colorbar=True, plot_abs=use_abs)
         nilp_.plot_overlay(arr=agg_saliency,
                            target_affine=atlas.nii.affine,
                            display_mode="mosaic",
-                           threshold=0.25,
+                           threshold=0.25, title=title,
                            cmap=nilp.cm.red_transparent if use_abs else nilp.cm.bwr,
                            colorbar=True)
-        nilp_.plot_glass_brain(arr=agg_saliency,
-                               target_affine=atlas.nii.affine,
-                               colorbar=True, plot_abs=use_abs)
         
     return xai_dict, agg_saliency
 
 
 def brain_barplot(xai_dict: dict,
-                  title: str = None,
+                  title: str = "",
                   sort_values: bool = True):
     fig, ax = plt.subplots(figsize=(12, UNIT_Y * len(xai_dict)))
     
-    ax.set_title(title or "")
+    ax.set_title(title)
     df = pd.DataFrame({
         "Regions": xai_dict.keys(),
         "Saliency": xai_dict.values()
