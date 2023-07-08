@@ -88,6 +88,7 @@ def calculate_overlaps(arr: np.ndarray,
     # 1. Calculate values over regions
     xai_dict = dict()
     pbar = tqdm(iterable=zip(atlas.indices, atlas.labels),
+                total=len(atlas.indices),
                 desc="Aggregating values across ROIs")
     for idx, label in pbar:
         roi_mask = atlas.array == idx
