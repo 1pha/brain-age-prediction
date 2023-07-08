@@ -80,7 +80,8 @@ def plot_overlay(arr: torch.Tensor | np.ndarray,
     arr = check_nii(arr=arr, target_mni=use_mni, target_affine=target_affine)
     if bg is None:
         bg = load_mni152_template()
-    display = nilp.plot_anat(anat_img=bg, display_mode=display_mode)
+    title = kwargs.pop("title", "")
+    display = nilp.plot_anat(anat_img=bg, display_mode=display_mode, title=title)
     display.add_overlay(arr, alpha=alpha, **kwargs)
     if save is not None:
         display.savefig(save)
