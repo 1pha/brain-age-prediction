@@ -1,8 +1,11 @@
-import torch
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 import nilearn.plotting as nilp
 import nibabel as nib
 from nilearn.datasets import load_mni152_template
+import torch
 
 from sage.utils import get_logger
 from .utils import _mni, _nifti
@@ -10,6 +13,8 @@ from .atlas import get_atlas
 
 
 logger = get_logger(name=__file__)
+
+UNIT_Y = 25 / 116
 
 
 def load_affine(target_affine: str | np.ndarray = "cerebra") -> np.ndarray:
@@ -107,3 +112,15 @@ def plot_roi(roi_img: np.ndarray | nib.nifti1.Nifti1Image,
     
     dp = nilp.plot_roi(roi_img=roi_img, bg_img=bg_img, display_mode=display_mode, **kwargs)
     return dp
+
+def brain_barplot(xai_dict: dict,
+                  title: str = "",
+                  sort_values: bool = True) -> None:
+    fig, ax = plt.subplots(figsize=(12, UNIT_Y * len(xai_dict)))
+    
+    ax.set_title(title)
+    df = pd.DataFrame({"Regions": xai_dict.keys(),
+                       "Saliency": xai_dict.values()})
+    if sort_values:
+        df = df.sort_values(by="Saliency")
+    sns.barplot(data=df, x="Saliency", y="Regions", ax=ax)

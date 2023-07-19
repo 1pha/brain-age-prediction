@@ -4,16 +4,12 @@ Possible outcomes:
 - Region-wise maps (glass / anat)
 
 They can be inferred with absolute or raw values"""
-
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
 from nilearn.image import resample_img, new_img_like
 import nilearn.plotting as nilp
-import pandas as pd
-import seaborn as sns
 from sklearn.utils import Bunch
 from tqdm import tqdm
 
@@ -26,7 +22,6 @@ from .atlas import get_atlas
 logger = get_logger(name=__file__)
 
 ASSET_DIR = Path("assets/weights")
-UNIT_Y = 25 / 116
 
 
 def load_sal(path: str = "resnet10t-aug",
@@ -62,7 +57,7 @@ def resample_sal(arr: np.ndarray,
                              target_affine=atlas.affine,
                              target_shape=atlas.shape)
     return resampled
-    
+
     
 def calculate_overlaps(arr: np.ndarray,
                        atlas: Bunch,
@@ -73,7 +68,7 @@ def calculate_overlaps(arr: np.ndarray,
                        plot_bargraph: bool = True,
                        plot_brains: bool = True) -> dict:
     ### Setups ###
-    # Load proper mask 
+    # Load proper mask
     if isinstance(arr, nib.nifti1.Nifti1Image):
         mask_ = arr.get_fdata()
     elif isinstance(arr, np.ndarray):
@@ -109,7 +104,7 @@ def calculate_overlaps(arr: np.ndarray,
         xai_dict[label] = roi_val / num_nonzero
     
     if plot_bargraph:
-        brain_barplot(xai_dict=xai_dict, title=title)
+       nilp_.brain_barplot(xai_dict=xai_dict, title=title)
         
     # 2. Map dict on brain
     agg_saliency = np.zeros_like(atlas.array)
@@ -134,21 +129,3 @@ def calculate_overlaps(arr: np.ndarray,
                            colorbar=True)
         
     return xai_dict, agg_saliency
-
-
-def brain_barplot(xai_dict: dict,
-                  title: str = "",
-                  sort_values: bool = True):
-    fig, ax = plt.subplots(figsize=(12, UNIT_Y * len(xai_dict)))
-    
-    ax.set_title(title)
-    df = pd.DataFrame({
-        "Regions": xai_dict.keys(),
-        "Saliency": xai_dict.values()
-    })
-    if sort_values:
-        df = df.sort_values(by="Saliency")
-    sns.barplot(data=df,
-                x="Saliency",
-                y="Regions",
-                ax=ax)

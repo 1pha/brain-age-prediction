@@ -1,4 +1,5 @@
 import os
+import argparse
 import subprocess
 import multiprocessing as mp
 from pathlib import Path
@@ -41,13 +42,25 @@ def run_fs(idx: int, ds: Dataset):
         raise
 
 
-def main():
-    # subprocess.call(["cd", "/Users/daehyuncho/FastSurfer"], shell=True)
-    ds = UKBDataset(mode="test")
-    with mp.Pool(processes=4) as p:
-        p.starmap(run_fs, ((idx, ds) for idx in range(len(ds))))
-        
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--start_index", default=0, type=int, help="Index for brain age")
+    parser.add_argument("--num_samples", default=200, type=int)
+    parser.add_argument("--num_proc", default=6, type=int, help="num_proc for multiprocess")
     
+    args = parser.parse_args()
+    return args
+
+
+def main(args):
+    ds = UKBDataset(mode="test")
+    with mp.Pool(processes=args.num_proc) as p:
+        p.starmap(run_fs,
+                  ((idx, ds) for idx in range(args.start_index, args.start_index + args.num_samples)))
+
+
 if __name__=="__main__":
     logger.info("Remember to use `fastsurfer` conda environment to run this")
-    main()
+    args = parse_args()
+    main(args)
