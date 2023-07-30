@@ -100,7 +100,8 @@ def _get_ho(atlas_name="cortl-maxprob-thr50-1mm") -> Tuple[nii, list, list]:
     indices = np.unique(atlas.maps.get_fdata())
     labels = atlas.labels
     return atlas_map, indices, labels
-    
+
+
 def _get_aal() -> Tuple[nii, list, list]:
     atlas = fetch_atlas_aal()
     atlas_map = _load_map(maps=atlas.maps)
@@ -108,4 +109,3 @@ def _get_aal() -> Tuple[nii, list, list]:
     indices = atlas.indices    
     labels = atlas.labels
     return atlas_map, indices, labels
-
