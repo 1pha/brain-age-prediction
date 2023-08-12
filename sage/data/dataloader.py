@@ -318,16 +318,19 @@ class UKBDataset(Dataset):
                  exclusion_fname: str = "exclusion.csv",
                  return_tensor: bool = True,
                  seed: int = 42,):
+        """ Here we treat same pid with scans from different timeline as independent dataset.
+        Since multiple scans have different ages """
         logger.info("Setting up UKBiobank Dataset")
-        self.return_tensor = return_tensor
-        root = Path(root)
-        self.files = list(root.rglob("*.h5"))
-        self._split_data(valid_ratio=valid_ratio, seed=seed, mode=mode)
         
-        self.files = self._exclude_data(lst=self.files, root=root, exclusion_fname=exclusion_fname)
+        self.root = Path(root)
+        self.labels = pd.read_csv(self.root / label_name)
+        
+        self.files = list(self.root.rglob("*.h5"))
+        self._split_data(valid_ratio=valid_ratio, seed=seed, mode=mode)
+        self.files = self._exclude_data(lst=self.files, root=self.root, exclusion_fname=exclusion_fname)
         logger.info("Total %s files of %s h5 exist", len(self.files), mode)
         
-        self.labels = pd.read_csv(root / label_name)
+        self.return_tensor = return_tensor
         
     def _exclude_data(self,
                       lst: pd.DataFrame,
@@ -349,9 +352,7 @@ class UKBDataset(Dataset):
         # Data split, used fixated seed
         trn, tst = train_test_split(self.files, test_size=0.1, random_state=42)
         trn, val = train_test_split(trn, test_size=valid_ratio, random_state=seed)
-        self.files = {"train": trn,
-                      "valid": val,
-                      "test": tst}.get(mode, None)
+        self.files = {"train": trn, "valid": val, "test": tst}.get(mode, None)
         if self.files is None:
             logger.exception(msg=f"Invalide mode given: {mode}")
             raise
@@ -370,7 +371,108 @@ class UKBDataset(Dataset):
         
     def __len__(self):
         return len(self.files)
+    
+    
+class UKBClassification(UKBDataset):
+    def __init__(self,
+                 root: Path | str = "./biobank",
+                 label_name: str = "ukb_age_label.csv",
+                 young_threshold: int = 55,
+                 old_threshold: int = 75,
+                 balance: bool = True,
+                 mode: str = "train",
+                 valid_ratio: float = 0.1,
+                 exclusion_fname: str = "exclusion.csv",
+                 return_tensor: bool = True,
+                 seed: int = 42,
+                 verbose: bool = False):
+        self.thresholds = {"young": young_threshold, "old": old_threshold}
+        self.balance = balance
+        self.verbose = verbose
+        # TODO: Many variables are accessed by `self.`. Make sure they can be introduced 
+        super().__init__(root=root, label_name=label_name,
+                         mode=mode, valid_ratio=valid_ratio,
+                         exclusion_fname=exclusion_fname,
+                         return_tensor=return_tensor, seed=seed)
+
+    def _fetch_vbm(self, vbm_path: str = "vbm.csv") -> list:
+        logger.info("Remove VBM analyzed files.")
+        # Will contain PID of VBM
+        vbm_files = pd.read_csv(self.root / vbm_path)
         
+        # Get pids
+        pids = list(map(lambda s: s.stem.split("_")[0], self.files))
+        tst = []
+        for pid in vbm_files.fname:
+            tst_pid = self.files.pop(pids.index(str(pid)))
+            tst.append(tst_pid)
+        return tst
+    
+    def _age_filter(self, files: list):
+        # Filter out self.files with age condition
+        logger.info("Filter out ages")
+        age = self.labels.age
+        self.age_pids = self.labels[(age < self.thresholds["young"]) | (age > self.thresholds["old"])]
+        age_pids = self.age_pids.fname.apply(lambda s: s.split("_")[0])
+        all_pids = list(map(lambda s: s.stem.split("_")[0], self.files))
+        filtered_files, passed = [], []
+        for pid in age_pids:
+            try:
+                idx = all_pids.index(str(pid))
+                filtered_files.append(self.files[idx])
+            except ValueError:
+                passed.append(pid)
+                if self.verbose:
+                    logger.info("\t\t %s was excluded.", pid)
+        self.files = filtered_files
+        logger.info("Total %s files will be used as train+valid scans", len(filtered_files))
+        logger.info("#%s scans were excluded since they were not found as h5 files in biobank", len(passed))
+        
+    def _split_data(self,
+                    valid_ratio: float = 0.1,
+                    mode: str = "train",
+                    seed: int = 42) -> None:
+        """ Override function.
+        This we use vbm analyzed 75/75 old/young brains as test brains
+        and use the rest of them as a train/valid sets.
+        
+        Also filters out data with age. """
+        tst = self._fetch_vbm()
+        self._age_filter(files=self.files)
+        if self.balance:
+            self._balance(seed=seed)
+            
+        trn, val = train_test_split(self.files, test_size=valid_ratio, random_state=seed)
+        self.files = {"train": trn, "valid": val, "test": tst}.get(mode, None)
+        if self.files is None:
+            logger.exception(msg=f"Invalide mode given: {mode}")
+            raise
+
+    def _balance(self, seed: int = 42):
+        logger.info("Balance out scans with respect to age.")
+        logger.info("Before balancing: %s", len(self.files))
+
+        youngs = self.age_pids[self.age_pids.age < self.thresholds["young"]]
+        olds = self.age_pids[self.age_pids.age > self.thresholds["old"]]
+
+        src, tgt = (youngs, olds) if len(youngs) > len(olds) else (olds, youngs)
+        src = src.sample(n=len(tgt), random_state=seed)
+        self.labels = pd.concat([src, tgt])
+        pids = set(self.labels.fname)
+        
+        self.files = list(filter(lambda f: f.stem in pids, self.files))
+        logger.info("After balaning: %s", len(self.files))
+
+    def __getitem__(self, idx: int) -> dict:
+        result = super().__getitem__(idx=idx)
+        age = result["age"]
+        if age < self.thresholds["young"]:
+            age = 0
+        elif age > self.thresholds["old"]:
+            age = 1
+        result["age"] = age
+        return result
+
 
 def get_dataloader(data_args: Arguments,
                    misc_args: Arguments,
