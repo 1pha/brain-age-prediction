@@ -466,10 +466,12 @@ class UKBClassification(UKBDataset):
     def __getitem__(self, idx: int) -> dict:
         result = super().__getitem__(idx=idx)
         age = result["age"]
-        if age < self.thresholds["young"]:
+        if age <= self.thresholds["young"]:
             age = 0
-        elif age > self.thresholds["old"]:
+        elif age >= self.thresholds["old"]:
             age = 1
+        else:
+            raise
         result["age"] = age
         return result
 

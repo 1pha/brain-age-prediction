@@ -6,8 +6,8 @@ hydra:
 
 defaults:
   - _self_
-  - model: resnet
-  - dataset: biobank
+  - model: resnet_cls
+  - dataset: biobank_cls
   - scheduler: torch_cosine
 
 dataloader:
@@ -41,15 +41,15 @@ module:
   separate_lr:
 
 metrics:
-  mae:
-    _target_: torchmetrics.MeanAbsoluteError
-  rmse:
-    _target_: torchmetrics.MeanSquaredError
-    squared: False
-  # corr:
-  #   _target_: torchmetrics.PearsonCorrCoef
-  r2:
-    _target_: torchmetrics.R2Score
+  acc:
+    _target_: torchmetrics.Accuracy
+    task: binary
+  f1:
+    _target_: torchmetrics.F1Score
+    task: binary
+  auroc:
+    _target_: torchmetrics.AUROC
+    task: binary
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger

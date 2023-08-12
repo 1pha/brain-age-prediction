@@ -1,0 +1,9 @@
+_target_: sage.data.dataloader.UKBClassification
+root: biobank
+label_name: ukb_age_label.csv
+young_threshold: 55
+old_threshold: 75
+balance: True
+mode: train
+valid_ratio: 0.1
+seed: ${misc.seed}
