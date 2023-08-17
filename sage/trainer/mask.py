@@ -6,13 +6,17 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from sage.utils import get_logger
 
-MASK_BASE = Path("./asets/masks/")
+logger = get_logger(name=__file__)
+MASK_BASE = Path("./assets/masks/")
 
 
 def load_mask(mask_path: str | Path = None,
               mask_threshold: float = 0.1):
-    if (not mask_path) or mask_path in ["False", "None"]:
+    mask_path = mask_aliasing(mask_path=mask_path)
+    if mask_path is None:
+        # Mask not given
         return None
     else:
         if isinstance(mask_path, Path | str):
@@ -29,20 +33,34 @@ def load_mask(mask_path: str | Path = None,
         return mask
     
     
-def mask_aliasing(mask_path: str | Path = None) -> Path:
+def mask_aliasing(mask_path: str | Path = None) -> None | np.ndarray:
     """ Naming can be
     1. Naive path that is actual path to the loading
-    2. Alias to mask: contains with certain format :: {model_name}-{xai_method}-{sigma}=0.5
+    2. Alias to mask: contains with certain format :: {model_name}-{xai_method}-{sigma}
         e.g.
         - model_name: resnet10t
-        - xai_method: ig0.99 (includes method and threshold value)
-        - sigma: 0.5 (values used to do Gaussian blur)
+        - xai_method: ig0.99-0.995 (Format of {method}{agg_threshold}_{top_threshold})
+        - sigma: sigma0.5 (values used to do Gaussian blur sigma{threshold:.1f})
     """
-    
+    if (not mask_path) or mask_path in ["False", "None"]:
+        return None
+
     if isinstance(mask_path, Path) or os.path.exists(mask_path):
-        return mask_path
+        mask = np.load(mask_path)
     elif isinstance(mask_path, str):
-        model_name, xai_method, sigma = mask_path.split("_")
+        model_name, xai_method, sigma = mask_path.split("-")
         if model_name == "resnet":
-            model_name = "resnet10t-aug-nomask"
-            
+            model_name = "resnet/resnet10t-aug-nomask"
+            if not xai_method:
+                xai_method = "ig0.99_0.995"
+        
+        mask_path = MASK_BASE / f"{model_name}-{xai_method}-{sigma}.npy"
+        mask = np.load(mask_path)
+    elif isinstance(mask_path, np.ndarray):
+        mask = mask_path
+    else:
+        logger.info("Not a valid format")
+        breakpoint()
+    logger.info("Successfully loaded mask from %s", mask_path)
+    breakpoint()
+    return mask
