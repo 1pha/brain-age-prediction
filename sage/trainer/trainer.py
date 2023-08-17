@@ -61,7 +61,7 @@ class PLModule(pl.LightningModule):
         metrics = MetricCollection(metrics=[
             hydra.utils.instantiate(metrics[m]) for m in metrics.keys() if "_target_" in metrics[m]
         ])
-        self.in_metric = metrics.clone(prefix="train_")
+        self.train_metric = metrics.clone(prefix="train_")
         self.valid_metric = metrics.clone(prefix="valid_")
 
         if load_model_ckpt:
