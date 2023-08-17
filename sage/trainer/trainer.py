@@ -16,7 +16,8 @@ import wandb
 
 import sage
 from sage.xai.nilearn_plots import plot_overlay, plot_glass_brain, plot_brain
-from .utils import load_mask, finalize_inference, tune_logging_interval, tune_lr_interval
+from .utils import finalize_inference, tune_logging_interval
+from .mask import load_mask
 
 
 logger = sage.utils.get_logger(name=__name__)
