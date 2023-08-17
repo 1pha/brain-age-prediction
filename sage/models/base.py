@@ -40,6 +40,14 @@ class ModelBase(nn.Module):
         self.load_state_dict(ckpt)
 
 
+class ResNet(ModelBase):
+    def __init__(self,
+                 backbone: nn.Module,
+                 criterion: nn.Module,
+                 name: str):
+        super().__init__(backbone=backbone, criterion=criterion, name=name)
+
+
 class ConvNext(ModelBase):
     def __init__(self,
                  backbone: nn.Module,

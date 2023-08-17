@@ -250,7 +250,7 @@ class ConvNeXt(nn.Module):
     def __init__(
             self,
             in_chans: int = 3,
-            num_classes: int = 1000,
+            num_classes: int = 1,
             global_pool: str = 'avg',
             output_stride: int = 32,
             depths: Tuple[int, ...] = (3, 3, 9, 3),
