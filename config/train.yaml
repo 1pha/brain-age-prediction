@@ -26,7 +26,7 @@ optim:
 misc:
   seed: 42
   debug: False
-  modes: [ train, valid ]
+  modes: [ train, valid, test ]
 
 module:
   _target_: sage.trainer.PLModule
@@ -55,7 +55,11 @@ logger:
   _target_: pytorch_lightning.loggers.WandbLogger
   project: brain-age
   entity: 1pha
-  name: ${model.backbone.model_name}
+  name: R ${model.name} | mask=${module.mask}
+  tags:
+    - model=${model.name}
+    - mask=${module.mask}
+    - REG
 
 # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
 trainer:
