@@ -1,10 +1,14 @@
 import json
 import os
-from typing import Any, List, NewType
+from pathlib import Path
+from typing import Any, List, NewType, Tuple
 
 Arguments = NewType("Arguments", Any)
 Logger = NewType("Logger", Any)
 
+import h5py
+import hydra
+import omegaconf
 import nibabel as nib
 import numpy as np
 import pandas as pd
@@ -21,10 +25,15 @@ try:
 except:
     pass
 
+from sage.utils import get_logger
+import sage.constants as sc
+
+
+logger = get_logger(name=__name__)
+
 
 class Identity:
-    """
-    Identity Scaler (returns X)
+    """ Identity Scaler (returns X)
     """
 
     def __init__(self):
@@ -32,25 +41,52 @@ class Identity:
 
     def fit_transform(self, X: np.ndarray):
         return X
+    
+
+def open_h5(fname: str) -> Tuple[np.ndarray, dict]:
+    with h5py.File(name=fname, mode="r") as hf:
+        arr = hf["volume"][:]
+        try:
+            meta = dict(hf.attrs)
+        except:
+            meta = None
+    return arr, meta
+
+
+def open_h5_nifti(fname: str) -> nib.nifti1.Nifti1Image:
+    with h5py.File(name=fname, mode="r") as hf:
+        arr = hf["volume"][:]
+        try:
+            meta = dict(hf.attrs)
+            
+            affine_last = np.array([0, 0, 0, 1], dtype=np.float32)
+            affine = np.stack([meta["srow_x"], meta["srow_y"], meta["srow_z"], affine_last])
+        except:
+            meta = None
+            affine = sc.BIOBANK_AFFINE
+    nii = nib.nifti1.Nifti1Image(dataobj=arr, affine=affine)
+    return nii
 
 
 def get_scaler(scaler: str):
-    return {"minmax": MinMaxScaler, "zscore": StandardScaler, "identity": Identity}[
-        scaler
-    ]()
+    return {"minmax": MinMaxScaler,
+            "zscore": StandardScaler,
+            "identity": Identity}[scaler]()
 
 
-def get_loader(extension: str):
-    return {"npy": np.load, "nii": lambda x: nib.load(x).get_fdata()}[extension]
+def get_loader(extension: str) -> callable:
+    return {"h5": open_h5,
+            "npy": np.load,
+            "nii": lambda x: nib.load(x).get_fdata()}[extension]
 
 
 class BrainAgeDataset(Dataset):
-    def __init__(
-        self, data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger
-    ):
-
-        """
-        CONFIG file should contain .csv file and -
+    def __init__(self,
+                 data_args: Arguments,
+                 misc_args: Arguments,
+                 sampling: str,
+                 logger: Logger):
+        """ CONFIG file should contain .csv file and -
         that .csv file should contain 'path' columns that contains full absolute path of the file
 
         sampling: str
@@ -66,7 +102,6 @@ class BrainAgeDataset(Dataset):
                 - maximum volume (for mni)
             - data
         """
-
         # INITIAL SETUP
         self.logger = logger
         self.logger.info("Initialize dataset.")
@@ -78,9 +113,7 @@ class BrainAgeDataset(Dataset):
         self._augmentation_setup(data_args)
 
     def _load_dataset_config(self, data_args: Arguments):
-
-        """
-        Loads dataset configuration file (json).
+        """ Loads dataset configuration file (json).
         This configuration depends on the dataset and lies in the same directory of brain scans.
         """
 
@@ -99,7 +132,6 @@ class BrainAgeDataset(Dataset):
         self.load = get_loader(extension=self.dataset_config["extension"])
 
     def _load_label(self, data_args: Arguments, exclude_source: List[str]):
-
         label_fname = os.path.join(data_args.data_path, data_args.label_file)
         self.logger.debug(f"Load label file. PATH: {label_fname}")
 
@@ -121,7 +153,6 @@ class BrainAgeDataset(Dataset):
         self.return_age_range = data_args.return_age_range
 
     def _split_data(self, data_args: Arguments, sampling: str, seed: int):
-
         self.logger.debug(f"Start spliting with seed {seed}")
 
         # Data split
@@ -149,7 +180,6 @@ class BrainAgeDataset(Dataset):
 
         # Set data
         if sampling == "train":  # TRAIN SET
-
             self.data_files = (
                 shuffle(pd.concat([trn_idx, aug_idx]), random_state=seed)
                 if self.augmentation == "concat"
@@ -180,9 +210,7 @@ class BrainAgeDataset(Dataset):
         return len(self.data_files)
 
     def __getitem__(self, idx: int):  # -> ((1, W', H', D'), age: torch.tensor.float)
-
-        """
-        PIPELINE
+        """ PIPELINE
         1. LOAD BRAIN (x = self.load(self.data_files[idx])) -> np.ndarray: (1, W, H, D)
             - absolute path(:str) is given to load method.
 
@@ -212,8 +240,7 @@ class BrainAgeDataset(Dataset):
         return x, y
 
     def maxcut(self, x: torch.Tensor):
-        """
-        For brains that has many blanks.
+        """ For brains that has many blanks.
         Should explicity give maxcut with tuples of tuples ((w, W), (h, H), (d, D))
         """
 
@@ -224,9 +251,7 @@ class BrainAgeDataset(Dataset):
             return x
 
     def preprocess(self, x: torch.Tensor):  # -> (1, W', H', D')
-
-        """
-        Given with raw brain np.ndarray
+        """ Given with raw brain np.ndarray
             -> return desired output 4D shape (1, W', H', D')
         """
 
@@ -251,7 +276,6 @@ class BrainAgeDataset(Dataset):
         return x
 
     def _augmentation_setup(self, data_args: Arguments):
-
         self.logger.debug("Setting up augmentation.")
 
         # self._transform = tio.Compose(
@@ -272,38 +296,214 @@ class BrainAgeDataset(Dataset):
         #         ),
         #     }
         # )
-        self._transform = tio.OneOf(
-            {
+        self._transform = tio.OneOf({
                 tio.RandomAffine(),
                 tio.RandomFlip(axes=["left-right"]),
-                tio.RandomElasticDeformation(),
-            }
-        )
+                tio.RandomElasticDeformation()})
 
     def transform(self, x: torch.Tensor):  # -> torch.Tensor (1, W', H', D')
-
-        """
-        x must be given with torch.tensor with (1, W', H', D')
+        """ x must be given with torch.tensor with (1, W', H', D')
         """
 
         x = self._transform(x)
         return x
+    
+    
+class UKBDataset(Dataset):
+    def __init__(self,
+                 root: Path | str = "./biobank",
+                 label_name: str = "ukb_age_label.csv",
+                 mode: str = "train",
+                 valid_ratio: float = 0.1,
+                 exclusion_fname: str = "exclusion.csv",
+                 return_tensor: bool = True,
+                 seed: int = 42,):
+        """ Here we treat same pid with scans from different timeline as independent dataset.
+        Since multiple scans have different ages """
+        logger.info("Setting up UKBiobank Dataset")
+        
+        self.root = Path(root)
+        self.labels = pd.read_csv(self.root / label_name)
+        
+        self.files = list(self.root.rglob("*.h5"))
+        self._split_data(valid_ratio=valid_ratio, seed=seed, mode=mode)
+        self.files = self._exclude_data(lst=self.files, root=self.root, exclusion_fname=exclusion_fname)
+        logger.info("Total %s files of %s h5 exist", len(self.files), mode)
+        
+        self.return_tensor = return_tensor
+        
+    def _exclude_data(self,
+                      lst: pd.DataFrame,
+                      root: Path,
+                      exclusion_fname: str = "exclusion.csv",):
+        try:
+            exc = pd.read_csv(root / exclusion_fname, header=None)
+            exclusion = set(exc.values.flatten().tolist())
+            lst = [f for f in lst if f not in exclusion]
+        except:
+            logger.info("No exclusion file found. %s", root / exclusion_fname)
+            pass
+        return lst
+        
+    def _split_data(self,
+                    valid_ratio: float = 0.1,
+                    mode: str = "train",
+                    seed: int = 42) -> None:
+        # Data split, used fixated seed
+        trn, tst = train_test_split(self.files, test_size=0.1, random_state=42)
+        trn, val = train_test_split(trn, test_size=valid_ratio, random_state=seed)
+        self.files = {"train": trn, "valid": val, "test": tst}.get(mode, None)
+        if self.files is None:
+            logger.exception(msg=f"Invalide mode given: {mode}")
+            raise
+        
+    def __getitem__(self, idx: int):
+        fname = self.files[idx]
+        arr, meta = open_h5(fname)
+        age = self.labels.query(f"fname == '{fname.stem}'").age.iloc[0]
+        if self.return_tensor:
+            arr = torch.tensor(arr, dtype=torch.float32)
+            age = torch.tensor(age, dtype=torch.long)
+        return {
+            "brain": arr,
+            "age": age,
+        }
+        
+    def __len__(self):
+        return len(self.files)
+    
+    
+class UKBClassification(UKBDataset):
+    def __init__(self,
+                 root: Path | str = "./biobank",
+                 label_name: str = "ukb_age_label.csv",
+                 young_threshold: int = 55,
+                 old_threshold: int = 75,
+                 balance: bool = True,
+                 mode: str = "train",
+                 valid_ratio: float = 0.1,
+                 exclusion_fname: str = "exclusion.csv",
+                 return_tensor: bool = True,
+                 seed: int = 42,
+                 verbose: bool = False):
+        self.thresholds = {"young": young_threshold, "old": old_threshold}
+        self.balance = balance
+        self.verbose = verbose
+        # TODO: Many variables are accessed by `self.`. Make sure they can be introduced 
+        super().__init__(root=root, label_name=label_name,
+                         mode=mode, valid_ratio=valid_ratio,
+                         exclusion_fname=exclusion_fname,
+                         return_tensor=return_tensor, seed=seed)
+
+    def _fetch_vbm(self, vbm_path: str = "vbm.csv") -> list:
+        logger.info("Remove VBM analyzed files.")
+        # Will contain PID of VBM
+        vbm_files = pd.read_csv(self.root / vbm_path)
+        
+        # Get pids
+        pids = list(map(lambda s: s.stem.split("_")[0], self.files))
+        tst = []
+        for pid in vbm_files.fname:
+            tst_pid = self.files.pop(pids.index(str(pid)))
+            tst.append(tst_pid)
+        return tst
+    
+    def _age_filter(self, files: list):
+        # Filter out self.files with age condition
+        logger.info("Filter out ages")
+        age = self.labels.age
+        self.age_pids = self.labels[(age < self.thresholds["young"]) | (age > self.thresholds["old"])]
+        age_pids = self.age_pids.fname.apply(lambda s: s.split("_")[0])
+        all_pids = list(map(lambda s: s.stem.split("_")[0], self.files))
+        filtered_files, passed = [], []
+        for pid in age_pids:
+            try:
+                idx = all_pids.index(str(pid))
+                filtered_files.append(self.files[idx])
+            except ValueError:
+                passed.append(pid)
+                if self.verbose:
+                    logger.info("\t\t %s was excluded.", pid)
+        self.files = filtered_files
+        logger.info("Total %s files will be used as train+valid scans", len(filtered_files))
+        logger.info("#%s scans were excluded since they were not found as h5 files in biobank", len(passed))
+        
+    def _split_data(self,
+                    valid_ratio: float = 0.1,
+                    mode: str = "train",
+                    seed: int = 42) -> None:
+        """ Override function.
+        This we use vbm analyzed 75/75 old/young brains as test brains
+        and use the rest of them as a train/valid sets.
+        
+        Also filters out data with age. """
+        tst = self._fetch_vbm()
+        self._age_filter(files=self.files)
+        if self.balance:
+            self._balance(seed=seed)
+            
+        trn, val = train_test_split(self.files, test_size=valid_ratio, random_state=seed)
+        self.files = {"train": trn, "valid": val, "test": tst}.get(mode, None)
+        if self.files is None:
+            logger.exception(msg=f"Invalide mode given: {mode}")
+            raise
+
+    def _balance(self, seed: int = 42):
+        logger.info("Balance out scans with respect to age.")
+        logger.info("Before balancing: %s", len(self.files))
+
+        youngs = self.age_pids[self.age_pids.age < self.thresholds["young"]]
+        olds = self.age_pids[self.age_pids.age > self.thresholds["old"]]
+
+        src, tgt = (youngs, olds) if len(youngs) > len(olds) else (olds, youngs)
+        src = src.sample(n=len(tgt), random_state=seed)
+        self.labels = pd.concat([src, tgt])
+        pids = set(self.labels.fname)
+        
+        self.files = list(filter(lambda f: f.stem in pids, self.files))
+        logger.info("After balaning: %s", len(self.files))
+
+    def __getitem__(self, idx: int) -> dict:
+        result = super().__getitem__(idx=idx)
+        age = result["age"]
+        if age <= self.thresholds["young"]:
+            age = 0
+        elif age >= self.thresholds["old"]:
+            age = 1
+        else:
+            raise
+        result["age"] = age
+        return result
 
 
-def get_dataloader(
-    data_args: Arguments, misc_args: Arguments, sampling: str, logger: Logger
-):
-
+def get_dataloader(data_args: Arguments,
+                   misc_args: Arguments,
+                   sampling: str,
+                   logger: Logger):
     dataset = BrainAgeDataset(data_args, misc_args, sampling, logger)
-    dataloader = DataLoader(
-        dataset, batch_size=data_args.batch_size, pin_memory=data_args.pin_memory
-    )
+    dataloader = DataLoader(dataset,
+                            batch_size=data_args.batch_size,
+                            pin_memory=data_args.pin_memory)
     return dataloader
 
 
-def get_dataloaders(data_args: Arguments, misc_args: Arguments, logger: Logger):
-
+def _get_dataloaders(data_args: Arguments, misc_args: Arguments, logger: Logger):
     _dataloaders = []
     for sampling in ["train", "valid", "test"]:
-        _dataloaders.append(get_dataloader(data_args, misc_args, sampling, logger))
+        _dataloaders.append(
+            get_dataloader(data_args, misc_args, sampling, logger)
+        )
     return _dataloaders
+
+
+def get_dataloaders(ds_cfg: omegaconf.DictConfig,
+                    dl_cfg: omegaconf.DictConfig,
+                    modes: list = ["train", "valid"]) -> dict:
+    dl_dict = {"train": None, "valid": None, "test": None}
+    for mode in modes:
+        _ds = hydra.utils.instantiate(ds_cfg, mode=mode)
+        _dl = hydra.utils.instantiate(dl_cfg,
+                                      dataset=_ds,
+                                      shuffle=(True if mode == "train" else False))
+        dl_dict[mode] = _dl
+    return dl_dict

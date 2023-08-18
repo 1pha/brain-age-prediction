@@ -301,9 +301,6 @@ class Option:
 def build_resnet():
 
     opt = Option()
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     opt.start_channels = 32
     model = generate_model(
         model_depth=opt.model_depth,
@@ -316,7 +313,6 @@ def build_resnet():
         widen_factor=opt.resnet_widen_factor,
         start_channels=opt.start_channels,
     )
-    model.to(device)
     return model
 
 

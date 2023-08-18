@@ -1,0 +1,6 @@
+_target_: sage.models.base.ResNet
+backbone:
+  _target_: sage.models.model_zoo.resnet.build_resnet
+criterion:
+  _target_: torch.nn.MSELoss
+name: resnet10t

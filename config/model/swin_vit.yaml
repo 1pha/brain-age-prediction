@@ -1,0 +1,13 @@
+_target_: sage.models.swin.SwinViT
+backbone:
+  _target_: monai.networks.nets.swin_unetr.SwinTransformer
+  in_chans: 1
+  embed_dim: 48
+  window_size: [7, 7, 7]
+  patch_size: [2, 2, 2]
+  depths: [2, 2, 2, 2]
+  num_heads: [3, 6, 12, 24]
+criterion:
+  _target_: torch.nn.MSELoss
+name: swin_vit
+pretrained: True
