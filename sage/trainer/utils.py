@@ -1,3 +1,5 @@
+""" Includes model inference, output sorting utils
+"""
 from pathlib import Path
 import pickle
 
@@ -46,26 +48,7 @@ def tune_lr_interval(lr_frequency: int = 1,
         ratio = BASE_BATCH / batch_size
         lr_frequency = round(BASE_FREQ * ratio)
         return lr_frequency
-        
 
-def load_mask(mask_path: str | Path = None,
-              mask_threshold: float = 0.1):
-    if (not mask_path) or mask_path in ["False", "None"]:
-        return None
-    else:
-        if isinstance(mask_path, Path | str):
-            mask = np.load(mask_path)
-        elif isinstance(mask_path, np.ndarray):
-            mask = mask_path
-        else:
-            raise
-        # 4D-tensor: applied before channel unsqueezing
-        mask = torch.tensor(mask)[None, None, ...].float()
-        mask = torch.nn.functional.interpolate(input=mask,
-                                                size=(96, 96, 96), mode="trilinear").squeeze(dim=0)
-        mask = mask < (mask_threshold or 0.1)
-        return mask
-    
 
 def _sort_outputs(outputs):
     try:

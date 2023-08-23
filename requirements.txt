@@ -16,3 +16,5 @@ hydra-core
 matplotlib
 captum
 seaborn
+flake8
+pytest 

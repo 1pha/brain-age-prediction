@@ -1,0 +1,7 @@
+_target_: sage.models.base.ConvNext
+backbone:
+  _target_: sage.models.model_zoo.convnext.build_convnext
+  model_name: convnext-base
+criterion:
+  _target_: torch.nn.MSELoss
+name: ConvNeXt-base

@@ -46,13 +46,17 @@ def load_sal(path: str = "resnet10t-aug",
     return saliency
 
 
-def resample_sal(arr: np.ndarray,
-                 atlas: nib.nifti1.Nifti1Image):
-    """ Resample a given array to target atlas.
-    When resampling, given array will be converted to mni space with nibabel. """
+def align(arr: np.ndarray) -> nib.nifti1.Nifti1Image:
     _arr: np.ndarray = _safe_get_data(_mni(arr), ensure_finite=True)
     arr_nifti = new_img_like(_mni(arr), _arr, MNI_AFFINE)
-    # arr_nifti = _mni(arr)
+    return arr_nifti
+
+
+def resample_sal(arr: np.ndarray,
+                 atlas: nib.nifti1.Nifti1Image) -> nib.nifti1.Nifti1Image:
+    """ Resample a given array to target atlas.
+    When resampling, given array will be converted to mni space with nibabel. """
+    arr_nifti = align(arr)
     resampled = resample_img(img=arr_nifti,
                              target_affine=atlas.affine,
                              target_shape=atlas.shape)

@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 
 from sage.trainer.utils import load_mask
 from sage.data import no_augment
-from .utils import load_mni152_template, _nifti, _mni, MNI_SHAPE, margin_mni_mask
+from .utils import _nifti, MNI_SHAPE, margin_mni_mask
 
 
 smaller_mask = margin_mni_mask()

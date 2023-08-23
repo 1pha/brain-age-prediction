@@ -6,6 +6,8 @@ outputs/
 raw_rfMRI
 *.pkl
 *.tar
+_*
+tmp_vbm/
 
 *.ini
 *.nii

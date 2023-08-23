@@ -16,7 +16,8 @@ import wandb
 
 import sage
 from sage.xai.nilearn_plots import plot_overlay, plot_glass_brain, plot_brain
-from .utils import load_mask, finalize_inference, tune_logging_interval, tune_lr_interval
+from .utils import finalize_inference, tune_logging_interval
+from .mask import load_mask
 
 
 logger = sage.utils.get_logger(name=__name__)
@@ -61,7 +62,7 @@ class PLModule(pl.LightningModule):
         metrics = MetricCollection(metrics=[
             hydra.utils.instantiate(metrics[m]) for m in metrics.keys() if "_target_" in metrics[m]
         ])
-        self.in_metric = metrics.clone(prefix="train_")
+        self.train_metric = metrics.clone(prefix="train_")
         self.valid_metric = metrics.clone(prefix="valid_")
 
         if load_model_ckpt:

@@ -6,9 +6,9 @@ hydra:
 
 defaults:
   - _self_
-  - model: resnet
-  - dataset: biobank
-  - scheduler: cosine_anneal_warmup
+  - model: resnet_cls
+  - dataset: biobank_cls
+  - scheduler: torch_cosine
 
 dataloader:
   _target_: torch.utils.data.DataLoader
@@ -26,7 +26,7 @@ optim:
 misc:
   seed: 42
   debug: False
-  modes: [ train, valid, test ]
+  modes: [ train, valid ]
 
 module:
   _target_: sage.trainer.PLModule
@@ -41,25 +41,25 @@ module:
   separate_lr:
 
 metrics:
-  mae:
-    _target_: torchmetrics.MeanAbsoluteError
-  rmse:
-    _target_: torchmetrics.MeanSquaredError
-    squared: False
-  # corr:
-  #   _target_: torchmetrics.PearsonCorrCoef
-  r2:
-    _target_: torchmetrics.R2Score
+  acc:
+    _target_: torchmetrics.Accuracy
+    task: binary
+  f1:
+    _target_: torchmetrics.F1Score
+    task: binary
+  auroc:
+    _target_: torchmetrics.AUROC
+    task: binary
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
   project: brain-age
   entity: 1pha
-  name: R ${model.name} | mask=${module.mask}
+  name: C ${model.name} | mask=${module.mask} | balanced=${dataset.balance}
   tags:
     - model=${model.name}
     - mask=${module.mask}
-    - REG
+    - CLS
 
 # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
 trainer:
@@ -78,8 +78,8 @@ callbacks:
   checkpoint:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
-    filename: "{step}-valid_mae{epoch/valid_MeanAbsoluteError:.3f}"
-    monitor: epoch/valid_MeanAbsoluteError
+    filename: "{step}-valid_mae{epoch/valid_BinaryF1Score:.3f}"
+    monitor: epoch/valid_BinaryF1Score
     mode: min
     save_top_k: 1
     save_last: True
@@ -89,7 +89,7 @@ callbacks:
   # https://pytorch-lightning.readthedocs.io/en/stable/common/early_stopping.html
   early_stop:
     _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
-    monitor: epoch/valid_MeanAbsoluteError
+    monitor: epoch/valid_BinaryF1Score
     mode: min
     patience: 10
 
