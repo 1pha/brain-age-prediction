@@ -1,11 +1,8 @@
-import os
 from typing import Union
 from pathlib import Path
 
 import pandas as pd
 import nibabel as nib
-
-from .constants import SEG_ROOT
 
 
 def _split(s: Union[str, list]) -> list:
