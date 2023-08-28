@@ -1,17 +1,27 @@
 import math
+from typing import List
 
 import torch
+import torch.nn as nn
 
 from .model_zoo import (
-    build_cait,
-    build_convit,
     build_convnext,
     build_resnet,
-    build_repvgg,
-    cait_list,
-    convit_list,
     convnext_list,
 )
+
+
+def find_conv_modules(model: nn.Module) -> List[nn.Module]:
+    conv_modules = []
+    def _find_conv_modules(module: nn.Module):
+        if isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+            conv_modules.append(module)
+        
+        for child_module in module.children():
+            _find_conv_modules(child_module)
+
+    _find_conv_modules(model)
+    return conv_modules
 
 
 def count_params(model):
@@ -30,17 +40,8 @@ def build_model(training_args, logger):
     if name == "resnet":
         model = build_resnet()
 
-    elif name == "repvgg":
-        model = build_repvgg(name)
-
-    elif name in convit_list:
-        model = build_convit(name)
-
     elif name in convnext_list:
         model = build_convnext(name)
-
-    elif name in cait_list:
-        model = build_cait(name)
 
     params = count_params(model)
     if torch.cuda.is_available():
