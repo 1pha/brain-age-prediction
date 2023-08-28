@@ -325,7 +325,7 @@ class UKBDataset(Dataset):
         self.root = Path(root)
         self.labels = pd.read_csv(self.root / label_name)
         
-        self.files = list(self.root.rglob("*.h5"))
+        self.files = sorted(self.root.rglob("*.h5"))
         self._split_data(valid_ratio=valid_ratio, seed=seed, mode=mode)
         self.files = self._exclude_data(lst=self.files, root=self.root, exclusion_fname=exclusion_fname)
         logger.info("Total %s files of %s h5 exist", len(self.files), mode)
