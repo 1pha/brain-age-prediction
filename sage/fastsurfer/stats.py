@@ -25,7 +25,7 @@ def get_idx_byname(name: str) -> int:
 
 
 def linefit(x, y) -> Tuple[np.ndarray, np.ndarray, dict]:
-    r = linregress.polyfit(x, y, deg=1)
+    r = linregress(x, y)
     xseq = np.linspace(min(x), max(x), num=100)
     return xseq, r.intercept + r.slope*xseq, r
 
