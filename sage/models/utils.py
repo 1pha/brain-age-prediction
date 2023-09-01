@@ -1,8 +1,23 @@
 import math
+from typing import List
 
 import torch
+import torch.nn as nn
 
 from .model_zoo import build_resnet
+
+
+def find_conv_modules(model: nn.Module) -> List[nn.Module]:
+    conv_modules = []
+    def _find_conv_modules(module: nn.Module):
+        if isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+            conv_modules.append(module)
+        
+        for child_module in module.children():
+            _find_conv_modules(child_module)
+
+    _find_conv_modules(model)
+    return conv_modules
 
 
 def count_params(model):

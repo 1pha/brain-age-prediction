@@ -1,11 +1,11 @@
 scheduler:
   _target_: sage.trainer.scheduler.CosineAnnealingWarmupRestarts
-  first_cycle_steps: 2000
+  first_cycle_steps: 3000
   cycle_mult: 2
   max_lr: 1e-3
   min_lr: 1e-7
-  warmup_steps: 1000
-  gamma: 0.2
+  warmup_steps: 2000
+  gamma: 0.8
   last_epoch: -1
 interval: step
 frequency: 1

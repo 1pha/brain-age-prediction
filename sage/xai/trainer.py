@@ -87,13 +87,14 @@ class XPLModule(PLModule):
                        model: nn.Module | Callable,
                        xai_method: str = "gbp",
                        target_layer_index: int = 1):
+        forward_func = model._forward
         if xai_method == "gcam":
-            xai = LayerGradCam(forward_func=model,
+            xai = LayerGradCam(forward_func=model.forward_func,
                                layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gbp":
-            xai = GuidedBackprop(model=model)
+            xai = GuidedBackprop(model=forward_func)
         elif xai_method == "ig":
-            xai = IntegratedGradients(forward_func=model)
+            xai = IntegratedGradients(forward_func=forward_func)
         elif xai_method == "lrp":
             xai = LRP(model=model)
         else:
@@ -104,14 +105,14 @@ class XPLModule(PLModule):
                       model: nn.Module,
                       xai_method: str = "gbp",
                       target_layer_index: int = 1) -> None:
-        
-        if model.NAME == "resnet10t":
-            self.model = model.backbone
+        name = model.NAME.lower()
+        if name in ["resnet10t", "convnext-base", "convnext-tiny"]:
+            # self.model = model.backbone
             self.xai = self._configure_xai(model=self.model,
                                            xai_method=xai_method,
                                            target_layer_index=target_layer_index)
 
-        elif model.NAME == "swin_vit":
+        elif name == "swin_vit":
             if xai_method != "gcam":
                 self.xai = self._configure_xai(model=self.model,
                                                xai_method=xai_method,
@@ -143,7 +144,7 @@ class XPLModule(PLModule):
             assert return_np
             upsampled *= self.smaller_mask
         return upsampled
-        
+
     def forward(self, batch: dict, mode: str = "test") -> dict:
         try:
             augmentor = self.augmentor if mode == "train" else self.no_augment

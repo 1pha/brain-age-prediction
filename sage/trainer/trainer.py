@@ -226,6 +226,9 @@ class PLModule(pl.LightningModule):
         result: dict = self.forward(batch, mode="test")
         return result
 
+    def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
+        return self.predict_step(batch=batch, batch_idx=batch_idx, dataloader_idx=dataloader_idx)
+
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start Setting up")
