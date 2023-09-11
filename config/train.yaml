@@ -86,6 +86,15 @@ callbacks:
     # Is useful to set it to False when metric names contain / as this will result in extra folders
     auto_insert_metric_name: False
 
+  checkpoint_lr:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    dirpath: ${hydra:run.dir}
+    filename: "ckpt-step{step}-lr{_lr:.2e}"
+    monitor: _lr
+    save_top_k: 7
+    mode: min
+    auto_insert_metric_name: False
+
   # https://pytorch-lightning.readthedocs.io/en/stable/common/early_stopping.html
   early_stop:
     _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping

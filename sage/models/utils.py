@@ -4,11 +4,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from .model_zoo import (
-    build_convnext,
-    build_resnet,
-    convnext_list,
-)
+from .model_zoo import build_resnet
 
 
 def find_conv_modules(model: nn.Module) -> List[nn.Module]:
@@ -39,9 +35,6 @@ def build_model(training_args, logger):
     logger.info(f"{name.capitalize()} was chosen.")
     if name == "resnet":
         model = build_resnet()
-
-    elif name in convnext_list:
-        model = build_convnext(name)
 
     params = count_params(model)
     if torch.cuda.is_available():

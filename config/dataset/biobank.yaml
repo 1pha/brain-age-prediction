@@ -1,6 +1,6 @@
 _target_: sage.data.dataloader.UKBDataset
 root: biobank
-label_name: ukb_age_label.csv
+label_name:
 mode: train
 valid_ratio: 0.1
 seed: ${misc.seed}
