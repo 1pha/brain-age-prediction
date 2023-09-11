@@ -148,6 +148,8 @@ class PLModule(pl.LightningModule):
                             num_training_steps: int = None):
         """ Do NOT feed `num_training_steps` if not required. """
         struct = {"optimizer": optimizer}
+        if "total_steps" in scheduler["scheduler"]:
+            struct["total_steps"] = num_training_steps
         try:
             sch = hydra.utils.instantiate(scheduler, scheduler=struct)
         except Exception as e:

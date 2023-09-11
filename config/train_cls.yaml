@@ -8,7 +8,7 @@ defaults:
   - _self_
   - model: resnet_cls
   - dataset: biobank_cls
-  - scheduler: torch_cosine
+  - scheduler: onecycle
 
 dataloader:
   _target_: torch.utils.data.DataLoader
@@ -55,7 +55,7 @@ logger:
   _target_: pytorch_lightning.loggers.WandbLogger
   project: brain-age
   entity: 1pha
-  name: C ${model.name} | mask=${module.mask} | balanced=${dataset.balance}
+  name: C ${model.name} | mask=${module.mask}
   tags:
     - model=${model.name}
     - mask=${module.mask}
