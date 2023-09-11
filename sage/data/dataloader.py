@@ -378,8 +378,8 @@ class UKBClassification(UKBDataset):
     def __init__(self,
                  root: Path | str = "./biobank",
                  label_name: str = "ukb_age_label.csv",
-                 young_threshold: int = 55,
-                 old_threshold: int = 75,
+                 young_threshold: int = 51,
+                 old_threshold: int = 77,
                  balance: bool = True,
                  mode: str = "train",
                  valid_ratio: float = 0.1,
@@ -402,7 +402,7 @@ class UKBClassification(UKBDataset):
         vbm_files = pd.read_csv(self.root / vbm_path)
         
         # Get pids
-        pids = list(map(lambda s: s.stem.split("_")[0], self.files))
+        pids = list(map(lambda s: s.stem, self.files))
         tst = []
         for pid in vbm_files.fname:
             tst_pid = self.files.pop(pids.index(str(pid)))
