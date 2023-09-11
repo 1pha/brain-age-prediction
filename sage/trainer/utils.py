@@ -7,7 +7,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_theme()
-import numpy as np
 import torch
 from torchmetrics.functional import mean_absolute_error, mean_squared_error, r2_score
 
@@ -96,7 +95,7 @@ def finalize_inference(prediction: list,
     logger.info("MSE: %.3f", mse)
     logger.info("MAE: %.3f", mae)
     logger.info("MSE: %.4f", r2)
-    
+
     # 3. Plot Jointplot
     data = pd.DataFrame({
         "Prediction": preds.numpy(),

@@ -20,29 +20,29 @@ HYDRA_FULL_ERROR=1
 
 python infer_ckpt.py --path=${path}\
                      --xai_method=${xai}\
-                     --mask=mask\
+                     --mask=False\
                      --batch_size=1\
                      --infer_xai=True\
                      --top_k=0.95
 
 python infer_ckpt.py --path=${path}\
                      --xai_method=${xai}\
-                     --mask=mask\
+                     --mask=False\
                      --batch_size=1\
                      --infer_xai=True\
                      --top_k=0.99
 
 
-python infer_ckpt.py --path=${path}\
-                     --xai_method=${xai}\
-                     --mask=nomask\
-                     --batch_size=1\
-                     --infer_xai=True\
-                     --top_k=0.95
+# python infer_ckpt.py --path=${path}\
+#                      --xai_method=${xai}\
+#                      --mask=nomask\
+#                      --batch_size=1\
+#                      --infer_xai=True\
+#                      --top_k=0.95
 
-python infer_ckpt.py --path=${path}\
-                     --xai_method=${xai}\
-                     --mask=nomask\
-                     --batch_size=1\
-                     --infer_xai=True\
-                     --top_k=0.99
+# python infer_ckpt.py --path=${path}\
+#                      --xai_method=${xai}\
+#                      --mask=nomask\
+#                      --batch_size=1\
+#                      --infer_xai=True\
+#                      --top_k=0.99

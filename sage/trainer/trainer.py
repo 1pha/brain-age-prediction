@@ -11,7 +11,6 @@ import pytorch_lightning as pl
 import torch
 from torch import nn
 from torchmetrics import MetricCollection
-from pytorch_lightning.plugins import DeepSpeedPrecisionPlugin
 import wandb
 
 import sage
@@ -189,7 +188,7 @@ class PLModule(pl.LightningModule):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
         self.log_dict(dictionary=output,
                       on_step=unit == "step",
-                      on_epoch=unit =="epoch")
+                      on_epoch=unit == "epoch")
 
     def training_step(self, batch, batch_idx, optimizer_idx=None):
         result: dict = self.forward(batch, mode="train")
@@ -200,6 +199,11 @@ class PLModule(pl.LightningModule):
             self.log_result(output, unit="step")
             
             self.training_step_outputs.append(result)
+        
+        # Since `ModelCheckpoint` cannot track learning rate automatically,
+        # We log learning rate explicitly and monitor this
+        lr = self.lr_schedulers().get_lr()[0]
+        self.log(name="_lr", value=lr, on_step=True)
         return result["loss"]
 
     def on_train_epoch_end(self):
@@ -227,7 +231,8 @@ class PLModule(pl.LightningModule):
         return result
 
     def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
-        return self.predict_step(batch=batch, batch_idx=batch_idx, dataloader_idx=dataloader_idx)
+        result: dict = self.forward(batch, mode="test")
+        return 
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
@@ -281,11 +286,11 @@ def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
 
 def train(config: omegaconf.DictConfig) -> None:
     config: omegaconf.DictConfig = tune(config)
-    logger = hydra.utils.instantiate(config.logger)
+    _logger = hydra.utils.instantiate(config.logger)
     module, dataloaders = setup_trainer(config)
 
     # Logger Setup
-    logger.watch(module)
+    _logger.watch(module)
     config_update: bool = "version" in config.logger or config.trainer.devices > 1
     if config_update:
         # Skip config update when using resume checkpoint
@@ -298,19 +303,19 @@ def train(config: omegaconf.DictConfig) -> None:
 
     # Callbacks
     callbacks: dict = hydra.utils.instantiate(config.callbacks)
-    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer,
-                                                  logger=logger,
+    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=_logger,
                                                   callbacks=list(callbacks.values()))
     trainer.fit(model=module,
                 train_dataloaders=dataloaders["train"],
                 val_dataloaders=dataloaders["valid"])
     if dataloaders["test"]:
-        prediction = trainer.test(ckpt_path="best", dataloaders=dataloaders["test"])
-        finalize_inference(prediction=prediction,
-                           name=config.logger.name)
+        logger.info("Test dataset given. Start inference on %s", len(dataloaders["test"].dataset))
+        prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["test"])
+        finalize_inference(prediction=prediction, name=config.logger.name,
+                           root_dir=Path(config.callbacks.checkpoint.dirpath))
     if config_update:
         wandb.config.update(omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True))
-    
+
 
 def inference(config: omegaconf.DictConfig,
               root_dir: Path = None) -> None:
@@ -341,13 +346,13 @@ def inference(config: omegaconf.DictConfig,
         root_dir = root_dir / postfix
         subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
         os.makedirs(name=root_dir, exist_ok=True)
-        
+
         logger.info("Start saving here %s", root_dir)
-        
+
         # Save attrs
         np.save(file=root_dir / "attrs.npy", arr=attr)
         np.save(file=root_dir / "top_attr.npy", arr=top_attr)
-        
+
         # Save plots
         plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png")
         plot_overlay(arr=attr, save=root_dir / "attr_anat.png")

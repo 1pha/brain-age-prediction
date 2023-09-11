@@ -113,7 +113,7 @@ class UKBDataset(Dataset):
 
     def __getitem__(self, idx: int):
         fname = self.files[idx]
-        arr, meta = open_h5(fname)
+        arr, _ = open_h5(fname)
         age = self.labels.query(f"fname == '{fname.stem}'").age.iloc[0]
         if self.return_tensor:
             arr = torch.tensor(arr, dtype=torch.float32)
