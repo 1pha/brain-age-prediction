@@ -197,7 +197,7 @@ class PLModule(pl.LightningModule):
         self.log(name="train_loss", value=result["loss"], prog_bar=True)
         
         if self.log_train_metrics:
-            output: dict = self.train_metric(result["reg_pred"], result["reg_target"])
+            output: dict = self.train_metric(result["pred"], result["target"])
             self.log_result(output, unit="step")
             
             self.training_step_outputs.append(result)
@@ -218,7 +218,7 @@ class PLModule(pl.LightningModule):
         result: dict = self.forward(batch, mode="valid")
         self.log(name="valid_loss", value=result["loss"], prog_bar=True)
         
-        output: dict = self.valid_metric(result["reg_pred"], result["reg_target"])
+        output: dict = self.valid_metric(result["pred"], result["target"])
         self.log_result(output, unit="step")
         
         self.validation_step_outputs.append(result)

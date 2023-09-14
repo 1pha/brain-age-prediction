@@ -25,8 +25,8 @@ class ModelBase(nn.Module):
         pred = self.backbone(brain).squeeze()
         loss = self.criterion(pred, age)
         return dict(loss=loss,
-                    reg_pred=pred.detach().cpu(),
-                    reg_target=age.detach().cpu())
+                    pred=pred.detach().cpu(),
+                    target=age.detach().cpu())
         
     def _forward(self, brain: torch.Tensor):
         return self.backbone(brain)
