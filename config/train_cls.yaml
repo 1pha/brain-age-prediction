@@ -78,7 +78,7 @@ callbacks:
   checkpoint:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
-    filename: "{step}-valid_mae{epoch/valid_BinaryF1Score:.3f}"
+    filename: "{step}-valid_f1{epoch/valid_BinaryF1Score:.3f}"
     monitor: epoch/valid_BinaryF1Score
     mode: max
     save_top_k: 1
