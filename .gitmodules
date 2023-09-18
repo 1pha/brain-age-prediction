@@ -1,0 +1,3 @@
+[submodule "FastsurferAnalysis"]
+	path = FastsurferAnalysis
+	url = https://github.com/1pha/FastsurferAnalysis

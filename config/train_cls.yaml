@@ -8,7 +8,7 @@ defaults:
   - _self_
   - model: resnet_cls
   - dataset: biobank_cls
-  - scheduler: torch_cosine
+  - scheduler: onecycle
 
 dataloader:
   _target_: torch.utils.data.DataLoader
@@ -55,7 +55,7 @@ logger:
   _target_: pytorch_lightning.loggers.WandbLogger
   project: brain-age
   entity: 1pha
-  name: C ${model.name} | mask=${module.mask} | balanced=${dataset.balance}
+  name: C ${model.name} | mask=${module.mask}
   tags:
     - model=${model.name}
     - mask=${module.mask}
@@ -78,9 +78,9 @@ callbacks:
   checkpoint:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
-    filename: "{step}-valid_mae{epoch/valid_BinaryF1Score:.3f}"
+    filename: "{step}-valid_f1{epoch/valid_BinaryF1Score:.3f}"
     monitor: epoch/valid_BinaryF1Score
-    mode: min
+    mode: max
     save_top_k: 1
     save_last: True
     # Is useful to set it to False when metric names contain / as this will result in extra folders
@@ -90,7 +90,7 @@ callbacks:
   early_stop:
     _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
     monitor: epoch/valid_BinaryF1Score
-    mode: min
+    mode: max
     patience: 10
 
   # https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.LearningRateMonitor.html

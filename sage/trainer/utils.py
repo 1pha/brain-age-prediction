@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_theme()
 import torch
-from torchmetrics.functional import mean_absolute_error, mean_squared_error, r2_score
+import torchmetrics.functional as tmf
 
 from sage.utils import get_logger
 
@@ -75,32 +75,41 @@ def finalize_inference(prediction: list,
         3. Plot prediction with jointplot / kde plot and save plots
     """
     root_dir = Path(root_dir)
-    
+
     # 1. Sort Prediction
     prediction = _sort_outputs(prediction)
-    
+
     # 2. Save PRediction
     save_name = f"{name}.pkl"
     logger.info("Save prediction as %s", save_name)
     with open(root_dir / save_name, "wb") as f:
         pickle.dump(prediction, f)
-        
+
     # 2. Log Predictions
     run_name = save_name[:-4]
-    preds, target = prediction["reg_pred"], prediction["reg_target"]
-    mse = mean_squared_error(preds=preds, target=target)
-    mae = mean_absolute_error(preds=preds, target=target)
-    r2 = r2_score(preds=preds, target=target)
+    preds, target = prediction["pred"], prediction["target"]
+    if name.startswith("C"):
+        logger.info("Classification data given:")
+        _cls_infrence(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
+    elif name.startswith("R"):
+        logger.info("Regression data given:")
+        _reg_infrence(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
+    else:
+        logger.info("Failed to inference. Check the run name for the task.")
+
+
+def _reg_infrence(preds, target, root_dir, run_name) -> None:
+    mse = tmf.mean_squared_error(preds=preds, target=target)
+    mae = tmf.mean_absolute_error(preds=preds, target=target)
+    r2 = tmf.r2_score(preds=preds, target=target)
     logger.info("Results as follow:")
     logger.info("MSE: %.3f", mse)
     logger.info("MAE: %.3f", mae)
-    logger.info("MSE: %.4f", r2)
+    logger.info("R2 : %.4f", r2)
 
     # 3. Plot Jointplot
-    data = pd.DataFrame({
-        "Prediction": preds.numpy(),
-        "Target": target.numpy(),
-    })
+    data = pd.DataFrame({"Prediction": preds.numpy(),
+                         "Target": target.numpy()})
     
     p = sns.jointplot(data=data,
                       x="Prediction", y="Target",
@@ -108,10 +117,30 @@ def finalize_inference(prediction: list,
     p.fig.suptitle(run_name)
     p.fig.tight_layout()
     p.savefig(root_dir / f"{run_name}-joint.png")
-    
+
     # 3. Plot KDE plot
     fig, ax = plt.subplots(figsize=(5, 5))
     sns.kdeplot(data=data, ax=ax)
     fig.suptitle(run_name)
     fig.tight_layout()
     fig.savefig(root_dir / f"{run_name}-kde.png")
+
+
+def _cls_infrence(preds, target, root_dir, run_name) -> None:
+    metrics_input = dict(preds=preds,
+                         target=target.int(),
+                         task="binary")
+    acc = tmf.accuracy(**metrics_input)
+    f1 = tmf.f1_score(**metrics_input)
+    auroc = tmf.auroc(**metrics_input)
+    logger.info("Results as follow:")
+    logger.info("ACC  : %.3f", acc)
+    logger.info("F1   : %.3f", f1)
+    logger.info("AUROC: %.4f", auroc)
+    
+    cf = tmf.confusion_matrix(**metrics_input)
+    p = sns.heatmap(cf, annot=True, fmt="d")
+    p.set_title(run_name)
+    p.savefig(root_dir / f"{run_name}-cf.png")
+
+

@@ -1,0 +1,10 @@
+scheduler:
+  _target_: torch.optim.lr_scheduler.OneCycleLR
+  max_lr: 1e-3
+  total_steps:
+  anneal_strategy: cos
+  cycle_momentum: False
+
+interval: step
+frequency: 1
+strict: False

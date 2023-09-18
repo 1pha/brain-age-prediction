@@ -57,5 +57,5 @@ class SwinViT(ModelBase):
             loss = self.criterion(pred, age)
             
             return dict(loss=loss,
-                        reg_pred=pred.detach().cpu(),
-                        reg_target=age.detach().cpu())
+                        pred=pred.detach().cpu(),
+                        target=age.detach().cpu())
