@@ -5,7 +5,7 @@ scheduler:
   max_lr: 1e-3
   min_lr: 1e-7
   warmup_steps: 2000
-  gamma: 0.8
+  gamma: 0.5
   last_epoch: -1
 interval: step
 frequency: 1

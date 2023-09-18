@@ -122,15 +122,15 @@ class UKBDataset(Dataset):
             "brain": arr,
             "age": age,
         }
-        
+
     def __len__(self):
         return len(self.files)
-    
-    
+
+
 class UKBClassification(UKBDataset):
     def __init__(self,
                  root: Path | str = "./biobank",
-                 label_name: str = "ukb_age_label.csv",
+                 label_name: str = None,
                  young_threshold: int = 51,
                  old_threshold: int = 77,
                  balance: bool = True,
@@ -161,7 +161,7 @@ class UKBClassification(UKBDataset):
             tst_pid = self.files.pop(pids.index(str(pid)))
             tst.append(tst_pid)
         return tst
-    
+
     def _age_filter(self, files: list):
         # Filter out self.files with age condition
         logger.info("Filter out ages")
@@ -195,7 +195,7 @@ class UKBClassification(UKBDataset):
         self._age_filter(files=self.files)
         if self.balance:
             self._balance(seed=seed)
-            
+
         trn, val = train_test_split(self.files, test_size=valid_ratio, random_state=seed)
         self.files = {"train": trn, "valid": val, "test": tst}.get(mode, None)
         if self.files is None:
@@ -218,6 +218,7 @@ class UKBClassification(UKBDataset):
         logger.info("After balaning: %s", len(self.files))
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        breakpoint()
         result = super().__getitem__(idx=idx)
         age = result["age"]
         if age <= self.thresholds["young"]:

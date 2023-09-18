@@ -89,7 +89,7 @@ callbacks:
   checkpoint_lr:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
-    filename: "ckpt-step{step}-lr{_lr:.2e}"
+    filename: "ckpt-step{step}-lr{_lr:.2e}-valid_mae{epoch/valid_MeanAbsoluteError:.3f}"
     monitor: _lr
     save_top_k: 7
     mode: min
