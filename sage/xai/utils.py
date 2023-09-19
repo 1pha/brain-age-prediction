@@ -6,13 +6,14 @@ from warnings import warn
 import torch
 import nibabel as nib
 import numpy as np
+from nilearn.datasets import load_mni152_brain_mask
 from nilearn.image import new_img_like
-from nilearn.datasets import load_mni152_template, load_mni152_brain_mask
 from captum.attr import LayerAttribution
 
-
-MNI_AFFINE = load_mni152_template().affine
-MNI_SHAPE = load_mni152_brain_mask().get_fdata().shape
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
 
 
 def load_np(fname: str | np.ndarray | Path):
@@ -74,7 +75,7 @@ def average(tensor, dim=0):
     return tensor.sum(dim) / N
 
 
-def align(arr: np.ndarray, affine: np.ndarray = MNI_AFFINE) -> nib.nifti1.Nifti1Image:
+def align(arr: np.ndarray, affine: np.ndarray = C.MNI_AFFINE) -> nib.nifti1.Nifti1Image:
     _arr: np.ndarray = _safe_get_data(_mni(arr), ensure_finite=True)
     arr_nifti = new_img_like(ref_niimg=_mni(arr), data=_arr, affine=affine)
     return arr_nifti
@@ -104,7 +105,7 @@ def margin_mni_mask():
 
 def upsample(arr: np.ndarray | torch.Tensor,
              return_mni: bool = True,
-             target_shape: tuple = MNI_SHAPE,
+             target_shape: tuple = C.MNI_SHAPE,
              interpolate_mode="trilinear") -> np.ndarray:
     """ If you're translating atlas, it is recommended to use 'nearest' as interpolation_mode"""
     if isinstance(arr, np.ndarray):
@@ -114,7 +115,7 @@ def upsample(arr: np.ndarray | torch.Tensor,
         arr = arr[0]
     
     if return_mni:
-        target_shape = MNI_SHAPE
+        target_shape = C.MNI_SHAPE
     
     arr = torch.tensor(arr)
     arr = LayerAttribution.interpolate(layer_attribution=arr[None, None, ...],
@@ -178,4 +179,4 @@ def _safe_get_data(img, ensure_finite=False, copy_data=False):
 
 
 _nifti = lambda arr, affine=np.eye(4): nib.nifti1.Nifti1Image(arr, affine)
-_mni = lambda arr: nib.nifti1.Nifti1Image(arr, MNI_AFFINE)
+_mni = lambda arr: nib.nifti1.Nifti1Image(arr, C.MNI_AFFINE)

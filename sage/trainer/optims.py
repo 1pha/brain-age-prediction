@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class confusion_loss(nn.Module):
     def __init__(self, task=0):
         super(confusion_loss, self).__init__()

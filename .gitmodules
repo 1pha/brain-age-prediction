@@ -1,6 +1,6 @@
 [submodule "FastsurferAnalysis"]
 	path = FastsurferAnalysis
 	url = https://github.com/1pha/FastsurferAnalysis
-[submodule "meta-brain"]
-	path = meta-brain
-	url = https://github.com/1pha/meta-brain
+[submodule "meta_brain"]
+	path = meta_brain
+	url = https://github.com/1pha/meta_brain

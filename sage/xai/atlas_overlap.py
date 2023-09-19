@@ -10,7 +10,7 @@ from typing import Tuple
 import numpy as np
 import nibabel as nib
 import nilearn.plotting as nilp
-from nilearn.image import resample_img
+from nilearn.image import resample_img, new_img_like
 from sklearn.utils import Bunch
 from tqdm import tqdm
 
@@ -18,6 +18,11 @@ from sage.utils import get_logger
 from . import nilearn_plots as nilp_
 from . import atlas as atlas_
 from . import utils
+
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
 
 
 logger = get_logger(name=__file__)
@@ -56,7 +61,13 @@ def load_sal(path: str = "resnet10t-aug",
     npy_dir = get_path(path=path, mask=mask, xai=xai,
                        top_k=top_k, load_top=load_top, root_dir=root_dir)
     saliency = np.load(file=npy_dir)
-    return saliency, npy_dir
+    return saliency
+
+
+def align(arr: np.ndarray) -> nib.nifti1.Nifti1Image:
+    _arr: np.ndarray = utils._safe_get_data(utils._mni(arr), ensure_finite=True)
+    arr_nifti = new_img_like(utils._mni(arr), _arr, C.MNI_AFFINE)
+    return arr_nifti
 
 
 def resample_sal(arr: np.ndarray,

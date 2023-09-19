@@ -9,8 +9,11 @@ from nilearn.datasets import fetch_atlas_aal, fetch_atlas_harvard_oxford
 import pandas as pd
 from sklearn.utils import Bunch
 
-from .utils import upsample, MNI_SHAPE, align
-from .atlas import align
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
+from . import utils
 import sage.constants as C
 
 
@@ -26,7 +29,7 @@ def get_cerebra():
 def get_atlas(atlas_name: str,
               atlas_kwargs: dict = {},
               return_mni: bool = True,
-              target_shape: tuple = MNI_SHAPE,
+              target_shape: tuple = C.MNI_SHAPE,
               interpolate_mode: str = "nearest"):
     atlas_map, indices, labels = {
         "aal": _get_aal(),
@@ -118,7 +121,7 @@ def _get_dkt() -> Tuple[nii, list, list]:
     # TODO: Fix hard-coded path
     ROOT = Path("assets/atlas/dkt")
     atlas = load_img(img=ROOT / "det_dktaseg.nii")
-    atlas = align(arr=atlas.get_fdata(), affine=C.BIOBANK_AFFINE)
+    atlas = utils.align(arr=atlas.get_fdata(), affine=C.BIOBANK_AFFINE)
     
     meta = pd.read_csv(ROOT / "stats_meta.csv")
     indices = meta.SegId.tolist()

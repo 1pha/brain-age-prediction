@@ -1,15 +1,14 @@
 import os
-import ast
 import argparse
 from pathlib import Path
 
 import hydra
-import omegaconf
 
 import sage
 
 
 logger = sage.utils.get_logger(name=__name__)
+
 
 MASK_DIR = Path("assets/masks")
 

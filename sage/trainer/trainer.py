@@ -15,7 +15,7 @@ import wandb
 
 import sage
 import sage.xai.nilearn_plots as nilp_
-from .utils import finalize_inference, tune_logging_interval
+from . import utils
 from .mask import load_mask
 
 
@@ -281,7 +281,7 @@ def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
     lr_frequency = config.scheduler.frequency
     
     # Tune logging interval
-    config.trainer.log_every_n_steps = tune_logging_interval(logging_interval=logging_interval,
+    config.trainer.log_every_n_steps = utils.tune_logging_interval(logging_interval=logging_interval,
                                                              batch_size=batch_size)
     return config
 
@@ -313,7 +313,7 @@ def train(config: omegaconf.DictConfig) -> None:
     if dataloaders["test"]:
         logger.info("Test dataset given. Start inference on %s", len(dataloaders["test"].dataset))
         prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["test"])
-        finalize_inference(prediction=prediction, name=config.logger.name,
+        utils.finalize_inference(prediction=prediction, name=config.logger.name,
                            root_dir=Path(config.callbacks.checkpoint.dirpath))
     if config_update:
         wandb.config.update(omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True))
@@ -335,7 +335,7 @@ def inference(config: omegaconf.DictConfig,
     task = config.module._target_
     # Infer Metrics
     if task == "sage.trainer.PLModule":
-        finalize_inference(prediction=prediction,
+        utils.finalize_inference(prediction=prediction,
                            name=config.logger.name,
                            root_dir=root_dir)
 
@@ -357,7 +357,7 @@ def inference(config: omegaconf.DictConfig,
 
         # Save plots
         nilp_.plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png", colorbar=True)
-        nilp_.plot_overlay(arr=attr, save=root_dir / "attr_anat.png")
+        nilp_.plot_overlay(arr=attr, save=root_dir / "attr_anat.png", display_mode="mosaic")
         
         nilp_.plot_glass_brain(arr=top_attr, save=root_dir / "top_glass.png", colorbar=True)
-        nilp_.plot_overlay(arr=top_attr, save=root_dir / "top_anat.png")
+        nilp_.plot_overlay(arr=top_attr, save=root_dir / "top_anat.png", display_mode="mosaic")
