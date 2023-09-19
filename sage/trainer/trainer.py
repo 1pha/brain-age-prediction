@@ -357,7 +357,7 @@ def inference(config: omegaconf.DictConfig,
 
         # Save plots
         plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png")
-        plot_overlay(arr=attr, save=root_dir / "attr_anat.png")
+        plot_overlay(arr=attr, save=root_dir / "attr_anat.png", display_mode="mosaic")
         
         plot_glass_brain(arr=top_attr, save=root_dir / "top_glass.png")
-        plot_overlay(arr=top_attr, save=root_dir / "top_anat.png")
+        plot_overlay(arr=top_attr, save=root_dir / "top_anat.png", display_mode="mosaic")
