@@ -9,12 +9,11 @@ from nilearn.datasets import fetch_atlas_aal, fetch_atlas_harvard_oxford
 import pandas as pd
 from sklearn.utils import Bunch
 
+from . import utils
 try:
     import sage.constants as C
 except ImportError:
     import meta_brain.router as C
-from . import utils
-import sage.constants as C
 
 
 nii = TypeVar(name="nii", bound=nibabel.nifti1.Nifti1Image)
@@ -39,10 +38,10 @@ def get_atlas(atlas_name: str,
     }[atlas_name]
 
     if return_mni:
-        arr = upsample(arr=atlas_map.get_fdata(),
-                       return_mni=return_mni,
-                       target_shape=target_shape,
-                       interpolate_mode=interpolate_mode)
+        arr = utils.upsample(arr=atlas_map.get_fdata(),
+                             return_mni=return_mni,
+                             target_shape=target_shape,
+                             interpolate_mode=interpolate_mode)
     else:
         arr = atlas_map.get_fdata()
     indices = _literal_eval(lst=indices)
