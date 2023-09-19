@@ -141,6 +141,4 @@ def _cls_infrence(preds, target, root_dir, run_name) -> None:
     cf = tmf.confusion_matrix(**metrics_input)
     p = sns.heatmap(cf, annot=True, fmt="d")
     p.set_title(run_name)
-    p.savefig(root_dir / f"{run_name}-cf.png")
-
-
+    plt.savefig(root_dir / f"{run_name}-cf.png")

@@ -14,7 +14,7 @@ from torchmetrics import MetricCollection
 import wandb
 
 import sage
-from sage.xai.nilearn_plots import plot_overlay, plot_glass_brain, plot_brain
+import sage.xai.nilearn_plots as nilp_
 from .utils import finalize_inference, tune_logging_interval
 from .mask import load_mask
 
@@ -91,7 +91,7 @@ class PLModule(pl.LightningModule):
         brain = self.augmentor(brain[None, ...]) if augment else self.no_augment(brain[None, ...])
         
         tmp = "tmp.png"
-        plot_brain(brain, save=tmp)
+        nilp_.plot_brain(brain, save=tmp)
         try:
             wandb.log({"sample": wandb.Image(tmp)})
         except:
@@ -356,8 +356,8 @@ def inference(config: omegaconf.DictConfig,
         np.save(file=root_dir / "top_attr.npy", arr=top_attr)
 
         # Save plots
-        plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png")
-        plot_overlay(arr=attr, save=root_dir / "attr_anat.png")
+        nilp_.plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png", colorbar=True)
+        nilp_.plot_overlay(arr=attr, save=root_dir / "attr_anat.png")
         
-        plot_glass_brain(arr=top_attr, save=root_dir / "top_glass.png")
-        plot_overlay(arr=top_attr, save=root_dir / "top_anat.png")
+        nilp_.plot_glass_brain(arr=top_attr, save=root_dir / "top_glass.png", colorbar=True)
+        nilp_.plot_overlay(arr=top_attr, save=root_dir / "top_anat.png")

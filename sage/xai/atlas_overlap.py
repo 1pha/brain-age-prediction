@@ -5,18 +5,19 @@ Possible outcomes:
 
 They can be inferred with absolute or raw values"""
 from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 import nibabel as nib
-from nilearn.image import resample_img, new_img_like
 import nilearn.plotting as nilp
+from nilearn.image import resample_img
 from sklearn.utils import Bunch
 from tqdm import tqdm
 
 from sage.utils import get_logger
 from . import nilearn_plots as nilp_
-from .utils import _mni, _safe_get_data, MNI_AFFINE
-from .atlas import get_atlas
+from . import atlas as atlas_
+from . import utils
 
 
 logger = get_logger(name=__file__)
@@ -24,12 +25,27 @@ logger = get_logger(name=__file__)
 ASSET_DIR = Path("assets/weights")
 
 
+def get_path(path: str,
+             mask: str = "nomask",
+             xai: str = "ig",
+             top_k: float = 0.95,
+             load_top: bool = True,
+             root_dir: Path = ASSET_DIR) -> Path:
+    """ Returns path for saliency map"""
+    npy_dir = root_dir / \
+              path / \
+              mask / \
+              f"{xai}k{top_k}" / \
+              f"{'top_attr' if load_top else 'attrs'}.npy"
+    return npy_dir
+
+
 def load_sal(path: str = "resnet10t-aug",
              mask: str = "nomask",
              xai: str = "ig",
              top_k: float = 0.95,
              load_top: bool = True,
-             root_dir: Path = ASSET_DIR) -> np.ndarray:
+             root_dir: Path = ASSET_DIR) -> Tuple[np.ndarray, Path]:
     """ Loads saliency and their metadata
     Given arguments will be used as follows
     Loads attr.npy from following dir
@@ -37,32 +53,23 @@ def load_sal(path: str = "resnet10t-aug",
     - $mask: e.g. mask, no-mask, sigma=0.5, sigma=1.0
     """
     
-    npy_dir = root_dir / \
-              path / \
-              mask / \
-              f"{xai}k{top_k}" / \
-              f"{'top_attr' if load_top else 'attrs'}.npy"
+    npy_dir = get_path(path=path, mask=mask, xai=xai,
+                       top_k=top_k, load_top=load_top, root_dir=root_dir)
     saliency = np.load(file=npy_dir)
-    return saliency
-
-
-def align(arr: np.ndarray) -> nib.nifti1.Nifti1Image:
-    _arr: np.ndarray = _safe_get_data(_mni(arr), ensure_finite=True)
-    arr_nifti = new_img_like(_mni(arr), _arr, MNI_AFFINE)
-    return arr_nifti
+    return saliency, npy_dir
 
 
 def resample_sal(arr: np.ndarray,
                  atlas: nib.nifti1.Nifti1Image) -> nib.nifti1.Nifti1Image:
     """ Resample a given array to target atlas.
     When resampling, given array will be converted to mni space with nibabel. """
-    arr_nifti = align(arr)
+    arr_nifti = utils.align(arr)
     resampled = resample_img(img=arr_nifti,
                              target_affine=atlas.affine,
                              target_shape=atlas.shape)
     return resampled
 
-    
+
 def calculate_overlaps(arr: np.ndarray,
                        atlas: Bunch,
                        title: str = "",
@@ -80,8 +87,8 @@ def calculate_overlaps(arr: np.ndarray,
         
     # Load atlas
     if isinstance(atlas, str):
-        atlas = get_atlas(atlas_name=atlas,
-                          return_mni=False if atlas == "cerebra" else True)
+        atlas = atlas_.get_atlas(atlas_name=atlas,
+                                 return_mni=False if atlas == "cerebra" else True)
     
     if use_abs:
         mask_ = np.abs(mask_)
@@ -131,5 +138,5 @@ def calculate_overlaps(arr: np.ndarray,
                            threshold=0.25, title=title,
                            cmap=nilp.cm.red_transparent if use_abs else nilp.cm.bwr,
                            colorbar=True)
-        
+
     return xai_dict, agg_saliency

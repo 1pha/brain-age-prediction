@@ -9,7 +9,9 @@ from nilearn.datasets import fetch_atlas_aal, fetch_atlas_harvard_oxford
 import pandas as pd
 from sklearn.utils import Bunch
 
-from .utils import upsample, MNI_SHAPE
+from .utils import upsample, MNI_SHAPE, align
+from .atlas import align
+import sage.constants as C
 
 
 nii = TypeVar(name="nii", bound=nibabel.nifti1.Nifti1Image)
@@ -30,8 +32,9 @@ def get_atlas(atlas_name: str,
         "aal": _get_aal(),
         "oxford": _get_ho(**atlas_kwargs),
         "cerebra": _get_cerebra(),
+        "dkt": _get_dkt(),
     }[atlas_name]
-    
+
     if return_mni:
         arr = upsample(arr=atlas_map.get_fdata(),
                        return_mni=return_mni,
@@ -109,3 +112,15 @@ def _get_aal() -> Tuple[nii, list, list]:
     indices = atlas.indices    
     labels = atlas.labels
     return atlas_map, indices, labels
+
+
+def _get_dkt() -> Tuple[nii, list, list]:
+    # TODO: Fix hard-coded path
+    ROOT = Path("assets/atlas/dkt")
+    atlas = load_img(img=ROOT / "det_dktaseg.nii")
+    atlas = align(arr=atlas.get_fdata(), affine=C.BIOBANK_AFFINE)
+    
+    meta = pd.read_csv(ROOT / "stats_meta.csv")
+    indices = meta.SegId.tolist()
+    labels = meta.StructName.tolist()
+    return atlas, indices, labels

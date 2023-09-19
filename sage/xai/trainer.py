@@ -92,7 +92,7 @@ class XPLModule(PLModule):
             xai = LayerGradCam(forward_func=model.forward_func,
                                layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gbp":
-            xai = GuidedBackprop(model=forward_func)
+            xai = GuidedBackprop(model=model.backbone)
         elif xai_method == "ig":
             xai = IntegratedGradients(forward_func=forward_func)
         elif xai_method == "lrp":
