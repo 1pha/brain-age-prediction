@@ -3,10 +3,14 @@
 from pathlib import Path
 from typing import List
 
-import matplotlib.pyplot as plt
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
 
 
-def load_imgs(root: Path = Path("assets/weights"),
+
+def load_imgs(root: Path = C.WEIGHT_DIR,
               path: Path | List = Path("resnet10t-mask"),
               img_type: str = "glass",
               mask: bool = True,

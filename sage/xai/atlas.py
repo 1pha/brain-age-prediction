@@ -9,7 +9,11 @@ from nilearn.datasets import fetch_atlas_aal, fetch_atlas_harvard_oxford
 import pandas as pd
 from sklearn.utils import Bunch
 
-from .utils import upsample, MNI_SHAPE
+from .utils import upsample
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
 
 
 nii = TypeVar(name="nii", bound=nibabel.nifti1.Nifti1Image)
@@ -24,7 +28,7 @@ def get_cerebra():
 def get_atlas(atlas_name: str,
               atlas_kwargs: dict = {},
               return_mni: bool = True,
-              target_shape: tuple = MNI_SHAPE,
+              target_shape: tuple = C.MNI_SHAPE,
               interpolate_mode: str = "nearest"):
     atlas_map, indices, labels = {
         "aal": _get_aal(),

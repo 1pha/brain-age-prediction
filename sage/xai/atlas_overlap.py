@@ -15,8 +15,13 @@ from tqdm import tqdm
 
 from sage.utils import get_logger
 from . import nilearn_plots as nilp_
-from .utils import _mni, _safe_get_data, MNI_AFFINE
+from .utils import _mni, _safe_get_data
 from .atlas import get_atlas
+
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
 
 
 logger = get_logger(name=__file__)
@@ -48,7 +53,7 @@ def load_sal(path: str = "resnet10t-aug",
 
 def align(arr: np.ndarray) -> nib.nifti1.Nifti1Image:
     _arr: np.ndarray = _safe_get_data(_mni(arr), ensure_finite=True)
-    arr_nifti = new_img_like(_mni(arr), _arr, MNI_AFFINE)
+    arr_nifti = new_img_like(_mni(arr), _arr, C.MNI_AFFINE)
     return arr_nifti
 
 

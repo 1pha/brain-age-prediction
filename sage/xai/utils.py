@@ -6,12 +6,13 @@ from warnings import warn
 import torch
 import nibabel
 import numpy as np
-from nilearn.datasets import load_mni152_template, load_mni152_brain_mask
+from nilearn.datasets import load_mni152_brain_mask
 from captum.attr import LayerAttribution
 
-
-MNI_AFFINE = load_mni152_template().affine
-MNI_SHAPE = load_mni152_brain_mask().get_fdata().shape
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
 
 
 def load_np(fname: str | np.ndarray | Path):
@@ -97,7 +98,7 @@ def margin_mni_mask():
 
 def upsample(arr: np.ndarray | torch.Tensor,
              return_mni: bool = True,
-             target_shape: tuple = MNI_SHAPE,
+             target_shape: tuple = C.MNI_SHAPE,
              interpolate_mode="trilinear") -> np.ndarray:
     """ If you're translating atlas, it is recommended to use 'nearest' as interpolation_mode"""
     if isinstance(arr, np.ndarray):
@@ -107,7 +108,7 @@ def upsample(arr: np.ndarray | torch.Tensor,
         arr = arr[0]
     
     if return_mni:
-        target_shape = MNI_SHAPE
+        target_shape = C.MNI_SHAPE
     
     arr = torch.tensor(arr)
     arr = LayerAttribution.interpolate(layer_attribution=arr[None, None, ...],
@@ -171,4 +172,4 @@ def _safe_get_data(img, ensure_finite=False, copy_data=False):
 
 
 _nifti = lambda arr, affine=np.eye(4): nibabel.nifti1.Nifti1Image(arr, affine)
-_mni = lambda arr: nibabel.nifti1.Nifti1Image(arr, MNI_AFFINE)
+_mni = lambda arr: nibabel.nifti1.Nifti1Image(arr, C.MNI_AFFINE)

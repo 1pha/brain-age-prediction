@@ -12,7 +12,11 @@ from torch.utils.data import Dataset
 
 from sage.trainer.utils import load_mask
 from sage.data import no_augment
-from .utils import _nifti, MNI_SHAPE, margin_mni_mask
+from .utils import _nifti, margin_mni_mask
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
 
 
 smaller_mask = margin_mni_mask()
@@ -82,7 +86,7 @@ def get_resnet_attr(model: torch.nn.Module,
     attr = layer_gc.attribute(brain)
     upsampled_attr = (
         LayerAttribution.interpolate(
-            attr, MNI_SHAPE, interpolate_mode="trilinear"
+            attr, C.MNI_SHAPE, interpolate_mode="trilinear"
         )
         .cpu()
         .detach()

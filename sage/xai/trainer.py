@@ -1,22 +1,20 @@
 from pathlib import Path
 from typing import Callable
 
-import omegaconf
+import captum.attr as ca
 import numpy as np
 import torch
 from torch import nn
-from captum.attr import (
-    LayerAttribution,
-    GuidedBackprop,
-    IntegratedGradients,
-    LayerGradCam,
-    LRP
-)
+import omegaconf
 
 import sage
 from sage.trainer import PLModule
-from sage.constants import MNI_SHAPE
-from .utils import margin_mni_mask, z_norm, top_q, load_np
+from . import utils
+try:
+    import sage.constants as C
+except ImportError:
+    import meta_brain.router as C
+
 
 
 logger = sage.utils.get_logger(name=__name__)
@@ -68,11 +66,10 @@ class XPLModule(PLModule):
         if self.test_dataloader:
             assert self.test_dataloader.batch_size == 1, "Test dataloader should have batch_size=1 for XPL"
 
-        self.smaller_mask = margin_mni_mask()
+        self.smaller_mask = utils.margin_mni_mask()
         self.target_layer_index = target_layer_index
         self.top_k_percentile = top_k_percentile
         self.xai_method = xai_method
-        self.baseline = load_np(fname=baseline)
         
         self.configure_xai(model=self.model,
                            xai_method=xai_method,
@@ -89,14 +86,14 @@ class XPLModule(PLModule):
                        target_layer_index: int = 1):
         forward_func = model._forward
         if xai_method == "gcam":
-            xai = LayerGradCam(forward_func=model.forward_func,
-                               layer=model.conv_layers()[target_layer_index])
+            xai = ca.LayerGradCam(forward_func=model.forward_func,
+                                  layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gbp":
-            xai = GuidedBackprop(model=forward_func)
+            xai = ca.GuidedBackprop(model=forward_func)
         elif xai_method == "ig":
-            xai = IntegratedGradients(forward_func=forward_func)
+            xai = ca.IntegratedGradients(forward_func=forward_func)
         elif xai_method == "lrp":
-            xai = LRP(model=model)
+            xai = ca.LRP(model=model)
         else:
             breakpoint()
         return xai
@@ -133,10 +130,10 @@ class XPLModule(PLModule):
                 "Given target_shape is not same as a smaller mask saved as attribute: "\
                 f"target_shape: {target_shape} | smaller_mask: {self.smaller_mask.shape}"
         
-        target_shape = target_shape or MNI_SHAPE
-        upsampled = LayerAttribution.interpolate(layer_attribution=tensor,
-                                                 interpolate_dims=target_shape,
-                                                 interpolate_mode=interpolate_mode)
+        target_shape = target_shape or C.MNI_SHAPE
+        upsampled = ca.LayerAttribution.interpolate(layer_attribution=tensor,
+                                                    interpolate_dims=target_shape,
+                                                    interpolate_mode=interpolate_mode)
         upsampled = upsampled.cpu().detach().squeeze()
         if return_np:
             upsampled = upsampled.numpy()
@@ -155,15 +152,15 @@ class XPLModule(PLModule):
                 attr_kwargs = dict()
             
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
-            attr: torch.Tensor = z_norm(attr)
+            attr: torch.Tensor = utils.z_norm(attr)
             attr: np.ndarray = self.upsample(tensor=attr,
-                                             target_shape=MNI_SHAPE,
+                                             target_shape=C.MNI_SHAPE,
                                              interpolate_mode="trilinear",
                                              return_np=True, apply_margin_mask=True)
-            top_attr: np.ndarray = top_q(arr=attr,
-                                         q=self.top_k_percentile,
-                                         use_abs=True,
-                                         return_bool=False)
+            top_attr: np.ndarray = utils.top_q(arr=attr,
+                                               q=self.top_k_percentile,
+                                               use_abs=True,
+                                               return_bool=False)
             while attr.ndim > 3:
                 attr = attr[0]
             while top_attr.ndim > 3:

@@ -15,7 +15,10 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 
 from sage.utils import get_logger
-import sage.constants as C
+try:
+    import meta_brain.router as C
+except ImportError:
+    import sage.constants as C
 
 
 logger = get_logger(name=__name__)
