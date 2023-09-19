@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 
 from sage.utils import get_logger
-import sage.constants as sc
+import sage.constants as C
 
 
 logger = get_logger(name=__name__)
@@ -41,7 +41,7 @@ def open_h5_nifti(fname: str) -> nib.nifti1.Nifti1Image:
             affine = np.stack([meta["srow_x"], meta["srow_y"], meta["srow_z"], affine_last])
         except:
             meta = None
-            affine = sc.BIOBANK_AFFINE
+            affine = C.BIOBANK_AFFINE
     nii = nib.nifti1.Nifti1Image(dataobj=arr, affine=affine)
     return nii
 
