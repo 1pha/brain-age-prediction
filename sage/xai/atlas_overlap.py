@@ -61,7 +61,7 @@ def load_sal(path: str = "resnet10t-aug",
     npy_dir = get_path(path=path, mask=mask, xai=xai,
                        top_k=top_k, load_top=load_top, root_dir=root_dir)
     saliency = np.load(file=npy_dir)
-    return saliency
+    return saliency, npy_dir
 
 
 def align(arr: np.ndarray) -> nib.nifti1.Nifti1Image:

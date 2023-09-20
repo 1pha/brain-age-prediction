@@ -11,9 +11,9 @@ from sklearn.utils import Bunch
 
 from . import utils
 try:
-    import sage.constants as C
-except ImportError:
     import meta_brain.router as C
+except ImportError:
+    import sage.constants as C
 
 
 nii = TypeVar(name="nii", bound=nibabel.nifti1.Nifti1Image)
@@ -31,11 +31,11 @@ def get_atlas(atlas_name: str,
               target_shape: tuple = C.MNI_SHAPE,
               interpolate_mode: str = "nearest"):
     atlas_map, indices, labels = {
-        "aal": _get_aal(),
-        "oxford": _get_ho(**atlas_kwargs),
-        "cerebra": _get_cerebra(),
-        "dkt": _get_dkt(),
-    }[atlas_name]
+        "aal": _get_aal,
+        "oxford": _get_ho,
+        "cerebra": _get_cerebra,
+        "dkt": _get_dkt,
+    }[atlas_name](*atlas_kwargs)
 
     if return_mni:
         arr = utils.upsample(arr=atlas_map.get_fdata(),
@@ -118,11 +118,10 @@ def _get_aal() -> Tuple[nii, list, list]:
 
 def _get_dkt() -> Tuple[nii, list, list]:
     # TODO: Fix hard-coded path
-    ROOT = Path("assets/atlas/dkt")
-    atlas = load_img(img=ROOT / "det_dktaseg.nii")
+    atlas = load_img(img=C.DKT_ATLAS)
     atlas = utils.align(arr=atlas.get_fdata(), affine=C.BIOBANK_AFFINE)
     
-    meta = pd.read_csv(ROOT / "stats_meta.csv")
+    meta = C.DKT_META
     indices = meta.SegId.tolist()
     labels = meta.StructName.tolist()
     return atlas, indices, labels
