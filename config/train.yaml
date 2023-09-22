@@ -39,6 +39,7 @@ module:
   load_from_checkpoint: # for lightning
   load_model_ckpt: # For model checkpoint only
   separate_lr:
+  save_dir: ${callbacks.checkpoint.dirpath}
 
 metrics:
   mae:
@@ -108,3 +109,11 @@ callbacks:
     logging_interval: step
     log_momentum: False
   
+  richsummary:
+    _target_: pytorch_lightning.callbacks.RichModelSummary
+
+  richpbar:
+    _target_: pytorch_lightning.callbacks.RichProgressBar
+
+  manual_ckpt:
+    _target_: sage.trainer.callbacks.ManualCheckpoint

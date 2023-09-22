@@ -38,7 +38,8 @@ class PLModule(pl.LightningModule):
                  scheduler: omegaconf.DictConfig = None,
                  load_model_ckpt: str = None,
                  load_from_checkpoint: str = None, # unused params but requires for instantiation
-                 separate_lr: dict = None):
+                 separate_lr: dict = None,
+                 save_dir: str = None,):
         super().__init__()
         self.model = model
 
@@ -75,6 +76,9 @@ class PLModule(pl.LightningModule):
         self.aug_config = augmentation
         self.mask = mask
         self.mask_threshold = mask_threshold
+        self.ckpt_gen = utils.ckpt_saver()
+        self.ckpt_cursor = next(self.ckpt_gen)
+        self.save_dir = Path(save_dir)
         
     def setup(self, stage):
         mask = load_mask(mask_path=self.mask,
@@ -206,6 +210,10 @@ class PLModule(pl.LightningModule):
         # We log learning rate explicitly and monitor this
         lr = self.lr_schedulers().get_lr()[0]
         self.log(name="_lr", value=lr, on_step=True)
+        
+        # Save on designated anchors
+        if self.global_step == self.ckpt_cursor:
+            self._save_to_state_dict
         return result["loss"]
 
     def on_train_epoch_end(self):
@@ -282,7 +290,7 @@ def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
     
     # Tune logging interval
     config.trainer.log_every_n_steps = utils.tune_logging_interval(logging_interval=logging_interval,
-                                                             batch_size=batch_size)
+                                                                   batch_size=batch_size)
     return config
 
 
