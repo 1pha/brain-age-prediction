@@ -9,6 +9,7 @@ defaults:
   - model: resnet
   - dataset: biobank
   - scheduler: cosine_anneal_warmup
+  - optim: lion
 
 dataloader:
   _target_: torch.utils.data.DataLoader
@@ -16,12 +17,6 @@ dataloader:
   num_workers: 4
   pin_memory: True
   dataset: ${dataset}
-
-optim:
-  _target_: lion_pytorch.Lion
-  lr: 1e-4
-  weight_decay: 1e-2
-  # eps: 1e-8
 
 misc:
   seed: 42
