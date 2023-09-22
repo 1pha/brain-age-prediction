@@ -4,9 +4,10 @@ from pathlib import Path
 from warnings import warn
 
 import torch
-import nibabel
+import nibabel as nib
 import numpy as np
 from nilearn.datasets import load_mni152_brain_mask
+from nilearn.image import new_img_like
 from captum.attr import LayerAttribution
 
 try:
@@ -72,6 +73,12 @@ def boolify(arr: np.ndarray) -> np.ndarray:
 def average(tensor, dim=0):
     N = tensor.shape[dim]
     return tensor.sum(dim) / N
+
+
+def align(arr: np.ndarray, affine: np.ndarray = C.MNI_AFFINE) -> nib.nifti1.Nifti1Image:
+    _arr: np.ndarray = _safe_get_data(_mni(arr), ensure_finite=True)
+    arr_nifti = new_img_like(ref_niimg=_mni(arr), data=_arr, affine=affine)
+    return arr_nifti
 
 
 def margin_mni_mask():
@@ -171,5 +178,5 @@ def _safe_get_data(img, ensure_finite=False, copy_data=False):
     return data
 
 
-_nifti = lambda arr, affine=np.eye(4): nibabel.nifti1.Nifti1Image(arr, affine)
-_mni = lambda arr: nibabel.nifti1.Nifti1Image(arr, C.MNI_AFFINE)
+_nifti = lambda arr, affine=np.eye(4): nib.nifti1.Nifti1Image(arr, affine)
+_mni = lambda arr: nib.nifti1.Nifti1Image(arr, C.MNI_AFFINE)

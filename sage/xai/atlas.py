@@ -9,11 +9,11 @@ from nilearn.datasets import fetch_atlas_aal, fetch_atlas_harvard_oxford
 import pandas as pd
 from sklearn.utils import Bunch
 
-from .utils import upsample
+from . import utils
 try:
-    import sage.constants as C
-except ImportError:
     import meta_brain.router as C
+except ImportError:
+    import sage.constants as C
 
 
 nii = TypeVar(name="nii", bound=nibabel.nifti1.Nifti1Image)
@@ -31,16 +31,17 @@ def get_atlas(atlas_name: str,
               target_shape: tuple = C.MNI_SHAPE,
               interpolate_mode: str = "nearest"):
     atlas_map, indices, labels = {
-        "aal": _get_aal(),
-        "oxford": _get_ho(**atlas_kwargs),
-        "cerebra": _get_cerebra(),
-    }[atlas_name]
-    
+        "aal": _get_aal,
+        "oxford": _get_ho,
+        "cerebra": _get_cerebra,
+        "dkt": _get_dkt,
+    }[atlas_name](*atlas_kwargs)
+
     if return_mni:
-        arr = upsample(arr=atlas_map.get_fdata(),
-                       return_mni=return_mni,
-                       target_shape=target_shape,
-                       interpolate_mode=interpolate_mode)
+        arr = utils.upsample(arr=atlas_map.get_fdata(),
+                             return_mni=return_mni,
+                             target_shape=target_shape,
+                             interpolate_mode=interpolate_mode)
     else:
         arr = atlas_map.get_fdata()
     indices = _literal_eval(lst=indices)
@@ -113,3 +114,14 @@ def _get_aal() -> Tuple[nii, list, list]:
     indices = atlas.indices    
     labels = atlas.labels
     return atlas_map, indices, labels
+
+
+def _get_dkt() -> Tuple[nii, list, list]:
+    # TODO: Fix hard-coded path
+    atlas = load_img(img=C.DKT_ATLAS)
+    atlas = utils.align(arr=atlas.get_fdata(), affine=C.BIOBANK_AFFINE)
+    
+    meta = C.DKT_META
+    indices = meta.SegId.tolist()
+    labels = meta.StructName.tolist()
+    return atlas, indices, labels
