@@ -1,8 +1,9 @@
 import torch
 import monai.transforms as mt
 
+SPATIAL_SIZE = (128, 128, 128)
 
-def mask_transform(spatial_size: tuple = (96, 96, 96),
+def mask_transform(spatial_size: tuple = SPATIAL_SIZE,
                    mask: torch.Tensor = None,
                    prob: float = 1.0) -> mt.transform:
     """ Checks if mask is valid when given,
@@ -15,7 +16,7 @@ def mask_transform(spatial_size: tuple = (96, 96, 96),
         return mt.RandLambda(lambda t: t, prob=prob)
 
 
-def no_augment(spatial_size: tuple = (96, 96, 96),
+def no_augment(spatial_size: tuple = SPATIAL_SIZE,
                mask: torch.Tensor = None):
     apply_mask: mt.transform = mask_transform(spatial_size=spatial_size, mask=mask)
     return mt.Compose([
@@ -26,7 +27,7 @@ def no_augment(spatial_size: tuple = (96, 96, 96),
     ])
 
 
-def augment(spatial_size: tuple = (96, 96, 96),
+def augment(spatial_size: tuple = SPATIAL_SIZE,
             mask: torch.Tensor = None):
     apply_mask: mt.transform = mask_transform(spatial_size=spatial_size, mask=mask)
     return mt.Compose([
@@ -41,7 +42,7 @@ def augment(spatial_size: tuple = (96, 96, 96),
     ])
     
     
-def augment_mask(spatial_size: tuple = (96, 96, 96),
+def augment_mask(spatial_size: tuple = SPATIAL_SIZE,
                  mask: torch.Tensor = None):
     """ Using masking as augmentation probabilistically """
     apply_mask: mt.transform = mask_transform(spatial_size=spatial_size, mask=mask, prob=0.7)
