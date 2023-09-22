@@ -18,10 +18,10 @@ dataloader:
   dataset: ${dataset}
 
 optim:
-  _target_: torch.optim.AdamW
+  _target_: lion_pytorch.Lion
   lr: 1e-4
-  weight_decay: 1e-6
-  eps: 1e-8
+  weight_decay: 1e-2
+  # eps: 1e-8
 
 misc:
   seed: 42
@@ -64,7 +64,7 @@ logger:
 # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
 trainer:
   _target_: pytorch_lightning.Trainer
-  max_epochs: 100
+  max_epochs: 300
   devices: 1
   accelerator: gpu
   gradient_clip_val: 1

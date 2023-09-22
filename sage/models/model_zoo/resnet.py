@@ -6,20 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def get_inplanes(start_channels=16):
-    if start_channels == 8:
-        return [8, 16, 32, 64]
-
-    elif start_channels == 16:
-        return [16, 32, 64, 128]
-
-    elif start_channels == 32:
-        return [32, 64, 128, 256]
-
-    elif start_channels == 64:
-        return [64, 128, 256, 512]
-
-
 def conv3x3x3(in_planes, out_planes, stride=1):
     return nn.Conv3d(
         in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
@@ -234,22 +220,28 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
 
-        # x = x.view(x.size(0), -1)
         x = self.flatten(x)
         x = self.fc(x)
 
         return x
 
-    # @property
     def conv_layers(self):
-
         conv_layers = [self.conv1]
         for layer in [self.layer1, self.layer2, self.layer3, self.layer4]:
             for l in layer:
                 conv_layers.append(l.conv1)
                 conv_layers.append(l.conv2)
-
         return conv_layers
+
+    
+def get_inplanes(start_channels: int = 16):
+    inplanes = {
+        8 : [8 , 16 , 32 , 64 ],
+        16: [16, 32 , 64 , 128],
+        32: [32, 64 , 128, 256],
+        64: [64, 128, 256, 512],
+    }[start_channels]
+    return inplanes
 
 
 def generate_model(model_depth, start_channels, **kwargs):
@@ -260,59 +252,31 @@ def generate_model(model_depth, start_channels, **kwargs):
     elif model_depth == 18:
         model = ResNet(BasicBlock, [2, 2, 2, 2], get_inplanes(start_channels), **kwargs)
     elif model_depth == 34:
-        model = ResNet(BasicBlock, [3, 4, 6, 3], get_inplanes(), **kwargs)
+        model = ResNet(BasicBlock, [3, 4, 6, 3], get_inplanes(start_channels), **kwargs)
     elif model_depth == 50:
-        model = ResNet(Bottleneck, [3, 4, 6, 3], get_inplanes(), **kwargs)
+        model = ResNet(Bottleneck, [3, 4, 6, 3], get_inplanes(start_channels), **kwargs)
     elif model_depth == 101:
-        model = ResNet(Bottleneck, [3, 4, 23, 3], get_inplanes(), **kwargs)
+        model = ResNet(Bottleneck, [3, 4, 23, 3], get_inplanes(start_channels), **kwargs)
     elif model_depth == 152:
-        model = ResNet(Bottleneck, [3, 8, 36, 3], get_inplanes(), **kwargs)
+        model = ResNet(Bottleneck, [3, 8, 36, 3], get_inplanes(start_channels), **kwargs)
     elif model_depth == 200:
-        model = ResNet(Bottleneck, [3, 24, 36, 3], get_inplanes(), **kwargs)
+        model = ResNet(Bottleneck, [3, 24, 36, 3], get_inplanes(start_channels), **kwargs)
 
     return model
 
 
-class Option:
-    def __init__(
-        self,
-        model_depth=10,
-        n_classes=1,
-        n_input_channels=1,
-        shortcut_type="A",
-        conv1_t_size=7,
-        conv1_t_stride=2,
-        no_max_pool=False,
-        resnet_widen_factor=1.0,
-        start_channels=16,
-    ):
-
-        self.model_depth = model_depth
-        self.n_classes = n_classes
-        self.n_input_channels = n_input_channels
-        self.shortcut_type = shortcut_type
-        self.conv1_t_size = conv1_t_size
-        self.conv1_t_stride = conv1_t_stride
-        self.no_max_pool = no_max_pool
-        self.resnet_widen_factor = resnet_widen_factor
-        self.start_channels = start_channels
-
-
-def build_resnet():
-
-    opt = Option()
-    opt.start_channels = 32
-    model = generate_model(
-        model_depth=opt.model_depth,
-        n_classes=opt.n_classes,
-        n_input_channels=opt.n_input_channels,
-        shortcut_type=opt.shortcut_type,
-        conv1_t_size=opt.conv1_t_size,
-        conv1_t_stride=opt.conv1_t_stride,
-        no_max_pool=opt.no_max_pool,
-        widen_factor=opt.resnet_widen_factor,
-        start_channels=opt.start_channels,
-    )
+def build_resnet(model_depth: int = 10, **kwargs) -> nn.Module:
+    params = dict(model_depth=model_depth,
+                  n_classes=1,
+                  n_input_channels=1,
+                  shortcut_type="A",
+                  conv1_t_size=7,
+                  conv1_t_stride=2,
+                  no_max_pool=False,
+                  resnet_widen_factor=1.0,
+                  start_channels=32)
+    params.update(kwargs)
+    model = generate_model(**params)
     return model
 
 
