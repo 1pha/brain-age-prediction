@@ -3,6 +3,7 @@ from torch import nn
 
 from sage.utils import get_logger
 from .utils import find_conv_modules
+from .model_zoo.sfcn import num2vect
 
 
 logger = get_logger(name=__file__)
@@ -64,3 +65,27 @@ class ConvNext(ModelBase):
                  criterion: nn.Module,
                  name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
+
+
+class SFCNModel(ModelBase):
+    def __init__(self,
+                 backbone: nn.Module,
+                 criterion: nn.Module,
+                 name: str):
+        super().__init__(backbone=backbone, criterion=criterion, name=name)
+        # TODO: bin_range interval and backbones' output_dim should be matched,
+        # but they are separately hard-coded!
+        self.num2vect_kwargs = dict(bin_range=(40, 100), bin_step=1, sigma=1)
+    
+    def forward(self, brain: torch.Tensor, age: torch.Tensor):
+        _pred = self.backbone(brain)
+        age_y, bc = num2vect(age, **self.num2vect_kwargs)
+        
+        device = brain.device
+        loss = self.criterion(_pred, torch.tensor(age_y, device=device))
+        
+        pred = _pred.clone().detach().exp().numpy() @ bc
+        pred = torch.tensor(pred)
+        return dict(loss=loss,
+                    pred=pred,
+                    target=age.detach().cpu())
