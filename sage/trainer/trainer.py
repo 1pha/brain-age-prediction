@@ -76,14 +76,11 @@ class PLModule(pl.LightningModule):
         self.aug_config = augmentation
         self.mask = mask
         self.mask_threshold = mask_threshold
-        self.ckpt_gen = utils.ckpt_saver()
-        self.ckpt_cursor = next(self.ckpt_gen)
-        self.save_dir = Path(save_dir)
         
     def setup(self, stage):
         mask = load_mask(mask_path=self.mask,
                          mask_threshold=self.mask_threshold)
-        self.no_augment = sage.data.no_augment(mask=mask)
+        self.no_augment = hydra.utils.instantiate(self.aug_config, _target_="sage.data.no_augment", mask=mask)
         self.augmentor = hydra.utils.instantiate(self.aug_config, mask=mask)
         self.log_brain(return_path=False)
         
@@ -210,10 +207,6 @@ class PLModule(pl.LightningModule):
         # We log learning rate explicitly and monitor this
         lr = self.lr_schedulers().get_lr()[0]
         self.log(name="_lr", value=lr, on_step=True)
-        
-        # Save on designated anchors
-        if self.global_step == self.ckpt_cursor:
-            self._save_to_state_dict
         return result["loss"]
 
     def on_train_epoch_end(self):
