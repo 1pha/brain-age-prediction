@@ -1,8 +1,7 @@
 scheduler:
-  _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
-  T_0: 200
-  T_mult: 2
-  eta_min: 1e-7
+  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+  T_max: 250_000
+  eta_min: 1e-9
 interval: step
 frequency: 1
 strict: False
