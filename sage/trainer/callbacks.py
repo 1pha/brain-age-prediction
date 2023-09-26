@@ -23,6 +23,6 @@ class ManualCheckpoint(pl.Callback):
         current_global_step = trainer.global_step
         if current_global_step % self.save_step == 0:
             metrics = trainer.callback_metrics
-            checkpoint_path = f"{current_global_step}-valid_mae.ckpt"
+            checkpoint_path = f"{current_global_step}-valid_mae{metrics}.ckpt"
             trainer.save_checkpoint(checkpoint_path)
             self.save_step = next(self.save_steps)
