@@ -19,7 +19,7 @@ class ManualCheckpoint(pl.Callback):
         self.save_steps = ckpt_saver()
         self.save_step = next(self.save_steps)
 
-    def on_batch_end(self, trainer, pl_module):
+    def on_train_epoch_end(self, trainer, pl_module):
         current_global_step = trainer.global_step
         breakpoint()
         if current_global_step % self.save_step == 0:
