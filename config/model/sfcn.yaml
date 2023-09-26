@@ -1,6 +1,6 @@
 _target_: sage.models.base.SFCNModel
 backbone:
-  _target_: sage.models.model_zoo.convnext.build_convnext
+  _target_: sage.models.model_zoo.sfcn.build_sfcn
 criterion:
   _target_: sage.trainer.optims.KLDivLossSFCN
 name: SFCN

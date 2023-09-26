@@ -76,14 +76,11 @@ class PLModule(pl.LightningModule):
         self.aug_config = augmentation
         self.mask = mask
         self.mask_threshold = mask_threshold
-        self.ckpt_gen = utils.ckpt_saver()
-        self.ckpt_cursor = next(self.ckpt_gen)
-        self.save_dir = Path(save_dir)
         
     def setup(self, stage):
         mask = load_mask(mask_path=self.mask,
                          mask_threshold=self.mask_threshold)
-        self.no_augment = sage.data.no_augment(mask=mask)
+        self.no_augment = hydra.utils.instantiate(self.aug_config, _target_="sage.data.no_augment", mask=mask)
         self.augmentor = hydra.utils.instantiate(self.aug_config, mask=mask)
         self.log_brain(return_path=False)
         
@@ -190,7 +187,7 @@ class PLModule(pl.LightningModule):
             breakpoint()
             raise e
         
-    def log_result(self, output: dict, unit: str = "step"):
+    def log_result(self, output: dict, unit: str = "step", prog_bar: bool = False):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
         self.log_dict(dictionary=output,
                       on_step=unit == "step",
@@ -202,7 +199,7 @@ class PLModule(pl.LightningModule):
         
         if self.log_train_metrics:
             output: dict = self.train_metric(result["pred"], result["target"])
-            self.log_result(output, unit="step")
+            self.log_result(output=output, unit="step", prog_bar=False)
             
             self.training_step_outputs.append(result)
         
@@ -210,10 +207,6 @@ class PLModule(pl.LightningModule):
         # We log learning rate explicitly and monitor this
         lr = self.lr_schedulers().get_lr()[0]
         self.log(name="_lr", value=lr, on_step=True)
-        
-        # Save on designated anchors
-        if self.global_step == self.ckpt_cursor:
-            self._save_to_state_dict
         return result["loss"]
 
     def on_train_epoch_end(self):
@@ -227,13 +220,13 @@ class PLModule(pl.LightningModule):
         self.log(name="valid_loss", value=result["loss"], prog_bar=True)
         
         output: dict = self.valid_metric(result["pred"], result["target"])
-        self.log_result(output, unit="step")
+        self.log_result(output, unit="step", prog_bar=False)
         
         self.validation_step_outputs.append(result)
 
     def on_validation_epoch_end(self):
         output: dict = self.valid_metric.compute()
-        self.log_result(output, unit="epoch")
+        self.log_result(output, unit="epoch", prog_bar=True)
         self.validation_step_outputs.clear()
     
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
@@ -242,7 +235,7 @@ class PLModule(pl.LightningModule):
 
     def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
         result: dict = self.forward(batch, mode="test")
-        return 
+        return result
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
@@ -322,7 +315,7 @@ def train(config: omegaconf.DictConfig) -> None:
         logger.info("Test dataset given. Start inference on %s", len(dataloaders["test"].dataset))
         prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["test"])
         utils.finalize_inference(prediction=prediction, name=config.logger.name,
-                           root_dir=Path(config.callbacks.checkpoint.dirpath))
+                                 root_dir=Path(config.callbacks.checkpoint.dirpath))
     if config_update:
         wandb.config.update(omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True))
 

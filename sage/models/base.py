@@ -79,13 +79,13 @@ class SFCNModel(ModelBase):
     
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         _pred = self.backbone(brain)
-        age_y, bc = num2vect(age, **self.num2vect_kwargs)
+        age_y, bc = num2vect(age.cpu().numpy(), **self.num2vect_kwargs)
         
         device = brain.device
         loss = self.criterion(_pred, torch.tensor(age_y, device=device))
         
-        pred = _pred.clone().detach().exp().numpy() @ bc
+        pred = _pred.cpu().clone().detach().exp().numpy() @ bc
         pred = torch.tensor(pred)
         return dict(loss=loss,
-                    pred=pred,
+                    pred=pred.detach().cpu(),
                     target=age.detach().cpu())

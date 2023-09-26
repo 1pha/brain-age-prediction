@@ -273,7 +273,7 @@ def build_resnet(model_depth: int = 10, **kwargs) -> nn.Module:
                   conv1_t_size=7,
                   conv1_t_stride=2,
                   no_max_pool=False,
-                  resnet_widen_factor=1.0,
+                  widen_factor=1.0,
                   start_channels=32)
     params.update(kwargs)
     model = generate_model(**params)
