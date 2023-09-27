@@ -15,9 +15,9 @@ from sklearn.utils import Bunch
 from tqdm import tqdm
 import torch
 
-from sage.utils import get_logger
+from sage.utils import get_logger, profile
 from . import nilearn_plots as nilp_
-from . import atlas as atlas_
+from . import atlas as A
 from . import utils
 
 try:
@@ -100,7 +100,7 @@ def flatten_to_dict(arr: np.ndarray,
         logger.info("Overlaps with absolute values")
     else:
         logger.info("Overlaps with raw values")
-        
+
     xai_dict = dict()
     pbar = tqdm(iterable=zip(atlas.indices, atlas.labels),
                 total=len(atlas.indices),
@@ -167,8 +167,7 @@ def calculate_overlaps(arr: np.ndarray,
                        plot_projection: bool = True) -> Tuple[Dict[str, float], np.ndarray]:
     # Load atlas if not loaded
     if isinstance(atlas, str) or (atlas is None):
-        atlas = atlas_.get_atlas(atlas_name=atlas,
-                                 return_mni=False if atlas == "cerebra" else True)
+        atlas = A.get_atlas(atlas_name=atlas, return_mni=False if atlas == "cerebra" else True)
 
     xai_dict, mask_ = flatten_to_dict(arr=arr, atlas=atlas,
                                       use_torch=use_torch, device=device, use_abs=use_abs)
@@ -183,7 +182,6 @@ def calculate_overlaps(arr: np.ndarray,
         save = root_dir / "bargraph.png" if root_dir is not None else root_dir
         nilp_.brain_barplot(xai_dict=xai_dict, title=title, save=save)
         
-    # 2. Map dict on brain
     if plot_projection:
         agg_saliency = project_to_atlas(atlas=atlas, xai_dict=xai_dict, root_dir=root_dir,
                                         title=title, use_abs=use_abs, vmin=vmin, vmax=vmax)

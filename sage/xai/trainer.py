@@ -94,6 +94,8 @@ class XPLModule(PLModule):
         if xai_method == "gcam":
             xai = ca.LayerGradCam(forward_func=model.forward_func,
                                   layer=model.conv_layers()[target_layer_index])
+        elif xai_method == "gcam_avg":
+            xai = [ca.LayerGradCam(forward_func=model.model, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
         elif xai_method == "gbp":
             xai = ca.GuidedBackprop(model=model.backbone)
         elif xai_method == "ig":
@@ -148,27 +150,46 @@ class XPLModule(PLModule):
             upsampled *= self.smaller_mask
             np.nan_to_num(x=upsampled, copy=False) # inplace
         return upsampled
+    
+    def attribute(self, brain: torch.Tensor) -> np.ndarray:
+        # For integrated gradients with baseline (average brain) given.
+        if self.xai_method == "ig" and self.baseline is not None:
+            attr_kwargs = dict(baselines=self.baseline.to(self.device))
+        else:
+            attr_kwargs = dict()
 
-    def forward(self, batch: dict, mode: str = "test") -> dict:
-        try:
-            augmentor = self.augmentor if mode == "train" else self.no_augment
-            brain = torch.tensor(augmentor(batch["brain"]))
-            if self.xai_method == "ig" and self.baseline is not None:
-                attr_kwargs = dict(baselines=self.baseline.to(self.device))
-            else:
-                attr_kwargs = dict()
-
+        if self.xai_method == "gcam_avg":
+            attrs = []
+            for idx, xai in enumerate(self.xai):
+                attr = xai.attribute(brain)
+                attr: torch.Tensor = utils.z_norm(attr)
+                if idx == 0:
+                    shape = attn.shape
+                else:
+                    attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
+                                                     interpolate_mode="trilinear",
+                                                     return_np=True, apply_margin_mask=True)
+                attrs.append(attn)
+            attr = torch.stack(attrs).mean(dim=0)
+        else:
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
             attr: torch.Tensor = utils.z_norm(attr)
             attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
                                              interpolate_mode="trilinear",
                                              return_np=True, apply_margin_mask=True)
+        return attr
+
+    def forward(self, batch: dict, mode: str = "test") -> dict:
+        try:
+            augmentor = self.augmentor if mode == "train" else self.no_augment
+            brain = torch.tensor(augmentor(batch["brain"]))
+            attr: np.ndarray = self.attribute(brain=brain)
 
             # Get projection list
             xai_dict, _ = ao.calculate_overlaps(arr=attr, atlas=self.atlas, use_torch=True, device=brain.device,
                                                 plot_raw_sal=False, plot_bargraph=False, plot_projection=False)
 
-            # Get 
+            # Get top_attribute
             top_attr: np.ndarray = utils.top_q(arr=attr, q=self.top_k_percentile,
                                                use_abs=True, return_bool=False)
 
@@ -235,4 +256,5 @@ class XPLModule(PLModule):
         # Save Total Projection Result
         xai_dict, agg_saliency = ao.calculate_overlaps(arr=self.top_attr, atlas=self.atlas,
                                                        root_dir=root_dir, title=root_dir.stem)
-        breakpoint()
+        with (root_dir / "xai_dict.json").open(mode="r") as f:
+            json.dump(obj=xai_dict, fp=f, indent="\t")

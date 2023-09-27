@@ -9,6 +9,8 @@ import importlib
 from pathlib import Path
 from datetime import datetime as dt
 from typing import FrozenSet
+import cProfile
+import functools
 
 import hydra
 import numpy as np
@@ -123,7 +125,6 @@ def stratified_sample_df(df, col, n_samples):
     df_.index = df_.index.droplevel(0)
     return df_
 
-# label = pd.read_csv("../rsc/age_ixidlbsoas13.csv", index_col=0)
 
 def path_maker(row):
     brain_id = row.id
@@ -140,4 +141,14 @@ def path_maker(row):
     return path if os.path.exists(path) else brain_id
 
 
-# FNAMES = stratified_sample_df(label, "src", 3).apply(path_maker, axis=1).values
+def profile(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        profiler = cProfile.Profile()
+        profiler.enable()
+        result = func(*args, **kwargs)
+        profiler.disable()
+        print(f"Profiling results for {func.__name__}:")
+        profiler.print_stats(sort='cumulative')
+        return result
+    return wrapper
