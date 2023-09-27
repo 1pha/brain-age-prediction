@@ -75,7 +75,6 @@ def _literal_eval(lst: list):
 def _get_cerebra(fname: str = "mni_icbm152_CerebrA_tal_nlin_sym_09c.nii",
                  label_fname: str = "CerebrA_LabelDetails.csv",
                  root: Path = Path("assets/mni_icbm152_nlin_sym_09c_CerebrA_nifti")) -> Tuple[nii, list, list]:
-    
     fname = root / fname
     atlas_map = _load_map(maps=fname)
     

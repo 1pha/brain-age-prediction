@@ -1,5 +1,8 @@
+from collections import defaultdict
 from pathlib import Path
 from typing import Callable
+import os
+import json
 
 import captum.attr as ca
 import numpy as np
@@ -9,6 +12,9 @@ import omegaconf
 
 import sage
 from sage.trainer import PLModule
+from . import nilearn_plots as nilp_
+from . import atlas_overlap as ao
+from . import atlas as A
 from . import utils
 try:
     import sage.constants as C
@@ -32,9 +38,8 @@ class XPLModule(PLModule):
                  top_k_percentile: float = 0.95,
                  xai_method: str = "gbp",
                  baseline: bool = False,
+                 atlas: str = "dkt",
                  ############################
-                 mask: Path | str | torch.Tensor = None,
-                 mask_threshold: float = 0.1,
                  test_loader: torch.utils.data.DataLoader = None,
                  predict_loader: torch.utils.data.DataLoader = None,
                  log_train_metrics: bool = False,
@@ -49,8 +54,6 @@ class XPLModule(PLModule):
                          valid_loader,
                          optimizer,
                          metrics,
-                         mask,
-                         mask_threshold,
                          test_loader,
                          predict_loader,
                          log_train_metrics,
@@ -74,11 +77,16 @@ class XPLModule(PLModule):
         self.configure_xai(model=self.model,
                            xai_method=xai_method,
                            target_layer_index=target_layer_index)
+        
+        self.atlas = A.get_atlas(atlas_name=atlas)
 
     def setup(self, stage):
         super().setup(stage)
         if self.baseline is not None and isinstance(self.baseline, np.ndarray):
             self.baseline = torch.tensor(self.no_augment(self.baseline[None, ...]))
+        # dict: {roi1: [X1, X2, ... Xn],
+        #        roi2: [X2, X2, ... Xn], ...}
+        self.xai_dict = defaultdict(list)
         
     def _configure_xai(self,
                        model: nn.Module | Callable,
@@ -150,32 +158,37 @@ class XPLModule(PLModule):
                 attr_kwargs = dict(baselines=self.baseline.to(self.device))
             else:
                 attr_kwargs = dict()
-            
+
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
             attr: torch.Tensor = utils.z_norm(attr)
             attr: np.ndarray = self.upsample(tensor=attr,
                                              target_shape=C.MNI_SHAPE,
                                              interpolate_mode="trilinear",
                                              return_np=True, apply_margin_mask=True)
+
+            # Get projection list
+            xai_dict, _ = ao.calculate_overlaps(arr=attr, atlas=self.atlas,
+                                                plot_raw_sal=False, plot_bargraph=False, plot_brains=False)
+            
+            # Get 
             top_attr: np.ndarray = utils.top_q(arr=attr,
                                                q=self.top_k_percentile,
                                                use_abs=True,
                                                return_bool=False)
+            
             while attr.ndim > 3:
                 attr = attr[0]
             while top_attr.ndim > 3:
                 top_attr = top_attr[0]
-            return {
-                "attr": attr,
-                "top_attr": top_attr
-            }
 
-        except RuntimeError as e:
+            return {"attr": attr,
+                    "top_attr": top_attr,
+                    "xai_dict": xai_dict}
+
+        except:
             # For CUDA Device-side asserted error
             logger.warn("Given batch %s", batch)
-            logger.exception(e)
             breakpoint()
-            raise e
     
     def on_predict_start(self) -> None:
         """ Initialize attribute """
@@ -187,11 +200,38 @@ class XPLModule(PLModule):
                      batch_idx: int,
                      dataloader_idx: int = 0) -> np.ndarray:
         attrs: np.ndarray = self.forward(batch, mode="test")
+        
         self.attr += attrs["attr"]
         self.top_attr += attrs["top_attr"]
+        for k in attrs["xai_dict"]:
+            self.xai_dict[k].append(attrs["xai_dict"][k])
+        
         # This is a hack to make lightning work
         return torch.zeros(size=(1,), requires_grad=True)
 
-    def on_predict_end(self) -> np.ndarray:
+    def on_predict_end(self) -> None:
         self.attr /= len(self.predict_dataloader)
         self.top_attr /= len(self.predict_dataloader)
+        
+    def save_result(self, root_dir: Path):
+        logger.info("Start saving here %s", root_dir)
+        os.makedirs(name=root_dir, exist_ok=True)
+
+        # Save attrs
+        np.save(file=root_dir / "attrs.npy", arr=self.attr)
+        np.save(file=root_dir / "top_attr.npy", arr=self.top_attr)
+
+        # Save plots
+        nilp_.plot_glass_brain(arr=self.attr, save=root_dir / "attr_glass.png", colorbar=True)
+        nilp_.plot_overlay(arr=self.attr, save=root_dir / "attr_anat.png", display_mode="mosaic")
+        
+        nilp_.plot_glass_brain(arr=self.top_attr, save=root_dir / "top_glass.png", colorbar=True)
+        nilp_.plot_overlay(arr=self.top_attr, save=root_dir / "top_anat.png", display_mode="mosaic")
+        
+        # Save Individual Projection Result
+        with (root_dir / "xai_dict_indiv.json").open(mode="r") as f:
+            json.dump(obj=self.xai_dict, fp=f, indent="\t")
+        
+        # Save Total Projection Result
+        xai_dict, agg_saliency = ao.calculate_overlaps(arr=self.top_attr, atlas=self.atlas,
+                                                       root_dir=root_dir, title=root_dir.stem)

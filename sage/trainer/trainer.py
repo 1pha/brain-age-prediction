@@ -16,7 +16,6 @@ import wandb
 import sage
 import sage.xai.nilearn_plots as nilp_
 from . import utils
-from .mask import load_mask
 
 
 logger = sage.utils.get_logger(name=__name__)
@@ -29,8 +28,6 @@ class PLModule(pl.LightningModule):
                  valid_loader: torch.utils.data.DataLoader,
                  optimizer: omegaconf.DictConfig,
                  metrics: dict,
-                 mask: Path | str | torch.Tensor = None,
-                 mask_threshold: float = 0.1,
                  test_loader: torch.utils.data.DataLoader = None,
                  predict_loader: torch.utils.data.DataLoader = None,
                  log_train_metrics: bool = False,
@@ -74,14 +71,10 @@ class PLModule(pl.LightningModule):
         self.validation_step_outputs = []
 
         self.aug_config = augmentation
-        self.mask = mask
-        self.mask_threshold = mask_threshold
         
     def setup(self, stage):
-        mask = load_mask(mask_path=self.mask,
-                         mask_threshold=self.mask_threshold)
-        self.no_augment = hydra.utils.instantiate(self.aug_config, _target_="sage.data.no_augment", mask=mask)
-        self.augmentor = hydra.utils.instantiate(self.aug_config, mask=mask)
+        self.no_augment = hydra.utils.instantiate(self.aug_config, _target_="sage.data.no_augment", mask=None)
+        self.augmentor = hydra.utils.instantiate(self.aug_config, mask=None)
         self.log_brain(return_path=False)
         
     def log_brain(self, return_path: bool = False, augment: bool = True):
@@ -328,6 +321,7 @@ def inference(config: omegaconf.DictConfig,
     module, dataloaders = setup_trainer(config)
     module.setup(stage=None)
     brain = module.log_brain(return_path=True, augment=False)
+    
 
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     logger.info("Start prediction")
@@ -337,8 +331,8 @@ def inference(config: omegaconf.DictConfig,
     # Infer Metrics
     if task == "sage.trainer.PLModule":
         utils.finalize_inference(prediction=prediction,
-                           name=config.logger.name,
-                           root_dir=root_dir)
+                                 name=config.logger.name,
+                                 root_dir=root_dir)
 
     elif task == "sage.xai.trainer.XPLModule":
         attr: np.ndarray = module.attr
@@ -348,17 +342,4 @@ def inference(config: omegaconf.DictConfig,
         postfix = module.xai_method + f"k{top_k:.2f}"
         root_dir = root_dir / postfix
         subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
-        os.makedirs(name=root_dir, exist_ok=True)
-
-        logger.info("Start saving here %s", root_dir)
-
-        # Save attrs
-        np.save(file=root_dir / "attrs.npy", arr=attr)
-        np.save(file=root_dir / "top_attr.npy", arr=top_attr)
-
-        # Save plots
-        nilp_.plot_glass_brain(arr=attr, save=root_dir / "attr_glass.png", colorbar=True)
-        nilp_.plot_overlay(arr=attr, save=root_dir / "attr_anat.png", display_mode="mosaic")
-        
-        nilp_.plot_glass_brain(arr=top_attr, save=root_dir / "top_glass.png", colorbar=True)
-        nilp_.plot_overlay(arr=top_attr, save=root_dir / "top_anat.png", display_mode="mosaic")
+        module.save_result(root_dir=root_dir)

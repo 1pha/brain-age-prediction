@@ -5,7 +5,7 @@ Possible outcomes:
 
 They can be inferred with absolute or raw values"""
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Dict
 
 import numpy as np
 import nibabel as nib
@@ -81,14 +81,46 @@ def resample_sal(arr: np.ndarray,
     return resampled
 
 
+def atlas_projection(atlas: Bunch,
+                     xai_dict: dict,
+                     title: str = "",
+                     use_abs: bool = True,
+                     vmin: float = None, vmax: float = None,
+                     root_dir: Path | str = None) -> np.ndarray:
+    agg_saliency = np.zeros_like(atlas.array)
+
+    pbar = tqdm(iterable=xai_dict, desc="Spread values to Brain ROI ...")
+    for label in pbar:
+        val = xai_dict[label]        
+        idx = atlas.labels.index(label)
+        idx = atlas.indices[idx]
+        agg_saliency[np.where(atlas.array == int(idx))] = val
+        
+    save = root_dir / "proj_glass.png" if root_dir is not None else None
+    nilp_.plot_glass_brain(arr=agg_saliency,
+                           target_affine=atlas.nii.affine, title=title,
+                           vmin=vmin, vmax=vmax,
+                           colorbar=True, plot_abs=use_abs, save=save)
+    
+    save = root_dir / "proj_mosaic.png" if root_dir is not None else None
+    nilp_.plot_overlay(arr=agg_saliency,
+                       target_affine=atlas.nii.affine,
+                       display_mode="mosaic",
+                       threshold=0.25, title=title,
+                       cmap=nilp.cm.red_transparent if use_abs else nilp.cm.bwr,
+                       colorbar=True, save=save)
+    return agg_saliency
+
+
 def calculate_overlaps(arr: np.ndarray,
                        atlas: Bunch,
                        title: str = "",
                        use_abs: bool = True,
                        vmin: float = None, vmax: float = None,
+                       root_dir: Path | str = None,
                        plot_raw_sal: bool = True,
                        plot_bargraph: bool = True,
-                       plot_brains: bool = True) -> dict:
+                       plot_projection: bool = True) -> Tuple[Dict[str, float], np.ndarray]:
     ### Setups ###
     # Load proper mask
     if isinstance(arr, nib.nifti1.Nifti1Image):
@@ -107,8 +139,9 @@ def calculate_overlaps(arr: np.ndarray,
     else:
         logger.info("Overlaps with raw values")
         
-    if plot_raw_sal and plot_brains:
+    if plot_raw_sal and plot_projection:
         _title = f"{title}_RAW Mask"
+        save = root_dir / "raw_mask.png" if root_dir is not None else root_dir
         nilp_.plot_glass_brain(arr=mask_, target_affine=atlas.nii.affine,
                                colorbar=True, title=_title, plot_abs=False) # Always draw raw
 
@@ -126,28 +159,14 @@ def calculate_overlaps(arr: np.ndarray,
         xai_dict[label] = roi_val / num_nonzero
     
     if plot_bargraph:
-       nilp_.brain_barplot(xai_dict=xai_dict, title=title)
+        save = root_dir / "bargraph.png" if root_dir is not None else root_dir
+        nilp_.brain_barplot(xai_dict=xai_dict, title=title, save=save)
         
     # 2. Map dict on brain
-    agg_saliency = np.zeros_like(atlas.array)
-
-    pbar = tqdm(iterable=xai_dict, desc="Spread values to Brain ROI ...")
-    for label in pbar:
-        val = xai_dict[label]        
-        idx = atlas.labels.index(label)
-        idx = atlas.indices[idx]
-        agg_saliency[np.where(atlas.array == int(idx))] = val
-        
-    if plot_brains:
-        nilp_.plot_glass_brain(arr=agg_saliency,
-                               target_affine=atlas.nii.affine, title=title,
-                               vmin=vmin, vmax=vmax,
-                               colorbar=True, plot_abs=use_abs)
-        nilp_.plot_overlay(arr=agg_saliency,
-                           target_affine=atlas.nii.affine,
-                           display_mode="mosaic",
-                           threshold=0.25, title=title,
-                           cmap=nilp.cm.red_transparent if use_abs else nilp.cm.bwr,
-                           colorbar=True)
+    if plot_projection:
+        agg_saliency = atlas_projection(atlas=atlas, xai_dict=xai_dict, root_dir=root_dir,
+                                        title=title, use_abs=use_abs, vmin=vmin, vmax=vmax)
+    else:
+        agg_saliency = None
 
     return xai_dict, agg_saliency
