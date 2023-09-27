@@ -164,7 +164,7 @@ class XPLModule(PLModule):
                 attr = xai.attribute(brain)
                 attr: torch.Tensor = utils.z_norm(attr)
                 if idx == 0:
-                    shape = attn.shape
+                    shape = attr.shape
                 else:
                     attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
                                                      interpolate_mode="trilinear",
