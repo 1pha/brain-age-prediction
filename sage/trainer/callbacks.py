@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 
 
 def ckpt_saver() -> int:
-    anchors = [1_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000]
+    anchors = [250, 1_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000]
     
     while anchors:
         yield anchors.pop(0)
@@ -21,9 +21,8 @@ class ManualCheckpoint(pl.Callback):
 
     def on_train_epoch_end(self, trainer, pl_module):
         current_global_step = trainer.global_step
-        breakpoint()
         if current_global_step % self.save_step == 0:
             metrics = trainer.callback_metrics
-            checkpoint_path = f"{current_global_step}-valid_mae.ckpt"
+            checkpoint_path = f"{current_global_step}-valid_mae{metrics}.ckpt"
             trainer.save_checkpoint(checkpoint_path)
             self.save_step = next(self.save_steps)
