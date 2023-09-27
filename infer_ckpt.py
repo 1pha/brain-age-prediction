@@ -17,12 +17,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--path", type=str, help="Leaf node directory name. e.g. resnet10t-mask")
-    parser.add_argument("--root", default="assets/weights/", type=str, help="Root directory where weights resides")
-    parser.add_argument("--weight", type=str, default="best", help="Choosing which weights to infer")
+    parser.add_argument("--root", default="meta_brain/weights/reg/", type=str, help="Root directory where weights resides")
     
     parser.add_argument("--mask", type=str, default=False, help="Masking inference")
     
-    parser.add_argument("--batch_size", type=int, default="4", help="batch size during inference")
+    parser.add_argument("--batch_size", type=int, default=1, help="batch size during inference")
     
     parser.add_argument("--infer_xai", type=str, default="False", help="Infer xai or not")
     parser.add_argument("--top_k", type=float, default=0.99, help="")
@@ -35,13 +34,14 @@ def parse_args():
 
 def main(args):
     root = Path(args.root) / args.path
-    weight = sorted(root.glob("*.ckpt"))[int(args.weight == "last")]
+    # Starting with numbers is the checkpoint recorded by best monitoring checkpoint via save_top_k=1
+    weight = sorted(root.glob("*.ckpt"))[0]
     
     mask = sage.utils.parse_bool(args.mask)
     overrides = ["misc.modes=[train,valid,test]",
                  f"module.load_model_ckpt={weight}",
-                 f"dataloader.batch_size={args.batch_size}",
-                 f"module.mask={MASK_DIR/mask if mask else 'False'}"]
+                 f"dataloader.batch_size={args.batch_size}"]
+                #  f"module.mask={MASK_DIR/mask if mask else 'False'}"]
     
     infer_xai: bool = sage.utils.parse_bool(args.infer_xai)
     if infer_xai:
@@ -51,7 +51,8 @@ def main(args):
             "module._target_=sage.xai.trainer.XPLModule",
             f"+module.top_k_percentile={args.top_k}",
             f"+module.xai_method={args.xai_method}",
-            "+trainer.inference_mode=False"
+            "+trainer.inference_mode=False",
+            "trainer.accelerator=cpu"
         ]
         if args.xai_method == "ig":
             overrides += [f"+module.baseline={args.baseline}"]

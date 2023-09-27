@@ -73,6 +73,7 @@ class XPLModule(PLModule):
         self.target_layer_index = target_layer_index
         self.top_k_percentile = top_k_percentile
         self.xai_method = xai_method
+        self.baseline = baseline
         
         self.configure_xai(model=self.model,
                            xai_method=xai_method,
@@ -84,9 +85,6 @@ class XPLModule(PLModule):
         super().setup(stage)
         if self.baseline is not None and isinstance(self.baseline, np.ndarray):
             self.baseline = torch.tensor(self.no_augment(self.baseline[None, ...]))
-        # dict: {roi1: [X1, X2, ... Xn],
-        #        roi2: [X2, X2, ... Xn], ...}
-        self.xai_dict = defaultdict(list)
         
     def _configure_xai(self,
                        model: nn.Module | Callable,
@@ -97,11 +95,11 @@ class XPLModule(PLModule):
             xai = ca.LayerGradCam(forward_func=model.forward_func,
                                   layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gbp":
-            xai = ca.GuidedBackprop(model=forward_func)
+            xai = ca.GuidedBackprop(model=model.backbone)
         elif xai_method == "ig":
             xai = ca.IntegratedGradients(forward_func=forward_func)
         elif xai_method == "lrp":
-            xai = ca.LRP(model=model)
+            xai = ca.LRP(model=model.backbone)
         else:
             breakpoint()
         return xai
@@ -148,6 +146,7 @@ class XPLModule(PLModule):
         if apply_margin_mask:
             assert return_np
             upsampled *= self.smaller_mask
+            np.nan_to_num(x=upsampled, copy=False) # inplace
         return upsampled
 
     def forward(self, batch: dict, mode: str = "test") -> dict:
@@ -161,21 +160,18 @@ class XPLModule(PLModule):
 
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
             attr: torch.Tensor = utils.z_norm(attr)
-            attr: np.ndarray = self.upsample(tensor=attr,
-                                             target_shape=C.MNI_SHAPE,
+            attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
                                              interpolate_mode="trilinear",
                                              return_np=True, apply_margin_mask=True)
 
             # Get projection list
-            xai_dict, _ = ao.calculate_overlaps(arr=attr, atlas=self.atlas,
-                                                plot_raw_sal=False, plot_bargraph=False, plot_brains=False)
-            
+            xai_dict, _ = ao.calculate_overlaps(arr=attr, atlas=self.atlas, use_torch=True, device=brain.device,
+                                                plot_raw_sal=False, plot_bargraph=False, plot_projection=False)
+
             # Get 
-            top_attr: np.ndarray = utils.top_q(arr=attr,
-                                               q=self.top_k_percentile,
-                                               use_abs=True,
-                                               return_bool=False)
-            
+            top_attr: np.ndarray = utils.top_q(arr=attr, q=self.top_k_percentile,
+                                               use_abs=True, return_bool=False)
+
             while attr.ndim > 3:
                 attr = attr[0]
             while top_attr.ndim > 3:
@@ -185,15 +181,19 @@ class XPLModule(PLModule):
                     "top_attr": top_attr,
                     "xai_dict": xai_dict}
 
-        except:
+        except Exception as e:
             # For CUDA Device-side asserted error
             logger.warn("Given batch %s", batch)
+            logger.exception(e)
             breakpoint()
-    
+
     def on_predict_start(self) -> None:
         """ Initialize attribute """
         self.attr = np.zeros(shape=self.smaller_mask.shape)
         self.top_attr = np.zeros(shape=self.smaller_mask.shape)
+        # dict: {roi1: [X1, X2, ... Xn],
+        #        roi2: [X2, X2, ... Xn], ...}
+        self.xai_dict = defaultdict(list)
         
     def predict_step(self,
                      batch: dict,
@@ -235,3 +235,4 @@ class XPLModule(PLModule):
         # Save Total Projection Result
         xai_dict, agg_saliency = ao.calculate_overlaps(arr=self.top_attr, atlas=self.atlas,
                                                        root_dir=root_dir, title=root_dir.stem)
+        breakpoint()

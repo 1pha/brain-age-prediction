@@ -13,6 +13,7 @@ import nilearn.plotting as nilp
 from nilearn.image import resample_img, new_img_like
 from sklearn.utils import Bunch
 from tqdm import tqdm
+import torch
 
 from sage.utils import get_logger
 from . import nilearn_plots as nilp_
@@ -81,7 +82,51 @@ def resample_sal(arr: np.ndarray,
     return resampled
 
 
-def atlas_projection(atlas: Bunch,
+def flatten_to_dict(arr: np.ndarray,
+                    atlas: Bunch,
+                    use_torch: bool = False,
+                    device: str = "cpu",
+                    use_abs: bool = True) -> Tuple[Dict[str, float], np.ndarray]:
+    """ Given a saliency array,
+    calculate representative value for each RoI
+    """
+    if isinstance(arr, nib.nifti1.Nifti1Image):
+        mask_ = arr.get_fdata()
+    elif isinstance(arr, np.ndarray):
+        mask_ = arr.copy()
+    
+    if use_abs:
+        mask_ = np.abs(mask_)
+        logger.info("Overlaps with absolute values")
+    else:
+        logger.info("Overlaps with raw values")
+        
+    xai_dict = dict()
+    pbar = tqdm(iterable=zip(atlas.indices, atlas.labels),
+                total=len(atlas.indices),
+                desc="Aggregating values across ROIs")
+    if use_torch:
+        atlas_ = torch.from_numpy(atlas.array).to(device)
+        mask_ = torch.from_numpy(arr).to(device)
+        for idx, label in pbar:
+            roi_mask = atlas_ == idx
+            # Norm
+            num_nonzero = torch.sum(roi_mask)
+            roi_val = torch.nansum(roi_mask * mask_)
+            xai_dict[label] = (roi_val / num_nonzero).cpu().numpy()
+        mask_ = mask_.cpu().numpy()
+
+    else:
+        for idx, label in pbar:
+            roi_mask = atlas.array == idx
+            # Norm
+            num_nonzero = np.sum(roi_mask)
+            roi_val = np.nansum(roi_mask * mask_)
+            xai_dict[label] = roi_val / num_nonzero
+    return xai_dict, mask_
+
+
+def project_to_atlas(atlas: Bunch,
                      xai_dict: dict,
                      title: str = "",
                      use_abs: bool = True,
@@ -94,77 +139,53 @@ def atlas_projection(atlas: Bunch,
         val = xai_dict[label]        
         idx = atlas.labels.index(label)
         idx = atlas.indices[idx]
+        breakpoint()
         agg_saliency[np.where(atlas.array == int(idx))] = val
-        
+
     save = root_dir / "proj_glass.png" if root_dir is not None else None
     nilp_.plot_glass_brain(arr=agg_saliency,
                            target_affine=atlas.nii.affine, title=title,
-                           vmin=vmin, vmax=vmax,
-                           colorbar=True, plot_abs=use_abs, save=save)
-    
+                           vmin=vmin, vmax=vmax, colorbar=True, plot_abs=use_abs, save=save)
+
     save = root_dir / "proj_mosaic.png" if root_dir is not None else None
-    nilp_.plot_overlay(arr=agg_saliency,
-                       target_affine=atlas.nii.affine,
-                       display_mode="mosaic",
-                       threshold=0.25, title=title,
-                       cmap=nilp.cm.red_transparent if use_abs else nilp.cm.bwr,
-                       colorbar=True, save=save)
+    nilp_.plot_overlay(arr=agg_saliency, target_affine=atlas.nii.affine,
+                       display_mode="mosaic", threshold=0.25, title=title, colorbar=True,
+                       cmap=nilp.cm.red_transparent if use_abs else nilp.cm.bwr, save=save)
     return agg_saliency
 
 
 def calculate_overlaps(arr: np.ndarray,
-                       atlas: Bunch,
+                       atlas: Bunch = None,
                        title: str = "",
+                       use_torch: bool = False,
+                       device: str = "cpu",
                        use_abs: bool = True,
                        vmin: float = None, vmax: float = None,
                        root_dir: Path | str = None,
                        plot_raw_sal: bool = True,
                        plot_bargraph: bool = True,
                        plot_projection: bool = True) -> Tuple[Dict[str, float], np.ndarray]:
-    ### Setups ###
-    # Load proper mask
-    if isinstance(arr, nib.nifti1.Nifti1Image):
-        mask_ = arr.get_fdata()
-    elif isinstance(arr, np.ndarray):
-        mask_ = arr.copy()
-        
-    # Load atlas
-    if isinstance(atlas, str):
+    # Load atlas if not loaded
+    if isinstance(atlas, str) or (atlas is None):
         atlas = atlas_.get_atlas(atlas_name=atlas,
                                  return_mni=False if atlas == "cerebra" else True)
-    
-    if use_abs:
-        mask_ = np.abs(mask_)
-        logger.info("Overlaps with absolute values")
-    else:
-        logger.info("Overlaps with raw values")
-        
-    if plot_raw_sal and plot_projection:
+
+    xai_dict, mask_ = flatten_to_dict(arr=arr, atlas=atlas,
+                                      use_torch=use_torch, device=device, use_abs=use_abs)
+
+    if plot_raw_sal:
         _title = f"{title}_RAW Mask"
         save = root_dir / "raw_mask.png" if root_dir is not None else root_dir
         nilp_.plot_glass_brain(arr=mask_, target_affine=atlas.nii.affine,
                                colorbar=True, title=_title, plot_abs=False) # Always draw raw
 
-    # 1. Calculate values over regions
-    xai_dict = dict()
-    pbar = tqdm(iterable=zip(atlas.indices, atlas.labels),
-                total=len(atlas.indices),
-                desc="Aggregating values across ROIs")
-    for idx, label in pbar:
-        roi_mask = atlas.array == idx
-        
-        # Norm
-        num_nonzero = np.count_nonzero(roi_mask)
-        roi_val = np.nansum(roi_mask * mask_)
-        xai_dict[label] = roi_val / num_nonzero
-    
     if plot_bargraph:
         save = root_dir / "bargraph.png" if root_dir is not None else root_dir
         nilp_.brain_barplot(xai_dict=xai_dict, title=title, save=save)
         
     # 2. Map dict on brain
     if plot_projection:
-        agg_saliency = atlas_projection(atlas=atlas, xai_dict=xai_dict, root_dir=root_dir,
+        agg_saliency = project_to_atlas(atlas=atlas, xai_dict=xai_dict, root_dir=root_dir,
                                         title=title, use_abs=use_abs, vmin=vmin, vmax=vmax)
     else:
         agg_saliency = None
