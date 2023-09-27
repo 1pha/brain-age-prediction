@@ -169,7 +169,7 @@ class XPLModule(PLModule):
                     attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
                                                      interpolate_mode="trilinear",
                                                      return_np=True, apply_margin_mask=True)
-                attrs.append(attn)
+                attrs.append(attr)
             attr = torch.stack(attrs).mean(dim=0)
         else:
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
