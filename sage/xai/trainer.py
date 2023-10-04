@@ -226,7 +226,7 @@ class XPLModule(PLModule):
         self.attr += attrs["attr"]
         self.top_attr += attrs["top_attr"]
         for k in attrs["xai_dict"]:
-            self.xai_dict[k].append(attrs["xai_dict"][k])
+            self.xai_dict[k].append(float(attrs["xai_dict"][k]))
         
         # This is a hack to make lightning work
         return torch.zeros(size=(1,), requires_grad=True)
@@ -236,7 +236,7 @@ class XPLModule(PLModule):
         self.top_attr /= len(self.predict_dataloader)
         
     def save_result(self, root_dir: Path):
-        logger.info("Start saving here %s", root_dir)
+        logger.info("Start saving here: %s", root_dir)
         os.makedirs(name=root_dir, exist_ok=True)
 
         # Save attrs

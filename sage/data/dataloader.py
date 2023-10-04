@@ -187,7 +187,6 @@ class UKBClassification(UKBDataset):
         return files
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        breakpoint()
         result = super().__getitem__(idx=idx)
         age = result["age"]
         if age <= self.thresholds["young"]:

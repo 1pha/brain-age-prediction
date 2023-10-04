@@ -21,7 +21,7 @@ def tune(batch_size: int = 64,
          lr_frequency: int = None,
          accumulate_grad_batches: int = None,
          multiplier: int = 1,
-         BASE_BATCH: int = 64):
+         BASE_BATCH: int = 32):
     """ Tune logging interval to log same number for varying batch sizes
     BASE: with batch size 64, logging_interval 50
     i.e. with a given batch size 4, freq step should increase to 16
@@ -38,9 +38,8 @@ def tune(batch_size: int = 64,
         return logging_interval
         
     if lr_frequency is not None:
-        BASE_FREQ = 1
         assert accumulate_grad_batches is not None, f"Please provide `accumulate_grad_batches`"
-        lr_frequency = round(BASE_FREQ * ratio / accumulate_grad_batches)
+        lr_frequency = round(lr_frequency * ratio / accumulate_grad_batches)
         return lr_frequency
     
     if multiplier is not None:

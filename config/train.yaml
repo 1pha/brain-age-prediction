@@ -109,5 +109,5 @@ callbacks:
     _target_: pytorch_lightning.callbacks.RichProgressBar
 
   manual_ckpt:
-    _target_: sage.trainer.callbacks.ManualCheckpoint
+    _target_: sage.trainer.callbacks.AnchorCheckpoint
     multiplier: 1

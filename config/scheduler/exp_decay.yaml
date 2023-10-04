@@ -2,5 +2,5 @@ scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
   gamma: 0.999
 interval: step
-frequency: 10
+frequency: 30
 strict: False

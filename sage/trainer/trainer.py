@@ -36,7 +36,7 @@ class PLModule(pl.LightningModule):
                  load_model_ckpt: str = None,
                  load_from_checkpoint: str = None, # unused params but requires for instantiation
                  separate_lr: dict = None,
-                 save_dir: str = None,):
+                 save_dir: str = None):
         super().__init__()
         self.model = model
 
@@ -71,6 +71,7 @@ class PLModule(pl.LightningModule):
         self.validation_step_outputs = []
 
         self.aug_config = augmentation
+        self.save_dir = Path(save_dir)
         
     def setup(self, stage):
         self.no_augment = hydra.utils.instantiate(self.aug_config, _target_="sage.data.no_augment", mask=None)
