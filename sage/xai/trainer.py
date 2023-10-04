@@ -37,7 +37,7 @@ class XPLModule(PLModule):
                  target_layer_index: int = -2,
                  top_k_percentile: float = 0.95,
                  xai_method: str = "gbp",
-                 baseline: bool = False,
+                 baseline: bool = None,
                  atlas: str = "dkt",
                  ############################
                  test_loader: torch.utils.data.DataLoader = None,
@@ -47,7 +47,8 @@ class XPLModule(PLModule):
                  scheduler: omegaconf.DictConfig = None,
                  load_model_ckpt: str = None,
                  load_from_checkpoint: str = None,
-                 separate_lr: dict = None):
+                 separate_lr: dict = None,
+                 save_dir: Path = None):
 
         super().__init__(model,
                          train_loader,
@@ -61,7 +62,8 @@ class XPLModule(PLModule):
                          scheduler,
                          load_model_ckpt,
                          load_from_checkpoint,
-                         separate_lr)
+                         separate_lr,
+                         save_dir)
 
         # Dataloader sanity check
         if self.predict_dataloader:
@@ -92,10 +94,10 @@ class XPLModule(PLModule):
                        target_layer_index: int = 1):
         forward_func = model._forward
         if xai_method == "gcam":
-            xai = ca.LayerGradCam(forward_func=model.forward_func,
+            xai = ca.LayerGradCam(forward_func=forward_func,
                                   layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gcam_avg":
-            xai = [ca.LayerGradCam(forward_func=model.model, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
+            xai = [ca.LayerGradCam(forward_func=forward_func, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
         elif xai_method == "gbp":
             xai = ca.GuidedBackprop(model=model.backbone)
         elif xai_method == "ig":
@@ -160,16 +162,15 @@ class XPLModule(PLModule):
 
         if self.xai_method == "gcam_avg":
             attrs = []
-            for idx, xai in enumerate(self.xai):
+            # GCAM_AVG will have list of attributers
+            for xai in self.xai:
                 attr = xai.attribute(brain)
                 attr: torch.Tensor = utils.z_norm(attr)
-                if idx == 0:
-                    shape = attr.shape
-                else:
-                    attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
-                                                     interpolate_mode="trilinear",
-                                                     return_np=True, apply_margin_mask=True)
+                attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
+                                                 interpolate_mode="trilinear",
+                                                 return_np=True, apply_margin_mask=True)
                 attrs.append(attr)
+            attrs = torch.from_numpy(attrs)
             attr = torch.stack(attrs).mean(dim=0)
         else:
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
@@ -249,12 +250,13 @@ class XPLModule(PLModule):
         nilp_.plot_glass_brain(arr=self.top_attr, save=root_dir / "top_glass.png", colorbar=True)
         nilp_.plot_overlay(arr=self.top_attr, save=root_dir / "top_anat.png", display_mode="mosaic")
         
+        breakpoint()
         # Save Individual Projection Result
-        with (root_dir / "xai_dict_indiv.json").open(mode="r") as f:
+        with (root_dir / "xai_dict_indiv.json").open(mode="w") as f:
             json.dump(obj=self.xai_dict, fp=f, indent="\t")
         
         # Save Total Projection Result
         xai_dict, agg_saliency = ao.calculate_overlaps(arr=self.top_attr, atlas=self.atlas,
                                                        root_dir=root_dir, title=root_dir.stem)
-        with (root_dir / "xai_dict.json").open(mode="r") as f:
+        with (root_dir / "xai_dict.json").open(mode="w") as f:
             json.dump(obj=xai_dict, fp=f, indent="\t")

@@ -15,7 +15,7 @@ from sklearn.utils import Bunch
 from tqdm import tqdm
 import torch
 
-from sage.utils import get_logger, profile
+from sage.utils import get_logger
 from . import nilearn_plots as nilp_
 from . import atlas as A
 from . import utils
@@ -86,7 +86,8 @@ def flatten_to_dict(arr: np.ndarray,
                     atlas: Bunch,
                     use_torch: bool = False,
                     device: str = "cpu",
-                    use_abs: bool = True) -> Tuple[Dict[str, float], np.ndarray]:
+                    use_abs: bool = True,
+                    verbose: bool = False) -> Tuple[Dict[str, float], np.ndarray]:
     """ Given a saliency array,
     calculate representative value for each RoI
     """
@@ -97,13 +98,10 @@ def flatten_to_dict(arr: np.ndarray,
     
     if use_abs:
         mask_ = np.abs(mask_)
-        logger.info("Overlaps with absolute values")
-    else:
-        logger.info("Overlaps with raw values")
 
     xai_dict = dict()
     pbar = tqdm(iterable=zip(atlas.indices, atlas.labels),
-                total=len(atlas.indices),
+                total=len(atlas.indices), leave=verbose,
                 desc="Aggregating values across ROIs")
     if use_torch:
         atlas_ = torch.from_numpy(atlas.array).to(device)
@@ -131,15 +129,15 @@ def project_to_atlas(atlas: Bunch,
                      title: str = "",
                      use_abs: bool = True,
                      vmin: float = None, vmax: float = None,
-                     root_dir: Path | str = None) -> np.ndarray:
+                     root_dir: Path | str = None,
+                     verbose: bool = False) -> np.ndarray:
     agg_saliency = np.zeros_like(atlas.array)
 
-    pbar = tqdm(iterable=xai_dict, desc="Spread values to Brain ROI ...")
+    pbar = tqdm(iterable=xai_dict, desc="Spread values to Brain ROI ...", leave=verbose)
     for label in pbar:
         val = xai_dict[label]        
         idx = atlas.labels.index(label)
         idx = atlas.indices[idx]
-        breakpoint()
         agg_saliency[np.where(atlas.array == int(idx))] = val
 
     save = root_dir / "proj_glass.png" if root_dir is not None else None
@@ -164,7 +162,8 @@ def calculate_overlaps(arr: np.ndarray,
                        root_dir: Path | str = None,
                        plot_raw_sal: bool = True,
                        plot_bargraph: bool = True,
-                       plot_projection: bool = True) -> Tuple[Dict[str, float], np.ndarray]:
+                       plot_projection: bool = True,
+                       verbose: bool = False,) -> Tuple[Dict[str, float], np.ndarray]:
     # Load atlas if not loaded
     if isinstance(atlas, str) or (atlas is None):
         atlas = A.get_atlas(atlas_name=atlas, return_mni=False if atlas == "cerebra" else True)
