@@ -275,8 +275,14 @@ def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
     lr_frequency = config.scheduler.frequency
     
     # Tune logging interval
-    config.trainer.log_every_n_steps = utils.tune_logging_interval(logging_interval=logging_interval,
-                                                                   batch_size=batch_size)
+    config.trainer.log_every_n_steps = utils.tune(batch_size=batch_size,
+                                                  logging_interval=logging_interval)
+    config.scheduler.frequency = utils.tune(batch_size=batch_size, lr_frequency=lr_frequency,
+                                            accumulate_grad_batches=config.trainer.accumulate_grad_batches)
+    if "manual_ckpt" in config.callbacks:
+        config.callbacks.manual_ckpt.multiplier = utils.tune(batch_size=batch_size,
+                                                             multiplier=config.callbacks.manual_ckpt.multiplier)
+    
     return config
 
 
@@ -321,7 +327,6 @@ def inference(config: omegaconf.DictConfig,
     module, dataloaders = setup_trainer(config)
     module.setup(stage=None)
     brain = module.log_brain(return_path=True, augment=False)
-    
 
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     logger.info("Start prediction")

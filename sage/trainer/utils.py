@@ -16,37 +16,39 @@ from sage.utils import get_logger
 logger = get_logger(name=__file__)
 
 
-def tune_logging_interval(logging_interval: int = 50,
-                          batch_size: int = 64) -> int:
+def tune(batch_size: int = 64,
+         logging_interval: int = None,
+         lr_frequency: int = None,
+         accumulate_grad_batches: int = None,
+         multiplier: int = 1,
+         BASE_BATCH: int = 64):
     """ Tune logging interval to log same number for varying batch sizes
     BASE: with batch size 64, logging_interval 50
     i.e. with a given batch size 4, freq step should increase to 16
-    """
-    BASE_BATCH = 64
-    BASE_INTERVAL = 50
-    if batch_size == BASE_BATCH and logging_interval == BASE_INTERVAL:
-        return logging_interval
-    else:
-        ratio = BASE_BATCH / batch_size
-        logging_interval = round(BASE_INTERVAL * ratio)
-        return logging_interval
     
-    
-def tune_lr_interval(lr_frequency: int = 1,
-                     batch_size: int = 64) -> int:
-    """ Tune learning rate stepping frequency
+    Tune learning rate stepping frequency
     to step same number for varying batch sizes (logging)
     BASE: with batch size 64, steps 1
     i.e. with a given batch size 4, freq step should increase to 16
     """
-    BASE_FREQ = 1
-    BASE_BATCH = 50
-    if lr_frequency == BASE_FREQ and batch_size == BASE_BATCH:
+    ratio = BASE_BATCH / batch_size
+    if logging_interval is not None:
+        BASE_INTERVAL = 50
+        logging_interval = round(BASE_INTERVAL * ratio)
+        return logging_interval
+        
+    if lr_frequency is not None:
+        BASE_FREQ = 1
+        assert accumulate_grad_batches is not None, f"Please provide `accumulate_grad_batches`"
+        lr_frequency = round(BASE_FREQ * ratio / accumulate_grad_batches)
         return lr_frequency
-    else:
-        ratio = BASE_BATCH / batch_size
-        lr_frequency = round(BASE_FREQ * ratio)
-        return lr_frequency
+    
+    if multiplier is not None:
+        BASE_MULTIPLIER = 1
+        multiplier = round(BASE_MULTIPLIER * ratio)
+        return multiplier
+    
+    return ratio
 
 
 def _sort_outputs(outputs):
