@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument("--infer_xai", type=str, default="False", help="Infer xai or not")
     parser.add_argument("--top_k", type=float, default=0.99, help="")
     parser.add_argument("--xai_method", type=str, default="gbp", help="Which explainability method to use")
-    parser.add_argument("--baseline", type=str, default=False, help="Baseline brain for Integrated gradients")
+    parser.add_argument("--baseline", type=str, default=None, help="Baseline brain for Integrated gradients")
     
     args = parser.parse_args()
     return args

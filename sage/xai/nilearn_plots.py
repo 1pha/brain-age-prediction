@@ -115,7 +115,8 @@ def plot_roi(roi_img: np.ndarray | nib.nifti1.Nifti1Image,
 
 def brain_barplot(xai_dict: dict,
                   title: str = "",
-                  sort_values: bool = True) -> None:
+                  sort_values: bool = True,
+                  save: str = None) -> None:
     fig, ax = plt.subplots(figsize=(12, UNIT_Y * len(xai_dict)))
     
     ax.set_title(title)
@@ -124,3 +125,4 @@ def brain_barplot(xai_dict: dict,
     if sort_values:
         df = df.sort_values(by="Saliency")
     sns.barplot(data=df, x="Saliency", y="Regions", ax=ax)
+    fig.savefig(fname=save)

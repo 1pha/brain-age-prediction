@@ -169,8 +169,7 @@ class XPLModule(PLModule):
                 attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
                                                  interpolate_mode="trilinear",
                                                  return_np=True, apply_margin_mask=True)
-                attrs.append(attr)
-            attrs = torch.from_numpy(attrs)
+                attrs.append(torch.from_numpy(attr))
             attr = torch.stack(attrs).mean(dim=0)
         else:
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
@@ -250,7 +249,6 @@ class XPLModule(PLModule):
         nilp_.plot_glass_brain(arr=self.top_attr, save=root_dir / "top_glass.png", colorbar=True)
         nilp_.plot_overlay(arr=self.top_attr, save=root_dir / "top_anat.png", display_mode="mosaic")
         
-        breakpoint()
         # Save Individual Projection Result
         with (root_dir / "xai_dict_indiv.json").open(mode="w") as f:
             json.dump(obj=self.xai_dict, fp=f, indent="\t")
