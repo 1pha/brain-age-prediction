@@ -39,6 +39,7 @@ class ModelBase(nn.Module):
     def load_from_checkpoint(self, ckpt: str):
         ckpt = torch.load(ckpt)["state_dict"]
         def parse_ckpt(s: str):
+            # This is to remove "model." prefix from pytorch_lightning
             s = ".".join(s.split(".")[1:])
             return s
         ckpt = {parse_ckpt(k): v for k, v in ckpt.items()}
