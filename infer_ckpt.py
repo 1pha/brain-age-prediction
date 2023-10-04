@@ -52,7 +52,7 @@ def main(args):
             f"+module.top_k_percentile={args.top_k}",
             f"+module.xai_method={args.xai_method}",
             "+trainer.inference_mode=False",
-            "trainer.accelerator=cpu"
+            "trainer.accelerator=gpu"
         ]
         if args.xai_method == "ig":
             overrides += [f"+module.baseline={args.baseline}"]
@@ -60,10 +60,13 @@ def main(args):
         logger.info("Infer Metrics")
     
     with hydra.initialize(config_path=str(root / ".hydra"), version_base="1.1"):
-        config = hydra.compose(config_name="config.yaml", overrides=overrides)
+        config = hydra.compose(config_name="config.yaml", overrides=overrides, return_hydra_config=True)
+        # TODO: Hydra key-interpolation did not work
+        for callback in config.callbacks:
+            _cb = config.callbacks[callback]
+            _cb.update({"dirpath": root} if "dirpath" in _cb else {})
 
     logger.info("Start Inference")
-    root = root / ("mask" if mask else "no-mask")
     os.makedirs(root, exist_ok=True)
     sage.trainer.inference(config, root_dir=root)
 
