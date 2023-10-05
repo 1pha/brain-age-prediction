@@ -31,6 +31,7 @@ class PLModule(pl.LightningModule):
                  test_loader: torch.utils.data.DataLoader = None,
                  predict_loader: torch.utils.data.DataLoader = None,
                  log_train_metrics: bool = False,
+                 manual_lr: bool = False,
                  augmentation: omegaconf.DictConfig = None,
                  scheduler: omegaconf.DictConfig = None,
                  load_model_ckpt: str = None,
@@ -67,6 +68,7 @@ class PLModule(pl.LightningModule):
             self.model.load_from_checkpoint(load_model_ckpt)
 
         self.log_train_metrics = log_train_metrics
+        self.log_lr = manual_lr
         self.training_step_outputs = []
         self.validation_step_outputs = []
 
@@ -197,10 +199,11 @@ class PLModule(pl.LightningModule):
             
             self.training_step_outputs.append(result)
         
-        # Since `ModelCheckpoint` cannot track learning rate automatically,
-        # We log learning rate explicitly and monitor this
-        lr = self.lr_schedulers().get_lr()[0]
-        self.log(name="_lr", value=lr, on_step=True)
+        if self.log_lr:
+            # Since `ModelCheckpoint` cannot track learning rate automatically,
+            # We log learning rate explicitly and monitor this
+            lr = self.lr_schedulers().get_lr()[0]
+            self.log(name="_lr", value=lr, on_step=True)
         return result["loss"]
 
     def on_train_epoch_end(self):
