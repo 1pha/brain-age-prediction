@@ -196,7 +196,6 @@ class PLModule(pl.LightningModule):
         if self.log_train_metrics:
             output: dict = self.train_metric(result["pred"], result["target"])
             self.log_result(output=output, unit="step", prog_bar=False)
-            
             self.training_step_outputs.append(result)
         
         if self.log_lr:
