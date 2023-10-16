@@ -40,7 +40,19 @@ def augment(spatial_size: tuple = SPATIAL_SIZE,
         mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),
         mt.Lambda(lambda t: t.unsqueeze(dim=1)),
     ])
-    
+
+
+def augment_mild(spatial_size: tuple = SPATIAL_SIZE,
+                 mask: torch.Tensor = None):
+    apply_mask: mt.transform = mask_transform(spatial_size=spatial_size, mask=mask)
+    return mt.Compose([
+        mt.Resize(spatial_size=spatial_size),
+        mt.ScaleIntensity(),
+        apply_mask,
+        mt.RandAxisFlip(prob=0.5),
+        mt.Lambda(lambda t: t.unsqueeze(dim=1)),
+    ])
+
     
 def augment_mask(spatial_size: tuple = SPATIAL_SIZE,
                  mask: torch.Tensor = None):
