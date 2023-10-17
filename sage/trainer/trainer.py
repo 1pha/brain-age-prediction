@@ -187,7 +187,8 @@ class PLModule(pl.LightningModule):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
         self.log_dict(dictionary=output,
                       on_step=unit == "step",
-                      on_epoch=unit == "epoch")
+                      on_epoch=unit == "epoch",
+                      prog_bar=prog_bar)
 
     def training_step(self, batch, batch_idx, optimizer_idx=None):
         result: dict = self.forward(batch, mode="train")
