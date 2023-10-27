@@ -344,8 +344,6 @@ def inference(config: omegaconf.DictConfig,
                                  root_dir=root_dir)
 
     elif task == "sage.xai.trainer.XPLModule":
-        attr: np.ndarray = module.attr
-        top_attr: np.ndarray = module.top_attr
         top_k: float = module.top_k_percentile
         
         postfix = module.xai_method + f"k{top_k:.2f}"

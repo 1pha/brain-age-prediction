@@ -4,4 +4,4 @@ backbone:
   model_depth: 10
 criterion:
   _target_: torch.nn.MSELoss
-name: resnet10t
+name: resnet10
