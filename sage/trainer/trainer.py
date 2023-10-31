@@ -344,9 +344,7 @@ def inference(config: omegaconf.DictConfig,
                                  root_dir=root_dir)
 
     elif task == "sage.xai.trainer.XPLModule":
-        top_k: float = module.top_k_percentile
-        
-        postfix = module.xai_method + f"k{top_k:.2f}"
+        postfix = module.xai_method + f"k{module.top_k_percentile:.2f}"
         root_dir = root_dir / postfix
         subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
         module.save_result(root_dir=root_dir)
