@@ -7,7 +7,7 @@ path=${path}
 export CUDA_VISIBLE_DEVICES=${device}
 export HYDRA_FULL_ERROR=1
 
-for xai_method in gbp ig gcam_avg
+for xai_method in gbp gradxinput gcam_avg ig
 do
     echo ${xai_method}
     python infer_ckpt.py --path=${path}\

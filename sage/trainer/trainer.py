@@ -249,6 +249,7 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 
     logger.info("Start instantiating Pytorch-Lightning Trainer")
     if config.module.get("load_from_checkpoint"):
+        # This is used for training resume.
         ckpt = config.module["load_from_checkpoint"]
         module = PLModule.load_from_checkpoint(ckpt,
                                                model=model,

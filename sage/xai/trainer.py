@@ -37,7 +37,7 @@ class XPLModule(PLModule):
                  target_layer_index: int = -2,
                  top_k_percentile: float = 0.95,
                  xai_method: str = "gbp",
-                 baseline: bool = None,
+                 baseline: bool = False,
                  atlas: str = "dkt",
                  ############################
                  test_loader: torch.utils.data.DataLoader = None,
@@ -87,9 +87,9 @@ class XPLModule(PLModule):
 
     def setup(self, stage):
         super().setup(stage)
-        if self.baseline is not None and isinstance(self.baseline, np.ndarray):
+        if self.baseline and isinstance(self.baseline, np.ndarray):
             self.baseline = torch.tensor(self.no_augment(self.baseline[None, ...]))
-        
+
     def _configure_xai(self,
                        model: nn.Module | Callable,
                        xai_method: str = "gbp",
@@ -100,6 +100,8 @@ class XPLModule(PLModule):
                                   layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gcam_avg":
             xai = [ca.LayerGradCam(forward_func=forward_func, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
+        elif xai_method == "gradxinput":
+            xai = ca.InputXGradient(forward_func=model.backbone)
         elif xai_method == "gbp":
             xai = ca.GuidedBackprop(model=model.backbone)
         elif xai_method == "ig":
@@ -109,26 +111,24 @@ class XPLModule(PLModule):
         else:
             breakpoint()
         return xai
-        
+
     def configure_xai(self,
                       model: nn.Module,
                       xai_method: str = "gbp",
                       target_layer_index: int = 1) -> None:
         name = model.NAME.lower()
-        if name in ["resnet10t", "convnext-base", "convnext-tiny"]:
+        if name in ["resnet10", "resnet18", "resnet34", "convnext-tiny", "convnext-base"]:
             # self.model = model.backbone
-            self.xai = self._configure_xai(model=self.model,
-                                           xai_method=xai_method,
+            self.xai = self._configure_xai(model=self.model, xai_method=xai_method,
                                            target_layer_index=target_layer_index)
 
         elif name == "swin_vit":
             if xai_method != "gcam":
-                self.xai = self._configure_xai(model=self.model,
-                                               xai_method=xai_method,
+                self.xai = self._configure_xai(model=self.model, xai_method=xai_method,
                                                target_layer_index=target_layer_index)
             else:
                 breakpoint()
-                
+
     def upsample(self,
                  tensor: torch.Tensor,
                  target_shape: tuple = None,
@@ -157,7 +157,7 @@ class XPLModule(PLModule):
     
     def attribute(self, brain: torch.Tensor) -> np.ndarray:
         # For integrated gradients with baseline (average brain) given.
-        if self.xai_method == "ig" and self.baseline is not None:
+        if self.xai_method == "ig" and self.baseline:
             attr_kwargs = dict(baselines=self.baseline.to(self.device))
         else:
             attr_kwargs = dict()
@@ -172,7 +172,7 @@ class XPLModule(PLModule):
                                                  interpolate_mode="trilinear",
                                                  return_np=True, apply_margin_mask=True)
                 attrs.append(torch.from_numpy(attr))
-            attr = torch.stack(attrs).mean(dim=0)
+            attr = torch.stack(attrs).mean(dim=0).numpy()
         else:
             attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
             attr: torch.Tensor = utils.z_norm(attr)
