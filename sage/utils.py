@@ -22,7 +22,7 @@ from torch import nn
 def parse_bool(s: str) -> bool:
     if s in ["true", "t", "y", 1, "1"]:
         return True
-    elif s in ["false", "f", "no", "n", "0", 0]:
+    elif s in ["false", "f", "no", "n", "0", 0, "None", "none"]:
         return False
     elif s in ["True", "False"]:
         return ast.literal_eval(s)
