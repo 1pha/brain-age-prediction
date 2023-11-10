@@ -17,7 +17,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--path", type=str, help="Leaf node directory name. e.g. resnet10t-mask")
-    parser.add_argument("--root", default="meta_brain/weights/reg/", type=str, help="Root directory where weights resides")
+    parser.add_argument("--root", default="meta_brain/weights/default/", type=str, help="Root directory where weights resides")
     
     parser.add_argument("--mask", type=str, default=False, help="Masking inference")
     
@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument("--infer_xai", type=str, default="False", help="Infer xai or not")
     parser.add_argument("--top_k", type=float, default=0.99, help="")
     parser.add_argument("--xai_method", type=str, default="gbp", help="Which explainability method to use")
-    parser.add_argument("--baseline", type=str, default=None, help="Baseline brain for Integrated gradients")
+    parser.add_argument("--baseline", type=bool, default=False, help="Baseline brain for Integrated gradients")
     
     args = parser.parse_args()
     return args
@@ -55,7 +55,7 @@ def main(args):
             "trainer.accelerator=gpu"
         ]
         if args.xai_method == "ig":
-            overrides += [f"+module.baseline={args.baseline}"]
+            overrides += [f"+module.baseline={sage.utils.parse_bool(args.baseline)}"]
     else:
         logger.info("Infer Metrics")
     
