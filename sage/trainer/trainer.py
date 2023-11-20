@@ -314,7 +314,8 @@ def train(config: omegaconf.DictConfig) -> None:
                                                   callbacks=list(callbacks.values()))
     trainer.fit(model=module,
                 train_dataloaders=dataloaders["train"],
-                val_dataloaders=dataloaders["valid"])
+                val_dataloaders=dataloaders["valid"],
+                ckpt_path=config.misc.get("ckpt_path", None))
     if dataloaders["test"]:
         logger.info("Test dataset given. Start inference on %s", len(dataloaders["test"].dataset))
         prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["test"])
