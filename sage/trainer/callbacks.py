@@ -55,4 +55,4 @@ class AnchorCheckpoint(pl.Callback):
             valid_loss = float(metrics["valid_loss"])
             checkpoint_path = f"epoch{current_epoch}-valid_loss{valid_loss:.3f}.ckpt"
             trainer.save_checkpoint(save_dir / checkpoint_path, weights_only=True)
-            self.self.epoch = next(self.save_epochs)
+            self.epoch = next(self.save_epochs)

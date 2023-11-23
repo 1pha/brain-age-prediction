@@ -185,7 +185,7 @@ class PLModule(pl.LightningModule):
         
     def log_result(self, output: dict, unit: str = "step", prog_bar: bool = False):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
-        self.log_dict(dictionary=output,
+        self.log_dict(dictionary=output, 
                       on_step=unit == "step",
                       on_epoch=unit == "epoch",
                       prog_bar=prog_bar)
