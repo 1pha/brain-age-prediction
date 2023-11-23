@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple
-from collections import defaultdict
 
 import hydra
 import numpy as np
@@ -33,7 +32,7 @@ class Weights:
                  base_dir: Path = C.WEIGHT_DIR,
                  xai_method: str = "",
                  debug: bool = False):
-        self.base_path: Path = base_dir / f"{model_name}-seed{seed}"
+        self.base_path: Path = base_dir / f"{model_name}-{seed}"
         if not self.base_path.exists():
             self.base_path = (self.base_path / ".." / model_name).resolve()
         logger.info("Set base_path as %s", self.base_path)
@@ -161,7 +160,7 @@ class Weights:
 
 class WeightAvg:
     """ Pivoting across multiple seeds per run. """
-    def __init__(self, model_name: list, xai_method: list, seeds: list = [42]):
+    def __init__(self, model_name: str, xai_method: str = "", seeds: List[int] = [42]):
         """ Fetch multiple Weights of a fixated model_name & xai_method.
         e.g. For resnet10, collect xai_attributes from all seeds """
         logger.info("Load all seeds: %s", seeds)
@@ -172,21 +171,22 @@ class WeightAvg:
         self._init_seed = seeds[0]
         self.seed_dict = dict()
         for seed in seeds:
-            w = Weights(model_name=model_name, xai_method=xai_method)
+            w = Weights(model_name=model_name, xai_method=xai_method, seed=seed)
             self.seed_dict[seed] = w
 
-        self.aggregate()
+        self.aggregate(agg_xai=bool(xai_method))
 
     def __repr__(self) -> str:
         return "\n".join([repr(w) for w in self.seed_dict.values()])
 
-    def aggregate(self) -> None:
+    def aggregate(self, agg_xai: bool = True) -> None:
         logger.info("Aggregate across %s seeds", self.num_seeds)
         self.test_performance, self.test_performance_std = self._agg_test_performance()
-        self.attrs = self._agg_array(arr_name="attrs")
-        self.top_attr = self._agg_array(arr_name="top_attr")
-        self.xai_dict, self.xai_dict_std = self._agg_xai_dict()
-        self.xai_dict_indiv, self.xai_dict_indiv_std = self._agg_xai_dict_indiv()
+        if agg_xai:
+            self.attrs = self._agg_array(arr_name="attrs")
+            self.top_attr = self._agg_array(arr_name="top_attr")
+            self.xai_dict, self.xai_dict_std = self._agg_xai_dict()
+            self.xai_dict_indiv, self.xai_dict_indiv_std = self._agg_xai_dict_indiv()
         
     def _agg_test_performance(self) -> Tuple[Dict[str, float], Dict[str, float]]:
         test_performance = {k: [] for k in self.seed_dict[self._init_seed].test_performance}
@@ -229,4 +229,3 @@ class WeightAvg:
         mean_dct = {k: np.mean(v, axis=0) for k, v in dct.items()}
         std_dct = {k: np.std(v, axis=0) for k, v in dct.items()}
         return mean_dct, std_dct
-
