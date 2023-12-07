@@ -25,7 +25,6 @@ class Weights:
     - .attrs
     - .top_attr
     """
-    XAI_METHODS = {"gbp", "gcam_avg", "ig", "gradxinput", "lrp"}
     def __init__(self,
                  model_name: str = "resnet10",
                  seed: int = 42,
@@ -117,9 +116,9 @@ class Weights:
         return perfs
     
     def set_path(self, xai_method: str, topk: float = 0.99) -> None:
-        assert xai_method in self.XAI_METHODS, \
+        assert xai_method in C.XAI_METHODS, \
                f"Please provide valid xai_method in string: given {xai_method}" + \
-               f"\nPossible methods: {self.XAI_METHODS}"
+               f"\nPossible methods: {C.XAI_METHODS}"
         xai_path = self.base_path / f"{xai_method}k{topk}"
         assert xai_path.exists(), f"Check if provided xai_path exists: {xai_path}"
         self.xai_path = xai_path

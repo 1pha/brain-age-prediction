@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def plot_corr(corr: pd.DataFrame, sub_cat: str = "", hide_triu: bool = True, ax=None,
-              cbar_size: float = 0.7, use_cbar: bool = True, use_title: bool = True):
+def plot_corr(corr: pd.DataFrame, subtitle: str = "", subtitle_size: str | int = "large",
+              hide_triu: bool = True, ax=None,
+              cbar_size: float = 0.7, use_cbar: bool = True):
     if hide_triu:
         mask = np.zeros_like(corr, dtype=np.bool)
         mask[np.triu_indices_from(mask)] = True
@@ -22,7 +23,7 @@ def plot_corr(corr: pd.DataFrame, sub_cat: str = "", hide_triu: bool = True, ax=
                      annot=True, fmt=".2f", annot_kws={"size": 9},
                      square=True, linewidth=0.5)
     for i, model_name in enumerate(corr.index):
-        model_name = model_name.split("_")[0]
+        model_name = model_name.split(" ")[0]
         if i == 0:
             prev = model_name
             continue
@@ -33,7 +34,6 @@ def plot_corr(corr: pd.DataFrame, sub_cat: str = "", hide_triu: bool = True, ax=
             else:
                 hm.axhline(i, color="black", linewidth=1.2)
         prev = model_name
-    if use_title:
-        ax.set_title(f"SpearmanR: {sub_cat}", size="xx-large")
+    ax.set_title(subtitle, size=subtitle_size)
     ax.set_xlabel("")
     ax.set_ylabel("")

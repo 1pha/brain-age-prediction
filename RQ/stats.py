@@ -23,7 +23,9 @@ def spearmanr_permutation(weight_avgs: List[weight_parser.WeightAvg], naming: st
         if u.check_nan(lst1) or u.check_nan(lst2):
             logger.warn("There is nan value in one of seeds %s or %s", c1, c2)
         if naming == "xai":
-            c1, c2 = f"{wa1.xai_method}_{s1}", f"{wa2.xai_method}_{s2}"
+            c1, c2 = f"{wa1.xai_method} {s1}", f"{wa2.xai_method} {s2}"
+        else:
+            c1, c2 = c1.replace("_", " "), c2.replace("_", " ")
         corr, pval = ss.spearmanr(lst1, lst2)
         corrs.append({"compare1": c1, "compare2": c2, "corr": corr})
         pvals.append({"compare1": c1, "compare2": c2, "pval": pval})
@@ -34,17 +36,22 @@ def spearmanr_permutation(weight_avgs: List[weight_parser.WeightAvg], naming: st
     return corrs, pvals
 
 
-def spearmanr_vs(weight_avgs: List[weight_parser.WeightAvg], meta_dicts: Dict[str, float]):
+def spearmanr_vs(weight_avgs: List[weight_parser.WeightAvg],
+                 meta_dicts: Dict[str, float],
+                 naming: str = "xai"):
+    key = {"xai": "Deep Learning", "model": "XAI Method"}[naming]
     corrs, pvals = [], []
     for meta in meta_dicts:
         meta_stats = u.to_list(meta_dicts[meta])
         for wa in weight_avgs:
             for seed in wa.seeds:
                 dl_stats = u.to_list(wa.xai_dicts[seed])
-                corr, pval = ss.spearmanr(meta_stats, dl_stats)    
-                corrs.append({"Conventional": meta, f"Deep Learning": f"{wa.model_name}_{seed}", "corr": corr})
-                pvals.append({"Conventional": meta, f"Deep Learning": f"{wa.model_name}_{seed}", "pval": pval})
+                corr, pval = ss.spearmanr(meta_stats, dl_stats)
+                corrs.append({"Conventional": meta, "corr": corr,
+                              key: f"{wa.model_name} {seed}" if naming == "xai" else f"{wa.xai_method} {seed}"})
+                pvals.append({"Conventional": meta, "pval": pval,
+                              key: f"{wa.model_name} {seed}" if naming == "xai" else f"{wa.xai_method} {seed}"})
     corrs, pvals = pd.DataFrame(corrs), pd.DataFrame(pvals)
-    corrs = corrs.pivot(columns="Conventional", index="Deep Learning", values="corr")
-    pvals = pvals.pivot(columns="Conventional", index="Deep Learning", values="pval")
+    corrs = corrs.pivot(columns="Conventional", index=key, values="corr")
+    pvals = pvals.pivot(columns="Conventional", index=key, values="pval")
     return corrs, pvals

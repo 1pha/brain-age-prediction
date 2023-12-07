@@ -102,10 +102,14 @@ class XPLModule(PLModule):
             xai = ca.GuidedGradCam(model=model.backbone, layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gcam_avg":
             xai = [ca.LayerGradCam(forward_func=forward_func, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
+        elif xai_method == "ggcam_avg":
+            xai = [ca.GuidedGradCam(model=model.backbone, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
         elif xai_method == "gradxinput":
             xai = ca.InputXGradient(forward_func=model.backbone)
         elif xai_method == "gbp":
             xai = ca.GuidedBackprop(model=model.backbone)
+        elif xai_method == "deconv":
+            xai = ca.Deconvolution(model=model.backbone)
         elif xai_method == "ig":
             xai = ca.IntegratedGradients(forward_func=forward_func)
         elif xai_method == "lrp":
@@ -164,7 +168,7 @@ class XPLModule(PLModule):
         else:
             attr_kwargs = dict()
 
-        if self.xai_method == "gcam_avg":
+        if self.xai_method in ["gcam_avg", "ggcam_avg"]:
             attrs = []
             # GCAM_AVG will have list of attributers
             for xai in self.xai:

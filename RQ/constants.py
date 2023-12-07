@@ -25,3 +25,6 @@ WEIGHTS_LIST = ["convnext-base-42",
                 "resnet34-42",
                 "resnet34-43",
                 "resnet34-44"]
+
+MODELS = ["resnet10", "resnet18", "resnet34", "convnext-tiny", "convnext-base"]
+XAI_METHODS = ["gcam_avg", "gradxinput", "gbp", "ggcam", "ig"]
