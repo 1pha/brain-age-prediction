@@ -93,11 +93,13 @@ class XPLModule(PLModule):
     def _configure_xai(self,
                        model: nn.Module | Callable,
                        xai_method: str = "gbp",
-                       target_layer_index: int = 1):
+                       target_layer_index: int = -1):
         forward_func = model._forward
         if xai_method == "gcam":
             xai = ca.LayerGradCam(forward_func=forward_func,
                                   layer=model.conv_layers()[target_layer_index])
+        elif xai_method == "ggcam":
+            xai = ca.GuidedGradCam(model=model.backbone, layer=model.conv_layers()[target_layer_index])
         elif xai_method == "gcam_avg":
             xai = [ca.LayerGradCam(forward_func=forward_func, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
         elif xai_method == "gradxinput":
