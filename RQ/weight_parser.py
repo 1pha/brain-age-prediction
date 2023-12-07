@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -24,21 +25,23 @@ class Weights:
     - .attrs
     - .top_attr
     """
-
     XAI_METHODS = {"gbp", "gcam_avg", "ig", "gradxinput", "lrp"}
     def __init__(self,
                  model_name: str = "resnet10",
                  seed: int = 42,
                  base_dir: Path = C.WEIGHT_DIR,
                  xai_method: str = "",
+                 verbose: bool = True,
                  debug: bool = False):
+        self.verbose = verbose
         self.base_path: Path = base_dir / f"{model_name}-{seed}"
         if not self.base_path.exists():
             self.base_path = (self.base_path / ".." / model_name).resolve()
+        logger.setLevel(logging.INFO if verbose else logging.CRITICAL)
         logger.info("Set base_path as %s", self.base_path)
+        logger.info("Loading Basic Information")
         self.debug = debug
         
-        logger.info("Loading Basic Information")
         self.prediction = self.load_prediction()
         self.config = self.load_config()
         self.ckpt_dict = self.load_checkpoint()
@@ -48,7 +51,7 @@ class Weights:
             # One can explicitly set xai method after instantiation via `obj.load_xai` as well.
             self.load_xai(xai_method=xai_method)
             
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return " / ".join([f"{k}: {v}" for k, v in self.test_performance.items()])
 
     def load_prediction(self, name: str = None) -> dict:
@@ -63,8 +66,8 @@ class Weights:
                 prediction = utils.load_pkl(preds[0])
                 return prediction
             else:
-                logger.info("There is no prediction pickle file in %s.", self.base_path)
-                logger.info("Check the following: %s", list(self.base_path.glob("*")))
+                logger.warn("There is no prediction pickle file in %s.", self.base_path)
+                logger.warn("Check the following: %s", list(self.base_path.glob("*")))
 
     def load_config(self,
                     config_fname: str = "config.yaml",
@@ -160,23 +163,29 @@ class Weights:
 
 class WeightAvg:
     """ Pivoting across multiple seeds per run. """
-    def __init__(self, model_name: str, xai_method: str = "", seeds: List[int] = [42]):
+    def __init__(self,
+                 model_name: str,
+                 xai_method: str = "",
+                 seeds: List[int] = [42, 43, 44],
+                 verbose: bool = False):
         """ Fetch multiple Weights of a fixated model_name & xai_method.
         e.g. For resnet10, collect xai_attributes from all seeds """
         logger.info("Load all seeds: %s", seeds)
+        self.model_name = model_name
+        self.xai_method = xai_method
         self.num_seeds = len(set(seeds))
         if self.num_seeds != len(seeds):
             logger.warn("Check seed list. There must be duplicates or other issues: %s", seeds)
+        self.seeds = seeds
 
         self._init_seed = seeds[0]
         self.seed_dict = dict()
         for seed in seeds:
-            w = Weights(model_name=model_name, xai_method=xai_method, seed=seed)
+            w = Weights(model_name=model_name, xai_method=xai_method, seed=seed, verbose=verbose)
             self.seed_dict[seed] = w
-
         self.aggregate(agg_xai=bool(xai_method))
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "\n".join([repr(w) for w in self.seed_dict.values()])
 
     def aggregate(self, agg_xai: bool = True) -> None:
@@ -229,3 +238,17 @@ class WeightAvg:
         mean_dct = {k: np.mean(v, axis=0) for k, v in dct.items()}
         std_dct = {k: np.std(v, axis=0) for k, v in dct.items()}
         return mean_dct, std_dct
+
+    @property
+    def xai_dicts(self) -> Dict[int, Dict[int, float]]:
+        xai_dicts = dict()
+        for seed in self.seed_dict:
+            xai_dicts[seed] = self.seed_dict[seed].xai_dict
+        return xai_dicts
+
+    @property
+    def xai_indiv_dicts(self) -> Dict[int, Dict[int, List[float]]]:
+        xai_dicts_indiv = dict()
+        for seed in self.seed_dict:
+            xai_dicts_indiv[seed] = self.seed_dict[seed].xai_dict_indiv
+        return xai_dicts_indiv
