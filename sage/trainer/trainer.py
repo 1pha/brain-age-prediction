@@ -226,11 +226,11 @@ class PLModule(pl.LightningModule):
         self.log_result(output, unit="epoch", prog_bar=True)
         self.validation_step_outputs.clear()
     
-    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
+    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")
         return result
 
-    def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
+    def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")
         return result
 

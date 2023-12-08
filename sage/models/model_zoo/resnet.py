@@ -53,7 +53,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, in_planes, planes, stride=1, downsample=None):
+    def __init__(self, in_planes, planes, stride=1, downsample=None, activation=None):
         super().__init__()
 
         self.conv1 = conv1x1x1(in_planes, planes)
@@ -62,7 +62,9 @@ class Bottleneck(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.conv3 = conv1x1x1(planes, planes * self.expansion)
         self.bn3 = nn.BatchNorm3d(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU(inplace=True) if activation is None else activation
+        self.relu2 = nn.ReLU(inplace=True) if activation is None else activation
+        self.relu3 = nn.ReLU(inplace=True) if activation is None else activation
         self.downsample = downsample
         self.stride = stride
 
@@ -71,11 +73,11 @@ class Bottleneck(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.relu1(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.relu(out)
+        out = self.relu2(out)
 
         out = self.conv3(out)
         out = self.bn3(out)
@@ -84,7 +86,7 @@ class Bottleneck(nn.Module):
             residual = self.downsample(x)
 
         out += residual
-        out = self.relu(out)
+        out = self.relu3(out)
 
         return out
 
