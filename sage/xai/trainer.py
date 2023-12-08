@@ -106,6 +106,10 @@ class XPLModule(PLModule):
             xai = [ca.GuidedGradCam(model=model.backbone, layer=layer) for layer in model.conv_layers()[-20:]] # TODO
         elif xai_method == "gradxinput":
             xai = ca.InputXGradient(forward_func=model.backbone)
+        elif xai_method == "deeplift":
+            xai = ca.DeepLift(model=model.backbone)
+        elif xai_method == "deepliftshap":
+            xai = ca.DeepLiftShap(model=model.backbone)
         elif xai_method == "gbp":
             xai = ca.GuidedBackprop(model=model.backbone)
         elif xai_method == "deconv":
@@ -116,6 +120,7 @@ class XPLModule(PLModule):
             xai = ca.LRP(model=model.backbone)
         else:
             breakpoint()
+        logger.info("Start XAI Inference of %s", xai_method.upper())
         return xai
 
     def configure_xai(self,
