@@ -78,6 +78,7 @@ def plot_overlay(arr: torch.Tensor | np.ndarray,
                  target_affine: np.ndarray = None,
                  bg: np.ndarray | nib.nifti1.Nifti1Image = None,
                  display_mode: str = "ortho",
+                 cut_coords: tuple = None,
                  save: str = None, alpha: float = 0.7, **kwargs):    
     """ Works similar with `nilp.plot_roi`
     However this first plots an original brain
@@ -86,7 +87,8 @@ def plot_overlay(arr: torch.Tensor | np.ndarray,
     if bg is None:
         bg = load_mni152_template()
     title = kwargs.pop("title", "")
-    display = nilp.plot_anat(anat_img=bg, display_mode=display_mode, title=title)
+    display = nilp.plot_anat(anat_img=bg, display_mode=display_mode,
+                             title=title, cut_coords=cut_coords)
     display.add_overlay(arr, alpha=alpha, **kwargs)
     if save is not None:
         display.savefig(save)

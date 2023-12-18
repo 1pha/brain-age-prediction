@@ -5,6 +5,7 @@ import numpy as np
 mni_template = load_mni152_brain_mask()
 MNI_SHAPE = mni_template.get_fdata().shape
 MNI_AFFINE = mni_template.affine
+H5_SHAPE = (182, 218, 182)
 
 BIOBANK_AFFINE = np.array([[ -1.,  0.,  0.,   90.],
                            [  0.,  1.,  0., -126.],

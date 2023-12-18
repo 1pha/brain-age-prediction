@@ -1,6 +1,7 @@
 import ast
 from pathlib import Path
-from typing import Tuple, TypeVar
+from typing import Tuple, TypeVar, List
+import types
 
 import numpy as np
 import nibabel
@@ -10,6 +11,7 @@ import pandas as pd
 from sklearn.utils import Bunch
 
 from . import utils
+from sage.utils import get_logger
 try:
     import meta_brain.router as C
 except ImportError:
@@ -17,6 +19,7 @@ except ImportError:
 
 
 nii = TypeVar(name="nii", bound=nibabel.nifti1.Nifti1Image)
+logger = get_logger(name=__file__)
 
 
 def get_cerebra():
@@ -30,6 +33,7 @@ def get_atlas(atlas_name: str,
               return_mni: bool = True,
               target_shape: tuple = C.MNI_SHAPE,
               interpolate_mode: str = "nearest"):
+    logger.info("Load %s atlas.", atlas_name)
     atlas_map, indices, labels = {
         "aal": _get_aal,
         "oxford": _get_ho,
@@ -47,8 +51,25 @@ def get_atlas(atlas_name: str,
     indices = _literal_eval(lst=indices)
     assert len(indices) == len(labels),\
         f"# Labels and indices should be same: len(indices)={len(indices)}, len(labels)={len(labels)}"
-    return Bunch(array=arr, indices=indices, labels=labels, nii=atlas_map)
-        
+
+    array_obj = Bunch(array=arr, indices=indices, labels=labels, nii=atlas_map)
+    array_obj.get_roi_index = types.MethodType(get_roi_index, array_obj)
+    array_obj.get_roi_name = types.MethodType(get_roi_name, array_obj)
+    return array_obj
+
+
+def get_roi_index(self, roi_name: int) -> int:
+    idx = self.labels.index(roi_name)
+    idx = self.indices[idx]
+    return idx
+
+
+def get_roi_name(self, index: int) -> str:
+    idx = self.indices.index(index)
+    label = self.labels[idx]
+    return label
+
+
     
 def _load_map(maps: str | nii) -> nii:
     if isinstance(maps, str | Path):
