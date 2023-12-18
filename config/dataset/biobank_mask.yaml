@@ -1,0 +1,8 @@
+_target_: sage.data.mask.UKB_MaskDataset
+atlas_name: dkt
+mask_idx:
+root: biobank
+label_name:
+mode: train
+valid_ratio: 0.1
+seed: ${misc.seed}
