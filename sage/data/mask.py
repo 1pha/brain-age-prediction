@@ -6,6 +6,7 @@ import numpy as np
 import torch
 
 from sage.data.dataloader import UKBDataset
+import sage.data.augmentation as aug
 from sage.xai.atlas import get_atlas
 from sage.utils import get_logger
 import sage.constants as C
@@ -24,16 +25,17 @@ class UKB_MaskDataset(UKBDataset):
                  mode: str = "train",
                  valid_ratio: float = 0.1,
                  exclusion_fname: str = "exclusion.csv",
-                 return_tensor: bool = True,
+                 augmentation: str = "augment",
                  seed: int = 42):
         super().__init__(root=root,
                          label_name=label_name,
                          mode=mode,
                          valid_ratio=valid_ratio,
                          exclusion_fname=exclusion_fname,
-                         return_tensor=return_tensor,
+                         augmentation=None,
                          seed=seed)
         self.initiate_atlas(atlas_name=atlas_name, mask_idx=mask_idx, reshape=reshape)
+        self.init_transforms(augmentation=augmentation)
 
     def initiate_atlas(self, atlas_name: str, mask_idx: int | List[int], reshape: Tuple) -> None:
         atlas = get_atlas(atlas_name=atlas_name)
@@ -66,6 +68,10 @@ class UKB_MaskDataset(UKBDataset):
         assert self.mask.sum() > 0, f"Masking is not done correctly. Check the mask index: {self.mask_idx}"
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        data = super().__getitem__(idx=idx)
-        data["brain"][self.mask] = 0.
-        return data
+        # (H, W, D)
+        arr, age = self._load_data(idx=idx)
+        arr[self.mask] = 0.
+        # (H, W, D) -> (B, C, H, W, D) -> (C, H, W, D)
+        arr = self.transforms(arr.unsqueeze(dim=0)).squeeze(axis=0)
+        arr = self.get_tensor(tensor=arr)
+        return dict(brain=arr, age=age)

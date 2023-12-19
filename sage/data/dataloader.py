@@ -13,8 +13,11 @@ import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
+import monai.transforms as mt
+from monai.data.meta_tensor import MetaTensor
 
 from sage.utils import get_logger
+import sage.data.augmentation as aug
 try:
     import meta_brain.router as C
 except ImportError:
@@ -56,7 +59,7 @@ class UKBDataset(Dataset):
                  mode: str = "train",
                  valid_ratio: float = 0.1,
                  exclusion_fname: str = "exclusion.csv",
-                 return_tensor: bool = True,
+                 augmentation: str = "augment",
                  seed: int = 42,):
         """ Here we treat same pid with scans from different timeline as independent dataset.
         Since multiple scans have different ages """
@@ -77,8 +80,7 @@ class UKBDataset(Dataset):
             files = self._split_data(files=files, valid_ratio=valid_ratio, mode=mode, seed=seed)
         self.files = self._exclude_data(lst=files, root=root, exclusion_fname=exclusion_fname)
         logger.info("Total %s files of %s h5 exist", len(self.files), mode)
-
-        self.return_tensor = return_tensor
+        self.init_transforms(augmentation=augmentation)
 
     def remove_duplicates(self, labels: pd.DataFrame) -> pd.DataFrame:
         """ This method removes duplicate patients
@@ -87,11 +89,11 @@ class UKBDataset(Dataset):
         _dups_bool = _labels.duplicated(keep=False)
         labels = labels[~_dups_bool]
         return labels
-        
+
     def _exclude_data(self,
                       lst: pd.DataFrame,
                       root: Path,
-                      exclusion_fname: str = "exclusion.csv",):
+                      exclusion_fname: str = "exclusion.csv") -> List[Path]:
         try:
             exc = pd.read_csv(root / exclusion_fname, header=None)
             exclusion = set(exc.values.flatten().tolist())
@@ -105,7 +107,7 @@ class UKBDataset(Dataset):
                     files: List[Path],
                     valid_ratio: float = 0.1,
                     mode: str = "train",
-                    seed: int = 42) -> None:
+                    seed: int = 42) -> Dict[str, List[Path]]:
         # Data split, used fixated seed
         trn, val = train_test_split(files, test_size=valid_ratio, random_state=seed)
         files = {"train": trn, "valid": val}.get(mode, None)
@@ -113,21 +115,35 @@ class UKBDataset(Dataset):
             logger.exception(msg=f"Invalide mode given: {mode}")
             raise
         return files
+    
+    def init_transforms(self, augmentation: str) -> None:
+        if isinstance(augmentation, str):
+            self.transforms = getattr(aug, augmentation)()
+        else:
+            self.transforms = mt.Identity()
 
-    def __getitem__(self, idx: int):
+    def _load_data(self, idx: int) -> Tuple[torch.Tensor]:
         fname = self.files[idx]
         arr, _ = open_h5(fname)
+        arr = torch.tensor(arr, dtype=torch.float32)
+    
         age = self.labels.query(f"fname == '{fname.stem}'").age.iloc[0]
-        if self.return_tensor:
-            arr = torch.tensor(arr, dtype=torch.float32)
-            age = torch.tensor(age, dtype=torch.long)
-        return {
-            "brain": arr,
-            "age": age,
-        }
+        age = torch.tensor(age, dtype=torch.long)
+        return arr, age
 
-    def __len__(self):
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        arr, age = self._load_data(idx=idx)
+        arr = self.transforms(arr.unsqueeze(dim=0))
+        return dict(brain=arr, age=age)
+
+    def __len__(self) -> int:
         return len(self.files)
+    
+    def get_tensor(self, tensor: torch.Tensor | MetaTensor) -> torch.Tensor:
+        if isinstance(tensor, MetaTensor):
+            tensor = tensor.as_tensor()
+        return tensor
+        
 
 
 class UKBClassification(UKBDataset):
@@ -139,7 +155,6 @@ class UKBClassification(UKBDataset):
                  mode: str = "train",
                  valid_ratio: float = 0.1,
                  exclusion_fname: str = "exclusion.csv",
-                 return_tensor: bool = True,
                  seed: int = 42,
                  verbose: bool = False):
         self.thresholds = {"young": young_threshold, "old": old_threshold}
@@ -150,9 +165,9 @@ class UKBClassification(UKBDataset):
                           "valid": "ukb_trainval_age.csv",
                           "test": "vbm.csv"}[mode]
         super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
-                         exclusion_fname=exclusion_fname, return_tensor=return_tensor, seed=seed)
+                         exclusion_fname=exclusion_fname, seed=seed)
 
-    def _age_filter(self, files: list):
+    def _age_filter(self, files: list) -> list:
         # Filter out self.files with age condition
         logger.info("Filter out ages")
         age = self.labels.age
@@ -179,7 +194,7 @@ class UKBClassification(UKBDataset):
                     files: list,
                     valid_ratio: float = 0.1,
                     mode: str = "train",
-                    seed: int = 42) -> None:
+                    seed: int = 42) -> pd.DataFrame:
         """ Override function.
         Filters out data with age. """
         files = self._age_filter(files=files)
@@ -187,16 +202,16 @@ class UKBClassification(UKBDataset):
         return files
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        result = super().__getitem__(idx=idx)
-        age = result["age"]
+        data = super().__getitem__(idx=idx)
+        age = data["age"]
         if age <= self.thresholds["young"]:
             age = 0
         elif age >= self.thresholds["old"]:
             age = 1
         else:
             raise
-        result["age"] = age
-        return result
+        data["age"] = age
+        return data
 
 
 def get_dataloaders(ds_cfg: omegaconf.DictConfig,
