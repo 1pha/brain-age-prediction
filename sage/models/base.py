@@ -18,6 +18,7 @@ class ModelBase(nn.Module):
         super().__init__()
         logger.info("Start Initiating model %s", name.upper())
         self.backbone = backbone
+        self.backbone = torch.compile(self.backbone, dynamic=True)
         self.criterion = criterion
         self.NAME = name
         self.TASK = task

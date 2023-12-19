@@ -164,7 +164,9 @@ class ResNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def _downsample_basic_block(self, x, planes, stride):
-        out = F.avg_pool3d(x, kernel_size=1, stride=stride)
+        if isinstance(stride, int):
+            stride = (int(stride), int(stride), int(stride))
+        out = F.avg_pool3d(x, kernel_size=(1, 1, 1), stride=stride)
         zero_pads = torch.zeros(
             out.size(0), planes - out.size(1), out.size(2), out.size(3), out.size(4)
         )
