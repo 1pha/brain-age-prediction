@@ -4,7 +4,6 @@ import subprocess
 from typing import Any
 from pathlib import Path
 
-import numpy as np
 import hydra
 import omegaconf
 import pytorch_lightning as pl
@@ -12,6 +11,8 @@ import torch
 from torch import nn
 from torchmetrics import MetricCollection
 import wandb
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
 
 import sage
 import sage.xai.nilearn_plots as nilp_
@@ -76,8 +77,6 @@ class PLModule(pl.LightningModule):
         self.save_dir = Path(save_dir)
         
     def setup(self, stage):
-        self.no_augment = hydra.utils.instantiate(self.aug_config, _target_="sage.data.no_augment", mask=None)
-        self.augmentor = hydra.utils.instantiate(self.aug_config, mask=None)
         self.log_brain(return_path=False)
         
     def log_brain(self, return_path: bool = False, augment: bool = True):
@@ -85,7 +84,6 @@ class PLModule(pl.LightningModule):
         ds = self.train_dataloader.dataset
         idx: int = random.randint(a=0, b=len(ds))
         brain: torch.Tensor = ds[idx]["brain"]
-        brain = self.augmentor(brain[None, ...]) if augment else self.no_augment(brain[None, ...])
         
         tmp = "tmp.png"
         nilp_.plot_brain(brain, save=tmp)
@@ -171,8 +169,6 @@ class PLModule(pl.LightningModule):
                 cls_target:
             }
             """
-            augmentor = self.augmentor if mode == "train" else self.no_augment
-            batch["brain"] = augmentor(batch["brain"])
             batch["age"] = batch["age"].float()
             result: dict = self.model(**batch)
             return result
