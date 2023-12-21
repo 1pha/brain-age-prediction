@@ -11,13 +11,13 @@ import nibabel as nib
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
+from sklearn.model_selection import train_test_split
+import torchio as tio
 import monai.transforms as mt
 from monai.data.meta_tensor import MetaTensor
 
 from sage.utils import get_logger
-import sage.data.augmentation as aug
 try:
     import meta_brain.router as C
 except ImportError:
@@ -59,7 +59,7 @@ class UKBDataset(Dataset):
                  mode: str = "train",
                  valid_ratio: float = 0.1,
                  exclusion_fname: str = "exclusion.csv",
-                 augmentation: str = "augment",
+                 augmentation: str = "monai",
                  seed: int = 42,):
         """ Here we treat same pid with scans from different timeline as independent dataset.
         Since multiple scans have different ages """
@@ -79,7 +79,9 @@ class UKBDataset(Dataset):
         if mode != "test":
             files = self._split_data(files=files, valid_ratio=valid_ratio, mode=mode, seed=seed)
         self.files = self._exclude_data(lst=files, root=root, exclusion_fname=exclusion_fname)
+        self.files = np.array(self.files) # To solve Memory leakage issue
         logger.info("Total %s files of %s h5 exist", len(self.files), mode)
+
         self.init_transforms(augmentation=augmentation)
 
     def remove_duplicates(self, labels: pd.DataFrame) -> pd.DataFrame:
@@ -115,10 +117,27 @@ class UKBDataset(Dataset):
             logger.exception(msg=f"Invalide mode given: {mode}")
             raise
         return files
-    
-    def init_transforms(self, augmentation: str) -> None:
+
+    def init_transforms(self, augmentation: str, spatial_size: tuple = (160, 192, 160)) -> None:
         if isinstance(augmentation, str):
-            self.transforms = getattr(aug, augmentation)()
+            if augmentation == "monai":
+                self.transforms = mt.Compose([
+                    mt.Resize(spatial_size=spatial_size),
+                    mt.ScaleIntensity(),
+                    mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
+                    mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
+                    mt.RandAxisFlip(prob=0.5),
+                    mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
+                ])
+            elif augmentation == "torchio":
+                self.transforms = tio.Compose(transforms=[
+                    tio.Resize(target_shape=spatial_size),
+                    tio.RescaleIntensity(),
+                    tio.RandomGamma(log_gamma=(0.5, 2.0)),
+                    tio.RandomSwap(num_iterations=20, patch_size=8),
+                    tio.RandomFlip(axes=[0, 1, 2]),
+                    tio.RandomAffine(scales=(0.9, 1.4))
+                ])
         else:
             self.transforms = mt.Identity()
 
@@ -133,17 +152,20 @@ class UKBDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         arr, age = self._load_data(idx=idx)
-        arr = self.transforms(arr.unsqueeze(dim=0))
+        # self.init_transforms(augmentation="s")
+        arr = arr.unsqueeze(dim=0)
+        # arr = mt.apply_transform(transform=self.transforms, data=arr)
+        arr = self.get_tensor(tensor=arr)
         return dict(brain=arr, age=age)
 
     def __len__(self) -> int:
         return len(self.files)
-    
+
     def get_tensor(self, tensor: torch.Tensor | MetaTensor) -> torch.Tensor:
         if isinstance(tensor, MetaTensor):
+            # MetaTensor is not suitable for torch.compile
             tensor = tensor.as_tensor()
         return tensor
-        
 
 
 class UKBClassification(UKBDataset):

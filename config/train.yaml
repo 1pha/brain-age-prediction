@@ -27,7 +27,6 @@ module:
   _target_: sage.trainer.PLModule
   _recursive_: False
   augmentation:
-    _target_: sage.data.augment
     spatial_size: [ 160 , 192 , 160 ]
   load_from_checkpoint: # for lightning
   load_model_ckpt: # For model checkpoint only

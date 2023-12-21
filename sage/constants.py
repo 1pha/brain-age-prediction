@@ -11,3 +11,6 @@ BIOBANK_AFFINE = np.array([[ -1.,  0.,  0.,   90.],
                            [  0.,  1.,  0., -126.],
                            [  0.,  0.,  1.,  -72.],
                            [  0.,  0.,  0.,    1.]], dtype=np.float32)
+
+# Reshape target size
+SPATIAL_SIZE = (160, 192, 160)

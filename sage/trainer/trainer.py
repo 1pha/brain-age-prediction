@@ -11,11 +11,11 @@ import torch
 from torch import nn
 from torchmetrics import MetricCollection
 import wandb
-import torch._dynamo
-torch._dynamo.config.suppress_errors = True
+import monai.transforms as mt
 
 import sage
 import sage.xai.nilearn_plots as nilp_
+import sage.constants as C
 from . import utils
 
 
@@ -73,18 +73,33 @@ class PLModule(pl.LightningModule):
         self.training_step_outputs = []
         self.validation_step_outputs = []
 
-        self.aug_config = augmentation
+        self.init_transforms(augmentation=augmentation)
         self.save_dir = Path(save_dir)
         
     def setup(self, stage):
         self.log_brain(return_path=False)
         
+    def init_transforms(self, augmentation: omegaconf.DictConfig):
+        self.train_transforms = mt.Compose([
+            mt.Resize(spatial_size=augmentation.get("spatial_size", C.SPATIAL_SIZE)),
+            mt.ScaleIntensity(channel_wise=True),
+            mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
+            mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
+            mt.RandAxisFlip(prob=0.5),
+            mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
+        ])
+        self.valid_transforms = mt.Compose([
+            mt.Resize(spatial_size=augmentation.get("spatial_size", C.SPATIAL_SIZE)),
+            mt.ScaleIntensity(channel_wise=True),
+        ])
+
     def log_brain(self, return_path: bool = False, augment: bool = True):
         """ Logs sample brain to check how augmentation is applied. """
         ds = self.train_dataloader.dataset
         idx: int = random.randint(a=0, b=len(ds))
         brain: torch.Tensor = ds[idx]["brain"]
-        
+        brain = self.train_transforms(brain) if augment else self.valid_transforms(brain)
+
         tmp = "tmp.png"
         nilp_.plot_brain(brain, save=tmp)
         try:
@@ -169,6 +184,10 @@ class PLModule(pl.LightningModule):
                 cls_target:
             }
             """
+            if mode == "train":
+                batch["brain"] = self.train_transforms(batch["brain"].squeeze()).unsqueeze(dim=1)
+            else:
+                batch["brain"] = self.valid_transforms(batch["brain"].squeeze()).unsqueeze(dim=1)
             batch["age"] = batch["age"].float()
             result: dict = self.model(**batch)
             return result
@@ -178,7 +197,7 @@ class PLModule(pl.LightningModule):
             logger.exception(e)
             breakpoint()
             raise e
-        
+
     def log_result(self, output: dict, unit: str = "step", prog_bar: bool = False):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
         self.log_dict(dictionary=output, 
