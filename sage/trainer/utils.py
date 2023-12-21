@@ -92,7 +92,7 @@ def finalize_inference(prediction: list,
     if name.startswith("C"):
         logger.info("Classification data given:")
         _cls_infrence(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
-    elif name.startswith("R"):
+    elif name[0] in set("R", "M"):
         logger.info("Regression data given:")
         _reg_infrence(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
     else:
