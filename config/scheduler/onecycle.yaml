@@ -4,6 +4,7 @@ scheduler:
   total_steps:
   anneal_strategy: cos
   cycle_momentum: False
+  pct_start: 0.1
 
 interval: step
 frequency: 1
