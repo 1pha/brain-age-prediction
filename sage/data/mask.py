@@ -73,6 +73,6 @@ class UKB_MaskDataset(UKBDataset):
         arr[self.mask] = 0.
 
         # (H, W, D) -> (B, C, H, W, D) -> (C, H, W, D)
-        arr = self.transforms(arr.unsqueeze(dim=0)).squeeze(axis=0)
+        arr = arr.unsqueeze(dim=0)
         arr = self.get_tensor(tensor=arr)
         return dict(brain=arr, age=age)
