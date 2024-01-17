@@ -94,12 +94,13 @@ def finalize_inference(prediction: list,
         _cls_infrence(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
     elif name[0] in set(["R", "M"]):
         logger.info("Regression data given:")
-        _reg_infrence(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
+        _reg_inference(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
+        _get_norm_cf_reg(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
     else:
         logger.info("Failed to inference. Check the run name for the task.")
 
 
-def _reg_infrence(preds, target, root_dir, run_name) -> None:
+def _reg_inference(preds, target, root_dir, run_name) -> None:
     mse = tmf.mean_squared_error(preds=preds, target=target)
     mae = tmf.mean_absolute_error(preds=preds, target=target)
     r2 = tmf.r2_score(preds=preds, target=target)
@@ -125,6 +126,34 @@ def _reg_infrence(preds, target, root_dir, run_name) -> None:
     fig.suptitle(run_name)
     fig.tight_layout()
     fig.savefig(root_dir / f"{run_name}-kde.png")
+    
+
+def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
+    """Calculate normalized confusion matrix for regression result.
+    Calculating number of bins is done autmoatically.
+    1. Number of bins: between 5 and 10
+    2. Interval of each bin: 5 or 10.
+    """
+    AGEMIN, AGEMAX = 0, 100
+    min_, max_ = target.min(), target.max()
+    min_, max_ = max(AGEMIN, min_), min(AGEMAX, max_)
+    int_ = max_ - min_ # interval
+    
+    # Check two intervals 5 and 10
+    bin_ = 5 if int_ // 5 <= 10 else 10
+    
+    # Bounds
+    lb, ub = int(min_), int(max_)
+    while (lb % bin_) != 0:
+        lb -= 1
+    while (ub % bin_) != 0:
+        ub += 1
+    bins = [lb + bin_ * idx for idx in range(0, (ub - lb) // bin_ + 1)]
+    labels = [f"{left+1}-{right}" for left, right in zip(bins, bins[1:])]
+    
+    _preds = pd.cut(x=preds, bins=bins, labels=labels)
+    _target = pd.cut(x=target, bins=bins, labels=labels)
+    breakpoint()
 
 
 def _cls_infrence(preds, target, root_dir, run_name) -> None:

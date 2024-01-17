@@ -184,10 +184,12 @@ class PLModule(pl.LightningModule):
                 cls_target:
             }
             """
+            # Avoid squeeze squeezing dim=0 and 1 due to batch_size = 1
+            dim = 1 if batch["brain"].shape[0] == 1 else None
             if mode == "train":
-                batch["brain"] = self.train_transforms(batch["brain"].squeeze()).unsqueeze(dim=1)
+                batch["brain"] = self.train_transforms(batch["brain"].squeeze(dim=dim)).unsqueeze(dim=1).as_tensor()
             else:
-                batch["brain"] = self.valid_transforms(batch["brain"].squeeze()).unsqueeze(dim=1)
+                batch["brain"] = self.valid_transforms(batch["brain"].squeeze(dim=dim)).unsqueeze(dim=1).as_tensor()
             batch["age"] = batch["age"].float()
             result: dict = self.model(**batch)
             return result
@@ -205,7 +207,7 @@ class PLModule(pl.LightningModule):
                       on_epoch=unit == "epoch",
                       prog_bar=prog_bar)
 
-    def training_step(self, batch, batch_idx, optimizer_idx=None):
+    def training_step(self, batch, batch_idx):
         result: dict = self.forward(batch, mode="train")
         self.log(name="train_loss", value=result["loss"], prog_bar=True)
         
