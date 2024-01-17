@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from nilearn.datasets import load_mni152_brain_mask
 import numpy as np
 
@@ -14,3 +16,4 @@ BIOBANK_AFFINE = np.array([[ -1.,  0.,  0.,   90.],
 
 # Reshape target size
 SPATIAL_SIZE = (160, 192, 160)
+BIOBANK_PATH = Path.home() / "brain-age-prediction" / "biobank"
