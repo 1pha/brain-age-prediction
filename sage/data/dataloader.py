@@ -27,6 +27,21 @@ except ImportError:
 logger = get_logger(name=__name__)
 
 
+def open_scan(fname: str) -> Tuple[np.array, dict]:
+    suffix = Path(fname).suffix
+    if suffix == ".npy":
+        arr = open_npy(fname)
+        meta = None
+    elif suffix == ".h5":
+        arr, meta = open_h5(fname=fname)
+    return arr, meta
+
+
+def open_npy(fname: str) -> np.array:
+    arr = np.load(file=fname)
+    return arr
+
+
 def open_h5(fname: str) -> Tuple[np.ndarray, dict]:
     with h5py.File(name=fname, mode="r") as hf:
         arr = hf["volume"][:]
@@ -58,6 +73,7 @@ class UKBDataset(Dataset):
                  label_name: str = None,
                  mode: str = "train",
                  valid_ratio: float = 0.1,
+                 extension: str = ".h5",
                  exclusion_fname: str = "exclusion.csv",
                  augmentation: str = "monai",
                  seed: int = 42,):
@@ -74,13 +90,15 @@ class UKBDataset(Dataset):
         self.labels = self.remove_duplicates(labels=labels)
 
         pids = set(self.labels.fname.unique())
-        files = sorted(root.rglob("*.h5"))
+        if not extension.startswith("."):
+            extension = f".{extension}"
+        files = sorted(root.rglob(f"*{extension}"))
         files = list(filter(lambda f: f.stem in pids, files))
         if mode != "test":
             files = self._split_data(files=files, valid_ratio=valid_ratio, mode=mode, seed=seed)
         self.files = self._exclude_data(lst=files, root=root, exclusion_fname=exclusion_fname)
         self.files = np.array(self.files) # To solve Memory leakage issue
-        logger.info("Total %s files of %s h5 exist", len(self.files), mode)
+        logger.info("Total %s files of %s %s exist", len(self.files), mode, extension)
 
         self.init_transforms(augmentation=augmentation)
 
@@ -119,6 +137,8 @@ class UKBDataset(Dataset):
         return files
 
     def init_transforms(self, augmentation: str, spatial_size: tuple = (160, 192, 160)) -> None:
+        # Currently unused and implemented inside the trainer
+        # If one needs to use `torch.compile`, then transform should happen inside the torch.dataset
         if isinstance(augmentation, str):
             if augmentation == "monai":
                 self.transforms = mt.Compose([
@@ -143,29 +163,26 @@ class UKBDataset(Dataset):
 
     def _load_data(self, idx: int) -> Tuple[torch.Tensor]:
         fname = self.files[idx]
-        arr, _ = open_h5(fname)
-        arr = torch.tensor(arr, dtype=torch.float32)
-    
+        arr, _ = open_scan(fname)
+        arr = torch.from_numpy(arr).type(dtype=torch.float32)
+
         age = self.labels.query(f"fname == '{fname.stem}'").age.iloc[0]
         age = torch.tensor(age, dtype=torch.long)
         return arr, age
-
-    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        arr, age = self._load_data(idx=idx)
-        # self.init_transforms(augmentation="s")
-        arr = arr.unsqueeze(dim=0)
-        # arr = mt.apply_transform(transform=self.transforms, data=arr)
-        arr = self.get_tensor(tensor=arr)
-        return dict(brain=arr, age=age)
-
-    def __len__(self) -> int:
-        return len(self.files)
 
     def get_tensor(self, tensor: torch.Tensor | MetaTensor) -> torch.Tensor:
         if isinstance(tensor, MetaTensor):
             # MetaTensor is not suitable for torch.compile
             tensor = tensor.as_tensor()
         return tensor
+
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        arr, age = self._load_data(idx=idx)
+        arr = arr.unsqueeze(dim=0)
+        return dict(brain=arr, age=age)
+
+    def __len__(self) -> int:
+        return len(self.files)
 
 
 class UKBClassification(UKBDataset):
