@@ -19,3 +19,4 @@ seaborn
 flake8
 pytest
 fire
+lion_pytorch

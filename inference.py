@@ -15,19 +15,17 @@ MASK_DIR = Path("assets/masks")
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    
+
     parser.add_argument("--path", type=str, help="Leaf node directory name. e.g. resnet10t-mask")
     parser.add_argument("--root", default="meta_brain/weights/default/", type=str, help="Root directory where weights resides")
-    
-    parser.add_argument("--mask", type=str, default=False, help="Masking inference")
-    
+
     parser.add_argument("--batch_size", type=int, default=1, help="batch size during inference")
-    
+
     parser.add_argument("--infer_xai", type=str, default="False", help="Infer xai or not")
     parser.add_argument("--top_k", type=float, default=0.99, help="")
     parser.add_argument("--xai_method", type=str, default="gbp", help="Which explainability method to use")
     parser.add_argument("--baseline", type=bool, default=False, help="Baseline brain for Integrated gradients")
-    
+
     args = parser.parse_args()
     return args
 
@@ -37,11 +35,9 @@ def main(args):
     # Starting with numbers is the checkpoint recorded by best monitoring checkpoint via save_top_k=1
     weight = sorted(root.glob("*.ckpt"))[0]
     
-    mask = sage.utils.parse_bool(args.mask)
     overrides = ["misc.modes=[train,valid,test]",
                  f"module.load_model_ckpt={weight}",
                  f"dataloader.batch_size={args.batch_size}"]
-                #  f"module.mask={MASK_DIR/mask if mask else 'False'}"]
     
     infer_xai: bool = sage.utils.parse_bool(args.infer_xai)
     if infer_xai:
