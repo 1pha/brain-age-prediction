@@ -172,3 +172,40 @@ def _cls_infrence(preds, target, root_dir, run_name) -> None:
     p = sns.heatmap(cf, annot=True, fmt="d")
     p.set_title(run_name)
     plt.savefig(root_dir / f"{run_name}-cf.png")
+
+
+def brain2augment(brain: torch.Tensor) -> torch.Tensor:
+    orig_ndim = brain.ndim
+    if orig_ndim == 3:
+        # (H, W, D) -> (1, H, W, D), making brain to batch=1
+        brain = brain.unsqueeze(dim=0)
+    elif orig_ndim == 4:
+        # (C, H, W, D)
+        pass
+    elif orig_ndim == 5:
+        # (B, C, H, W, D)
+        # Kill channel
+        C = brain.shape[1]
+        assert C == 1, f"Brain should have single-channel: #channels = {C}"
+        # Specify dimension in case batch_size is 1 (i.e. (1, 1, H, W, D))
+        brain = brain.squeeze(dim=1)
+        assert brain.ndim == 4, f"Output brain should be ndim 4"
+    return brain
+
+
+def augment2brain(brain: torch.Tensor) -> torch.Tensor:
+    """Return to .ndim=5
+    """
+    orig_ndim = brain.ndim
+    if orig_ndim == 3:
+        # (H, W, D) -> (1, 1, H, W, D)
+        brain = brain.unsqueeze(dim=0).unsqueeze(dim=0)
+    elif orig_ndim == 4:
+        # (B, H, W, D) -> (B, 1, H, W, D)
+        brain = brain.unsqueeze(dim=1)
+    elif orig_ndim == 5:
+        # (B, C, H, W, D)
+        # Kill channel
+        C = brain.shape[1]
+        assert C == 1, f"Brain should have single-channel: #channels = {C}"
+    return brain

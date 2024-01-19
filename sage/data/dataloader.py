@@ -88,6 +88,7 @@ class UKBDataset(Dataset):
                           "test": "ukb_test_age.csv"}[mode]
         labels = pd.read_csv(root / label_name)
         self.labels = self.remove_duplicates(labels=labels)
+        self.mode = mode
 
         pids = set(self.labels.fname.unique())
         if not extension.startswith("."):
@@ -141,14 +142,21 @@ class UKBDataset(Dataset):
         # If one needs to use `torch.compile`, then transform should happen inside the torch.dataset
         if isinstance(augmentation, str):
             if augmentation == "monai":
-                self.transforms = mt.Compose([
-                    mt.Resize(spatial_size=spatial_size),
-                    mt.ScaleIntensity(),
-                    mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
-                    mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
-                    mt.RandAxisFlip(prob=0.5),
-                    mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
-                ])
+                if self.mode == "train":
+                    self.transforms = mt.Compose([
+                        mt.Resize(spatial_size=spatial_size),
+                        mt.ScaleIntensity(channel_wise=True),
+                        mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
+                        mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
+                        mt.RandAxisFlip(prob=0.5),
+                        mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
+                    ])
+                else:
+                    self.transforms = mt.Compose([
+                        mt.Resize(spatial_size=spatial_size),
+                        mt.ScaleIntensity(channel_wise=True)
+                    ])
+
             elif augmentation == "torchio":
                 self.transforms = tio.Compose(transforms=[
                     tio.Resize(target_shape=spatial_size),
@@ -177,8 +185,8 @@ class UKBDataset(Dataset):
         return tensor
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        arr, age = self._load_data(idx=idx)
-        arr = arr.unsqueeze(dim=0)
+        arr, age = self._load_data(idx=idx) # (H, W, D)
+        arr = arr.unsqueeze(dim=0) # (C, H, W, D)
         return dict(brain=arr, age=age)
 
     def __len__(self) -> int:

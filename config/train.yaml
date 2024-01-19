@@ -14,7 +14,7 @@ defaults:
 dataloader:
   _target_: torch.utils.data.DataLoader
   batch_size: 32
-  num_workers: 4
+  num_workers: 8
   pin_memory: True
   dataset: ${dataset}
 
@@ -48,7 +48,7 @@ logger:
   _target_: pytorch_lightning.loggers.WandbLogger
   project: brain-age
   entity: 1pha
-  name: R ${model.name} | ${module.augmentation.spatial_size} | ${misc.seed}
+  name: R ${model.name} | ${misc.seed}
   tags:
     - model=${model.name}
     - REG

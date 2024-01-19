@@ -53,6 +53,7 @@ def main(args):
         if args.xai_method == "ig":
             overrides += [f"+module.baseline={sage.utils.parse_bool(args.baseline)}"]
     else:
+        # overrides += ["+trainer.inference_mode=True"]
         logger.info("Infer Metrics")
     
     with hydra.initialize(config_path=str(root / ".hydra"), version_base="1.1"):

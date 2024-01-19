@@ -66,12 +66,12 @@ class XPLModule(PLModule):
                          load_from_checkpoint,
                          separate_lr,
                          save_dir)
+        self.init_transforms(augmentation=augmentation)
 
         # Dataloader sanity check
-        if self.predict_dataloader:
-            assert self.predict_dataloader.batch_size == 1, "Predict dataloader should have batch_size=1 for XPL"
-        if self.test_dataloader:
-            assert self.test_dataloader.batch_size == 1, "Test dataloader should have batch_size=1 for XPL"
+        # if self.predict_dataloader:
+        #     assert self.predict_dataloader.batch_size == 1, "Predict dataloader should have batch_size=1 for XPL"
+        
 
         self.smaller_mask = utils.margin_mni_mask()
         self.target_layer_index = target_layer_index
@@ -165,7 +165,7 @@ class XPLModule(PLModule):
             upsampled *= self.smaller_mask
             np.nan_to_num(x=upsampled, copy=False) # inplace
         return upsampled
-    
+
     def attribute(self, brain: torch.Tensor) -> np.ndarray:
         # For integrated gradients with baseline (average brain) given.
         if self.xai_method == "ig" and self.baseline:
@@ -194,8 +194,10 @@ class XPLModule(PLModule):
 
     def forward(self, batch: dict, mode: str = "test") -> dict:
         try:
-            augmentor = self.augmentor if mode == "train" else self.no_augment
-            brain = torch.tensor(augmentor(batch["brain"]))
+            # augmentor = self.augmentor if mode == "train" else self.no_augment
+            aug = getattr(self, f"{'train' if mode == 'train' else 'valid'}_transforms")
+
+            brain = aug(batch["brain"]) # (B, C, H, W, D)
             attr: np.ndarray = self.attribute(brain=brain)
 
             # Get projection list
@@ -205,6 +207,8 @@ class XPLModule(PLModule):
             # Get top_attribute
             top_attr: np.ndarray = utils.top_q(arr=attr, q=self.top_k_percentile,
                                                use_abs=True, return_bool=False)
+            if attr.ndim == 4:
+                attr = attr.sum(axis=0)
 
             while attr.ndim > 3:
                 attr = attr[0]
@@ -228,18 +232,17 @@ class XPLModule(PLModule):
         # dict: {roi1: [X1, X2, ... Xn],
         #        roi2: [X2, X2, ... Xn], ...}
         self.xai_dict = defaultdict(list)
-        
+
     def predict_step(self,
                      batch: dict,
                      batch_idx: int,
                      dataloader_idx: int = 0) -> np.ndarray:
         attrs: np.ndarray = self.forward(batch, mode="test")
-        
+
         self.attr += attrs["attr"]
         self.top_attr += attrs["top_attr"]
         for k in attrs["xai_dict"]:
             self.xai_dict[k].append(float(attrs["xai_dict"][k]))
-        
         # This is a hack to make lightning work
         return torch.zeros(size=(1,), requires_grad=True)
 

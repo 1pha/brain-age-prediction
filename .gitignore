@@ -8,6 +8,8 @@ raw_rfMRI
 *.tar
 _*
 tmp_vbm/
+nbia/
+brain/
 
 *.ini
 *.nii

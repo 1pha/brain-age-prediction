@@ -81,16 +81,20 @@ class PLModule(pl.LightningModule):
         
     def init_transforms(self, augmentation: omegaconf.DictConfig):
         self.train_transforms = mt.Compose([
+            mt.Lambda(func=utils.brain2augment),
             mt.Resize(spatial_size=augmentation.get("spatial_size", C.SPATIAL_SIZE)),
             mt.ScaleIntensity(channel_wise=True),
             mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
             mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
             mt.RandAxisFlip(prob=0.5),
             mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
+            mt.Lambda(func=utils.augment2brain),
         ])
         self.valid_transforms = mt.Compose([
+            mt.Lambda(func=utils.brain2augment),
             mt.Resize(spatial_size=augmentation.get("spatial_size", C.SPATIAL_SIZE)),
             mt.ScaleIntensity(channel_wise=True),
+            mt.Lambda(func=utils.augment2brain),
         ])
 
     def log_brain(self, return_path: bool = False, augment: bool = True):
@@ -184,12 +188,8 @@ class PLModule(pl.LightningModule):
                 cls_target:
             }
             """
-            # Avoid squeeze squeezing dim=0 and 1 due to batch_size = 1
-            dim = 1 if batch["brain"].shape[0] == 1 else None
-            if mode == "train":
-                batch["brain"] = self.train_transforms(batch["brain"].squeeze(dim=dim)).unsqueeze(dim=1).as_tensor()
-            else:
-                batch["brain"] = self.valid_transforms(batch["brain"].squeeze(dim=dim)).unsqueeze(dim=1).as_tensor()
+            aug = getattr(self, f"{'train' if mode == 'train' else 'valid'}_transforms")
+            batch["brain"] = aug(batch["brain"]).as_tensor()
             batch["age"] = batch["age"].float()
             result: dict = self.model(**batch)
             return result
@@ -356,14 +356,19 @@ def inference(config: omegaconf.DictConfig,
     prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
 
     task = config.module._target_
-    # Infer Metrics
     if task == "sage.trainer.PLModule":
+        # Infer Metrics
         utils.finalize_inference(prediction=prediction,
                                  name=config.logger.name,
                                  root_dir=root_dir)
 
     elif task == "sage.xai.trainer.XPLModule":
+        # Infer Saliency maps
         postfix = module.xai_method + f"k{module.top_k_percentile:.2f}"
+
+        bsz = config.dataloader.batch_size
+        if bsz > 1:
+            postfix = f"{postfix}-bsz{bsz}"
         root_dir = root_dir / postfix
         subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
         module.save_result(root_dir=root_dir)
