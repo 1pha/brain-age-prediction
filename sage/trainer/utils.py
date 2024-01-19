@@ -1,5 +1,6 @@
 """ Includes model inference, output sorting utils
 """
+from datetime import datetime
 from pathlib import Path
 import pickle
 
@@ -69,6 +70,12 @@ def _sort_outputs(outputs):
     return result
 
 
+def timestamp(fmt: str = "%y%m%d_%H%M") -> str:
+    now = datetime.now()
+    now = now.strftime(fmt)
+    return now
+
+
 def finalize_inference(prediction: list,
                        name: str,
                        root_dir: Path = Path(".")) -> None:
@@ -89,7 +96,7 @@ def finalize_inference(prediction: list,
         pickle.dump(prediction, f)
 
     # 2. Log Predictions
-    run_name = save_name[:-4]
+    run_name = save_name[:-4] + "_" + timestamp()
     preds, target = prediction["pred"], prediction["target"]
     if name.startswith("C"):
         logger.info("Classification data given:")
