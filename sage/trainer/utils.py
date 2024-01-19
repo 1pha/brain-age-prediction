@@ -212,6 +212,14 @@ def _cls_inference(preds, target, root_dir, run_name) -> None:
 
 
 def brain2augment(brain: torch.Tensor) -> torch.Tensor:
+    """ Monai transforms is intended to take a single data as input.
+    However, if this augmentation is implemented inside the dataloader,
+    this will invoke high memory usage.
+    I have splitted this outside the dataloader, and included inside the LightningModule.
+    
+    Because monai.transforms expects a single array with multi-channel image to be fed,
+    we remove channel but instead put batch inside.
+    However, this will instead apply the same augmentation to all batches. """
     orig_ndim = brain.ndim
     if orig_ndim == 3:
         # (H, W, D) -> (1, H, W, D), making brain to batch=1
