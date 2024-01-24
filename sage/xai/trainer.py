@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List, Dict
 import os
 import json
 
@@ -73,7 +73,7 @@ class XPLModule(PLModule):
         #     assert self.predict_dataloader.batch_size == 1, "Predict dataloader should have batch_size=1 for XPL"
         
 
-        self.smaller_mask = utils.margin_mni_mask()
+        self.smaller_mask = utils.margin_mni_mask(return_pt=True)
         self.target_layer_index = target_layer_index
         self.top_k_percentile = top_k_percentile
         self.xai_method = xai_method
@@ -139,13 +139,35 @@ class XPLModule(PLModule):
                                                target_layer_index=target_layer_index)
             else:
                 breakpoint()
-
+                
     def upsample(self,
                  tensor: torch.Tensor,
                  target_shape: tuple = None,
                  interpolate_mode: str = "trilinear",
-                 return_np: bool = True,
+                 return_np: bool = False,
                  apply_margin_mask: bool = True) -> np.ndarray | torch.Tensor:
+        B = tensor.size(0)
+        if B > 1:
+            upsampled = []
+            for brain in tensor:
+                brain = brain.unsqueeze(dim=0)
+                brain = self._upsample(tensor=brain, target_shape=target_shape,
+                                       interpolate_mode=interpolate_mode, return_np=return_np,
+                                       apply_margin_mask=apply_margin_mask)
+                upsampled.append(torch.from_numpy(brain))
+            upsampled = torch.stack(upsampled, dim=0)
+        else:
+            upsampled = self._upsample(tensor=tensor, target_shape=target_shape,
+                                       interpolate_mode=interpolate_mode, return_np=return_np,
+                                       apply_margin_mask=apply_margin_mask)
+        return upsampled
+
+    def _upsample(self,
+                  tensor: torch.Tensor,
+                  target_shape: tuple = None,
+                  interpolate_mode: str = "trilinear",
+                  return_np: bool = True,
+                  apply_margin_mask: bool = True) -> torch.Tensor | np.ndarray:
         """ Upsamples a given tensor to target_shape
         through captum.attrs.LayerAttribution.interpolate """
         if apply_margin_mask:
@@ -154,20 +176,22 @@ class XPLModule(PLModule):
                 f"target_shape: {target_shape} | smaller_mask: {self.smaller_mask.shape}"
         
         target_shape = target_shape or C.MNI_SHAPE
+        # upsampled: (B, C, H', W', D')
         upsampled = ca.LayerAttribution.interpolate(layer_attribution=tensor,
                                                     interpolate_dims=target_shape,
                                                     interpolate_mode=interpolate_mode)
+        # upsampled: (B, H', W', D')
         upsampled = upsampled.cpu().detach().squeeze()
+        if apply_margin_mask:
+            upsampled *= self.smaller_mask
+            upsampled = torch.nan_to_num(x=upsampled, nan=0.0) # inplace
         if return_np:
             upsampled = upsampled.numpy()
-        if apply_margin_mask:
-            assert return_np
-            upsampled *= self.smaller_mask
-            np.nan_to_num(x=upsampled, copy=False) # inplace
         return upsampled
 
-    def attribute(self, brain: torch.Tensor) -> np.ndarray:
+    def attribute(self, brain: torch.Tensor) -> torch.Tensor:
         # For integrated gradients with baseline (average brain) given.
+        # brain: (B, C, H, W, D)
         if self.xai_method == "ig" and self.baseline:
             attr_kwargs = dict(baselines=self.baseline.to(self.device))
         else:
@@ -179,42 +203,57 @@ class XPLModule(PLModule):
             for xai in self.xai:
                 attr = xai.attribute(brain)
                 attr: torch.Tensor = utils.z_norm(attr)
-                attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
+                attr: torch.Tensor = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
                                                  interpolate_mode="trilinear",
-                                                 return_np=True, apply_margin_mask=True)
-                attrs.append(torch.from_numpy(attr))
-            attr = torch.stack(attrs).mean(dim=0).numpy()
+                                                 return_np=False, apply_margin_mask=True)
+                attrs.append(attr)
+            attr = torch.stack(attrs, dim=0).mean(dim=0)
         else:
-            attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs)
-            attr: torch.Tensor = utils.z_norm(attr)
-            attr: np.ndarray = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
+            attr: torch.Tensor = self.xai.attribute(brain, **attr_kwargs) # (B, C, H, W, D)
+            attr: torch.Tensor = utils.z_norm(attr) # (B, C, H, W, D)
+            attr: torch.Tensor = self.upsample(tensor=attr, target_shape=C.MNI_SHAPE,
                                              interpolate_mode="trilinear",
-                                             return_np=True, apply_margin_mask=True)
+                                             return_np=False, apply_margin_mask=True)
         return attr
 
-    def forward(self, batch: dict, mode: str = "test") -> dict:
+    def calculate_overlaps(self,
+                           attr: torch.Tensor,
+                           atlas: ao.Bunch,
+                           device: str | torch.device) -> Dict[str, List[float] | float]:
+        B = attr.size(0)
+        if (attr.ndim > 3) and (B > 1):
+            # Multi-batch
+            xai_dict: Dict[str, List[float]] = defaultdict(list)
+            for _attr in attr:
+                _xai_dict, _ = ao.calculate_overlaps(arr=_attr, atlas=atlas, use_torch=True, device=device,
+                                                    plot_raw_sal=False, plot_bargraph=False, plot_projection=False)
+                for k in _xai_dict:
+                    val = float(_xai_dict[k])
+                    xai_dict[k].append(val)
+        else:
+            xai_dict, _ = ao.calculate_overlaps(arr=attr, atlas=atlas, use_torch=True, device=device,
+                                                plot_raw_sal=False, plot_bargraph=False, plot_projection=False)
+            xai_dict = {k: float(v) for k, v in xai_dict.items()}
+        return xai_dict
+
+    def forward(self, batch: dict, mode: str = "test") -> Dict[str, torch.Tensor | dict]:
         try:
             # augmentor = self.augmentor if mode == "train" else self.no_augment
             aug = getattr(self, f"{'train' if mode == 'train' else 'valid'}_transforms")
-
             brain = aug(batch["brain"]) # (B, C, H, W, D)
-            attr: np.ndarray = self.attribute(brain=brain)
+
+            # Calculate Attribute & Get Top-k attribute
+            attr: torch.Tensor = self.attribute(brain=brain) # (B, H', W', D') or (H', W', D')
+            top_attr: np.ndarray = utils.top_q(arr=attr, q=self.top_k_percentile, use_abs=True,
+                                               return_bool=False) # (B, H', W', D') or (H', W', D')
+            # When attr is batch-inferred
+            if attr.ndim == 4:
+                attr = attr.sum(dim=0)
+            if top_attr.ndim == 4:
+                top_attr = top_attr.sum(dim=0)
 
             # Get projection list
-            xai_dict, _ = ao.calculate_overlaps(arr=attr, atlas=self.atlas, use_torch=True, device=brain.device,
-                                                plot_raw_sal=False, plot_bargraph=False, plot_projection=False)
-
-            # Get top_attribute
-            top_attr: np.ndarray = utils.top_q(arr=attr, q=self.top_k_percentile,
-                                               use_abs=True, return_bool=False)
-            if attr.ndim == 4:
-                attr = attr.sum(axis=0)
-
-            while attr.ndim > 3:
-                attr = attr[0]
-            while top_attr.ndim > 3:
-                top_attr = top_attr[0]
-
+            xai_dict = self.calculate_overlaps(attr=attr, atlas=self.atlas, device=brain.device)
             return {"attr": attr,
                     "top_attr": top_attr,
                     "xai_dict": xai_dict}
@@ -227,8 +266,8 @@ class XPLModule(PLModule):
 
     def on_predict_start(self) -> None:
         """ Initialize attribute """
-        self.attr = np.zeros(shape=self.smaller_mask.shape)
-        self.top_attr = np.zeros(shape=self.smaller_mask.shape)
+        self.attr = torch.zeros_like(self.smaller_mask)
+        self.top_attr = torch.zeros_like(self.smaller_mask)
         # dict: {roi1: [X1, X2, ... Xn],
         #        roi2: [X2, X2, ... Xn], ...}
         self.xai_dict = defaultdict(list)
@@ -237,19 +276,25 @@ class XPLModule(PLModule):
                      batch: dict,
                      batch_idx: int,
                      dataloader_idx: int = 0) -> np.ndarray:
-        attrs: np.ndarray = self.forward(batch, mode="test")
+        result: dict = self.forward(batch, mode="test")
 
-        self.attr += attrs["attr"]
-        self.top_attr += attrs["top_attr"]
-        for k in attrs["xai_dict"]:
-            self.xai_dict[k].append(float(attrs["xai_dict"][k]))
+        self.attr += result["attr"]
+        self.top_attr += result["top_attr"]
+        for k in result["xai_dict"]:
+            val = result["xai_dict"][k]
+            if isinstance(val, float):
+                self.xai_dict[k].append(val)
+            elif isinstance(val, list):
+                self.xai_dict[k].extend(val)
         # This is a hack to make lightning work
         return torch.zeros(size=(1,), requires_grad=True)
 
     def on_predict_end(self) -> None:
-        self.attr /= len(self.predict_dataloader)
-        self.top_attr /= len(self.predict_dataloader)
-        
+        # XXX: Note that we divide by len(dataset) NOT len(dataloader).
+        # This is possible since we summated attr/top_attr one-by-one even in multi-batch cases
+        self.attr /= len(self.predict_dataloader.dataset)
+        self.top_attr /= len(self.predict_dataloader.dataset)
+
     def save_result(self, root_dir: Path):
         logger.info("Start saving here: %s", root_dir)
         os.makedirs(name=root_dir, exist_ok=True)
@@ -261,14 +306,14 @@ class XPLModule(PLModule):
         # Save plots
         nilp_.plot_glass_brain(arr=self.attr, save=root_dir / "attr_glass.png", colorbar=True)
         nilp_.plot_overlay(arr=self.attr, save=root_dir / "attr_anat.png", display_mode="mosaic")
-        
+
         nilp_.plot_glass_brain(arr=self.top_attr, save=root_dir / "top_glass.png", colorbar=True)
         nilp_.plot_overlay(arr=self.top_attr, save=root_dir / "top_anat.png", display_mode="mosaic")
-        
+
         # Save Individual Projection Result
         with (root_dir / "xai_dict_indiv.json").open(mode="w") as f:
             json.dump(obj=self.xai_dict, fp=f, indent="\t")
-        
+
         # Save Total Projection Result
         xai_dict, agg_saliency = ao.calculate_overlaps(arr=self.top_attr, atlas=self.atlas,
                                                        root_dir=root_dir, title=root_dir.stem)

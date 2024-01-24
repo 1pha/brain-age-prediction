@@ -95,7 +95,10 @@ def flatten_to_dict(arr: np.ndarray,
         mask_ = arr.get_fdata()
     elif isinstance(arr, np.ndarray):
         mask_ = arr.copy()
-    
+    elif isinstance(arr, torch.Tensor):
+        # Monai `MetaTensor` would also get caught here.
+        mask_ = arr.clone()
+
     if use_abs:
         mask_ = np.abs(mask_)
 
@@ -105,7 +108,7 @@ def flatten_to_dict(arr: np.ndarray,
                 desc="Aggregating values across ROIs")
     if use_torch:
         atlas_ = torch.from_numpy(atlas.array).to(device)
-        mask_ = torch.from_numpy(arr).to(device)
+        mask_ = torch.from_numpy(mask_).to(device) if isinstance(mask_, np.ndarray) else mask_.to(device)
         for idx, label in pbar:
             roi_mask = atlas_ == idx
             # Norm

@@ -31,7 +31,53 @@ def load_np(fname: str | np.ndarray | Path):
     return arr
 
 
-def top_q(arr: np.ndarray, q: float = 0.95, use_abs: bool = True, return_bool: bool = False):
+def top_q(arr: np.ndarray | torch.Tensor,
+          q: float = 0.95, use_abs: bool = True, return_bool: bool = False):
+    if isinstance(arr, np.ndarray):
+        result = _top_q_np(arr=arr, q=q, use_abs=use_abs, return_bool=return_bool)
+    elif isinstance(arr, torch.Tensor):
+        result = _top_q_pt(arr=arr, q=q, use_abs=use_abs, return_bool=return_bool)
+    return result
+
+
+def _top_q_pt(arr: torch.Tensor, q: float = 0.95, use_abs: bool = True, return_bool: bool = False):
+    B = arr.size(0)
+    if (arr.ndim > 3) and (B > 1):
+        # Multi-batch
+        top_qs = [__top_q_pt(arr=_arr, q=q,
+                         use_abs=use_abs, return_bool=return_bool) for _arr in arr]
+        result = torch.stack(top_qs, dim=0) # (B, H, W, D)
+    else:
+        result = __top_q_pt(arr=arr, q=q, use_abs=use_abs, return_bool=return_bool)
+    return result
+
+
+def __top_q_pt(arr: torch.Tensor, q: float = 0.95, use_abs: bool = True, return_bool: bool = False):
+    if use_abs:
+        quantile_value = torch.nanquantile(arr.abs(), q=q)
+    else:
+        quantile_value = torch.nanquantile(arr, q=q)
+
+    mask = arr > quantile_value
+    if return_bool:
+        return mask.astype(torch.int32)
+    else:
+        return arr * mask
+
+
+def _top_q_np(arr: np.ndarray, q: float = 0.95, use_abs: bool = True, return_bool: bool = False):
+    B = arr.shape[0]
+    if (arr.ndim > 3) and (B > 1):
+        # Multi-batch
+        top_qs = [__top_q_np(arr=_arr, q=q,
+                         use_abs=use_abs, return_bool=return_bool) for _arr in arr]
+        result = np.stack(top_qs) # (B, H, W, D)
+    else:
+        result = __top_q_np(arr=arr, q=q, use_abs=use_abs, return_bool=return_bool)
+    return result
+
+
+def __top_q_np(arr: np.ndarray, q: float = 0.95, use_abs: bool = True, return_bool: bool = False):
     if use_abs:
         quantile_value = np.nanquantile(np.abs(arr), q=q)
     else:
@@ -83,7 +129,7 @@ def align(arr: np.ndarray, affine: np.ndarray = C.MNI_AFFINE) -> nib.nifti1.Nift
     return arr_nifti
 
 
-def margin_mni_mask():
+def margin_mni_mask(return_pt: bool = False):
     """ This loads smaller brain mask of mni
     Why do we need smaller mask?
         - Since some models watch dura maters on the edges
@@ -102,6 +148,8 @@ def margin_mni_mask():
                                                 interpolate_mode="trilinear")[0][0].numpy()
     smaller_mask[smaller_mask < 0.5] = np.nan
     smaller_mask[smaller_mask > 0.5] = 1.
+    if return_pt:
+        smaller_mask = torch.from_numpy(smaller_mask)
     return smaller_mask
 
 
@@ -112,14 +160,12 @@ def upsample(arr: np.ndarray | torch.Tensor,
     """ If you're translating atlas, it is recommended to use 'nearest' as interpolation_mode"""
     if isinstance(arr, np.ndarray):
         arr = torch.from_numpy(arr)
-        
     while arr.ndim > 3:
         arr = arr[0]
     
     if return_mni:
         target_shape = C.MNI_SHAPE
-    
-    arr = torch.tensor(arr)
+
     arr = LayerAttribution.interpolate(layer_attribution=arr[None, None, ...],
                                        interpolate_dims=target_shape,
                                        interpolate_mode=interpolate_mode)[0][0].numpy()
