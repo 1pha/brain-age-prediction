@@ -1,5 +1,6 @@
 """ Includes model inference, output sorting utils
 """
+import math
 from datetime import datetime
 from pathlib import Path
 import pickle
@@ -147,11 +148,15 @@ def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
     pmin_, pmax_ = preds.min(), preds.max()
     tmin_, tmax_ = target.min(), target.max()
     min_, max_ = max(AGEMIN, min(tmin_, pmin_)), min(AGEMAX, max(tmax_, pmax_))
+    if math.isnan(min_):
+        min_ = AGEMIN
+    if math.isnan(max_):
+        max_ = AGEMIN
     int_ = max_ - min_ # interval
-    
+
     # Check two intervals 5 and 10
     bin_ = 5 if int_ // 5 <= 10 else 10
-    
+
     # Bounds
     lb, ub = int(min_), int(max_)
     while (lb % bin_) != 0:
@@ -164,33 +169,32 @@ def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
     cut_kwargs = dict(bins=bins, labels=labels, include_lowest=True)
     _preds = pd.cut(x=preds, **cut_kwargs)
     _target = pd.cut(x=target, **cut_kwargs)
-    assert (_preds.isna().sum() + _target.isna().sum()) == 0, f"nan value in binning."
+    if (_preds.isna().sum() + _target.isna().sum()) == 0:
+        fig, ax = plt.subplots(figsize=(13, 6), ncols=2)
+        labelsize = "large"
+        titlesize = "xx-large"
+        cmap = "Blues"
 
-    fig, ax = plt.subplots(figsize=(13, 6), ncols=2)
-    labelsize = "large"
-    titlesize = "xx-large"
-    cmap = "Blues"
+        # Normalized Confusion Matrix
+        cf = confusion_matrix(_preds, _target)
+        sns.heatmap(cf, annot=True, fmt="d",
+                    xticklabels=_target.categories, cmap=cmap, ax=ax[0])
+        ax[0].set_xlabel("Target", size=labelsize)
+        ax[0].set_yticklabels(_preds.categories, rotation=270)
+        ax[0].set_ylabel("Prediction", size=labelsize)
 
-    # Normalized Confusion Matrix
-    cf = confusion_matrix(_preds, _target)
-    sns.heatmap(cf, annot=True, fmt="d",
-                xticklabels=_target.categories, cmap=cmap, ax=ax[0])
-    ax[0].set_xlabel("Target", size=labelsize)
-    ax[0].set_yticklabels(_preds.categories, rotation=270)
-    ax[0].set_ylabel("Prediction", size=labelsize)
-
-    # 0-1 row-wise Noramlized Confusion.
-    norm_cf = (cf.T / cf.sum(axis=1)).T
-    norm_cf = np.nan_to_num(x=norm_cf, nan=0.0)
-    sns.heatmap(norm_cf, annot=True, fmt="0.2f",
-                xticklabels=_target.categories, cmap=cmap, ax=ax[1])
-    ax[1].set_xlabel("Target", size=labelsize)
-    ax[1].set_yticklabels(_preds.categories, rotation=270)
-    ax[1].set_ylabel("Prediction", size=labelsize)
-    
-    fig.suptitle(run_name, size=titlesize)
-    fig.tight_layout()
-    fig.savefig(root_dir / f"{run_name}-cf.png")
+        # 0-1 row-wise Noramlized Confusion.
+        norm_cf = (cf.T / cf.sum(axis=1)).T
+        norm_cf = np.nan_to_num(x=norm_cf, nan=0.0)
+        sns.heatmap(norm_cf, annot=True, fmt="0.2f",
+                    xticklabels=_target.categories, cmap=cmap, ax=ax[1])
+        ax[1].set_xlabel("Target", size=labelsize)
+        ax[1].set_yticklabels(_preds.categories, rotation=270)
+        ax[1].set_ylabel("Prediction", size=labelsize)
+        
+        fig.suptitle(run_name, size=titlesize)
+        fig.tight_layout()
+        fig.savefig(root_dir / f"{run_name}-cf.png")
 
 
 def _cls_inference(preds, target, root_dir, run_name) -> None:
@@ -219,13 +223,15 @@ def brain2augment(brain: torch.Tensor) -> torch.Tensor:
     
     Because monai.transforms expects a single array with multi-channel image to be fed,
     we remove channel but instead put batch inside.
-    However, this will instead apply the same augmentation to all batches. """
+    However, this will instead apply the same augmentation to all batches.
+    
+    In short, this will convert a given tensor into (B, H, W, D)."""
     orig_ndim = brain.ndim
     if orig_ndim == 3:
         # (H, W, D) -> (1, H, W, D), making brain to batch=1
         brain = brain.unsqueeze(dim=0)
     elif orig_ndim == 4:
-        # (C, H, W, D)
+        # (B, H, W, D)
         pass
     elif orig_ndim == 5:
         # (B, C, H, W, D)
