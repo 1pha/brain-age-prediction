@@ -70,7 +70,6 @@ def get_roi_name(self, index: int) -> str:
     return label
 
 
-    
 def _load_map(maps: str | nii) -> nii:
     if isinstance(maps, str | Path):
         atlas_map = load_img(maps)

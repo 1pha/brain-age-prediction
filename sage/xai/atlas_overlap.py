@@ -144,8 +144,7 @@ def project_to_atlas(atlas: Bunch,
         agg_saliency[np.where(atlas.array == int(idx))] = val
 
     save = root_dir / "proj_glass.png" if root_dir is not None else None
-    nilp_.plot_glass_brain(arr=agg_saliency,
-                           target_affine=atlas.nii.affine, title=title,
+    nilp_.plot_glass_brain(arr=agg_saliency, target_affine=atlas.nii.affine, title=title, symmetric_cbar=False,
                            vmin=vmin, vmax=vmax, colorbar=True, plot_abs=use_abs, save=save)
 
     save = root_dir / "proj_mosaic.png" if root_dir is not None else None

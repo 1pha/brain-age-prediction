@@ -22,6 +22,7 @@ def load_affine(target_affine: str | np.ndarray = "cerebra") -> np.ndarray:
         atlas = get_atlas(atlas_name=target_affine,
                           return_mni=False if target_affine == "cerebra" else True)
         target_affine = atlas.nii.affine
+
     elif isinstance(target_affine, np.ndarray):
         assert target_affine.ndim == 2, "`target_affine` should be 2-dimensional 4*4 matrix"
         assert target_affine.shape == (4, 4), "`target_affine` should be 2-dimensional 4*4 matrix"
@@ -114,6 +115,7 @@ def plot_roi(roi_img: np.ndarray | nib.nifti1.Nifti1Image,
     
     dp = nilp.plot_roi(roi_img=roi_img, bg_img=bg_img, display_mode=display_mode, **kwargs)
     return dp
+
 
 def brain_barplot(xai_dict: dict,
                   title: str = "",
