@@ -90,7 +90,7 @@ def finalize_inference(prediction: list,
     # 1. Sort Prediction
     prediction = _sort_outputs(prediction)
 
-    # 2. Save PRediction
+    # 2. Save Prediction
     save_name = f"{name}.pkl"
     logger.info("Save prediction as %s", save_name)
     with open(root_dir / save_name, "wb") as f:
@@ -167,8 +167,8 @@ def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
     labels = [f"{left}-{right - 1}" for left, right in zip(bins, bins[1:])]
 
     cut_kwargs = dict(bins=bins, labels=labels, include_lowest=True)
-    _preds = pd.cut(x=preds, **cut_kwargs)
-    _target = pd.cut(x=target, **cut_kwargs)
+    _preds = pd.cut(x=preds.tolist(), **cut_kwargs)
+    _target = pd.cut(x=target.tolist(), **cut_kwargs)
     if (_preds.isna().sum() + _target.isna().sum()) == 0:
         fig, ax = plt.subplots(figsize=(13, 6), ncols=2)
         labelsize = "large"
