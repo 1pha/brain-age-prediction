@@ -1,8 +1,6 @@
+import os
 from pathlib import Path
 from typing import Any, Dict, NewType, Tuple, List
-
-Arguments = NewType("Arguments", Any)
-Logger = NewType("Logger", Any)
 
 import h5py
 import hydra
@@ -29,11 +27,14 @@ logger = get_logger(name=__name__)
 
 def open_scan(fname: str) -> Tuple[np.array, dict]:
     suffix = Path(fname).suffix
+    meta = None
     if suffix == ".npy":
         arr = open_npy(fname)
-        meta = None
     elif suffix == ".h5":
         arr, meta = open_h5(fname=fname)
+    elif suffix in {".nii", ".nii.gz"}:
+        arr = nib.load(filename=fname)
+        arr = arr.get_fdata()
     return arr, meta
 
 
@@ -53,6 +54,9 @@ def open_h5(fname: str) -> Tuple[np.ndarray, dict]:
 
 
 def open_h5_nifti(fname: str) -> nib.nifti1.Nifti1Image:
+    """ Open `.h5` file and returns into Nifti file.
+    Affine and other meta information will be stored in the nifti objects.
+    If affine is not found, we will use constants.BIOBANK_AFFINE as default. """
     with h5py.File(name=fname, mode="r") as hf:
         arr = hf["volume"][:]
         try:
@@ -67,75 +71,89 @@ def open_h5_nifti(fname: str) -> nib.nifti1.Nifti1Image:
     return nii
 
     
-class UKBDataset(Dataset):
+class DatasetBase(Dataset):
+    """ This Dataset class takes `.csv` labels with following scheme
+    cols: pid (primary_key) | label | abspath
+    
+    - Removal of duplicates will base on `pid`
+    - `__getitem__` will base on this csv
+    - Sanity checking on abspath will be done.
+    
+    - Make sure to use split csv for test data. Test data will NOT be splitted
+    - If dataset needs to be splitted based on their unique patient, provide `pid_col` 
+    """
+    NAME = ""
     def __init__(self,
-                 root: Path | str = "./biobank",
-                 label_name: str = None,
-                 mode: str = "train",
-                 valid_ratio: float = 0.1,
-                 extension: str = ".h5",
+                 root: Path | str,
+                 label_name: str,
+                 mode: str,
+                 valid_ratio: float,
+                 path_col: str,
+                 pk_col: str,
+                 pid_col: str,
+                 label_col: str,
                  exclusion_fname: str = "exclusion.csv",
                  augmentation: str = "monai",
                  seed: int = 42,):
         """ Here we treat same pid with scans from different timeline as independent dataset.
         Since multiple scans have different ages """
-        logger.info("Setting up UKBiobank Dataset")
-        
+        logger.info("Setting up %s Dataset", self.NAME)
+        self.path_col, self.pk_col, self.label_col = path_col, pk_col, label_col
+
         root = Path(root)
-        if label_name is None:
-            label_name = {"train": "ukb_trainval_age.csv",
-                          "valid": "ukb_trainval_age.csv",
-                          "test": "ukb_test_age.csv"}[mode]
-        labels = pd.read_csv(root / label_name)
-        self.labels = self.remove_duplicates(labels=labels)
+        labels: pd.DataFrame = self.load_labels(root=root, label_name=label_name, mode=mode)
+        labels: pd.DataFrame = self.remove_duplicates(labels=labels)
         self.mode = mode
 
-        pids = set(self.labels.fname.unique())
-        if not extension.startswith("."):
-            extension = f".{extension}"
-        files = sorted(root.rglob(f"*{extension}"))
-        files = list(filter(lambda f: f.stem in pids, files))
         if mode != "test":
-            files = self._split_data(files=files, valid_ratio=valid_ratio, mode=mode, seed=seed)
-        self.files = self._exclude_data(lst=files, root=root, exclusion_fname=exclusion_fname)
-        self.files = np.array(self.files) # To solve Memory leakage issue
-        logger.info("Total %s files of %s %s exist", len(self.files), mode, extension)
-
+            labels: pd.DataFrame = self._split_data(labels=labels, valid_ratio=valid_ratio,
+                                                    pid_col=pid_col, mode=mode, seed=seed)
+        
+        self.sanity_check(labels=labels, path_col=path_col)
+        self.labels = labels
         self.init_transforms(augmentation=augmentation)
+        logger.info("Total %s files of %s exist", len(self), mode)
+
+    def load_labels(self, root: Path, label_name: str = None, mode: str = None) -> pd.DataFrame:
+        """ Load `.csv` """
+        labels = pd.read_csv(root / label_name)
+        return labels
 
     def remove_duplicates(self, labels: pd.DataFrame) -> pd.DataFrame:
-        """ This method removes duplicate patients
-        who have undergone multiple scans """
-        _labels = labels.fname.apply(lambda s: s.split("_")[0])
-        _dups_bool = _labels.duplicated(keep=False)
-        labels = labels[~_dups_bool]
         return labels
 
     def _exclude_data(self,
                       lst: pd.DataFrame,
                       root: Path,
                       exclusion_fname: str = "exclusion.csv") -> List[Path]:
-        try:
-            exc = pd.read_csv(root / exclusion_fname, header=None)
-            exclusion = set(exc.values.flatten().tolist())
-            lst = [f for f in lst if f not in exclusion]
-        except:
-            logger.info("No exclusion file found. %s", root / exclusion_fname)
-            pass
         return lst
 
     def _split_data(self,
-                    files: List[Path],
+                    labels: pd.DataFrame,
                     valid_ratio: float = 0.1,
+                    pid_col: str = "",
                     mode: str = "train",
-                    seed: int = 42) -> Dict[str, List[Path]]:
+                    seed: int = 42) -> pd.DataFrame:
         # Data split, used fixated seed
-        trn, val = train_test_split(files, test_size=valid_ratio, random_state=seed)
-        files = {"train": trn, "valid": val}.get(mode, None)
-        if files is None:
+        if pid_col:
+            pid = labels[pid_col].unique().tolist()
+            trn_pid, val_pid = train_test_split(pid, test_size=valid_ratio, random_state=seed)
+            trn = labels[labels[pid_col].isin(trn_pid)]
+            val = labels[labels[pid_col].isin(val_pid)]
+        else:    
+            trn, val = train_test_split(labels, test_size=valid_ratio, random_state=seed)
+        labels = {"train": trn, "valid": val}.get(mode, None)
+        if labels is None:
             logger.exception(msg=f"Invalide mode given: {mode}")
             raise
-        return files
+        return labels
+    
+    def sanity_check(self, labels: pd.DataFrame, path_col: str):
+        paths = labels[path_col]
+        existence = paths.apply(os.path.exists)
+        exists = existence.sum()
+        num_file = len(paths)
+        assert exists == num_file, f"There are {num_file - exists} files that does not exist.\n{existence.tolist()}"
 
     def init_transforms(self, augmentation: str, spatial_size: tuple = (160, 192, 160)) -> None:
         # Currently unused and implemented inside the trainer
@@ -170,11 +188,11 @@ class UKBDataset(Dataset):
             self.transforms = mt.Identity()
 
     def _load_data(self, idx: int) -> Tuple[torch.Tensor]:
-        fname = self.files[idx]
-        arr, _ = open_scan(fname)
+        data: dict = self.labels.iloc[idx].to_dict()
+        arr, _ = open_scan(data[self.path_col])
         arr = torch.from_numpy(arr).type(dtype=torch.float32)
 
-        age = self.labels.query(f"fname == '{fname.stem}'").age.iloc[0]
+        age: int = data[self.label_col]
         age = torch.tensor(age, dtype=torch.long)
         return arr, age
 
@@ -190,7 +208,77 @@ class UKBDataset(Dataset):
         return dict(brain=arr, age=age)
 
     def __len__(self) -> int:
-        return len(self.files)
+        return len(self.labels)
+
+
+class UKBDataset(DatasetBase):
+    """ There are 45,800 .h5 scans inside the biobank directory.
+    However, there is a disjoint set between labels files PID and actual .h5 files
+    
+    biobank .h5: 45,800
+    label files: 40,940
+        trainval: 37,911
+        test_labels: 3,029
+
+    trainval - biobank = 1,236
+    test - biobank = 0 (all test_labels are included in actual h5)
+    biobank - (trainval | test) = 6,096
+    
+    Until Feb 20, 2024, the logic of loading the scan due to this discrepancy was as follows
+    1. Fetch all `.h5` scans in the biobank dir
+    2. Load labels `ukb_trainval_age.csv`/`ukb_test_age.csv`
+    3. Leave files that exist in the label file. Train/val split will be made w/ filelist from 2.
+    
+    From Feb 21, 2024, the label `.csv` file will include only existing files,
+    no longer sanity checking.
+    """
+    NAME = "UKBiobank"
+    def __init__(self,
+                 root: Path | str = "./biobank",
+                 label_name: str = None,
+                 mode: str = "train",
+                 valid_ratio: float = 0.1,
+                 path_col: str = "abs_path",
+                 pk_col: str = "fname",
+                 pid_col: str = "",
+                 label_col: str = "age",
+                 exclusion_fname: str = "exclusion.csv",
+                 augmentation: str = "monai",
+                 seed: int = 42,):
+        super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
+                         path_col=path_col, pk_col=pk_col, pid_col=pid_col, label_col=label_col,
+                         exclusion_fname=exclusion_fname, augmentation=augmentation, seed=seed)
+
+    def load_labels(self, root: Path, label_name: str = None, mode: str = None) -> pd.DataFrame:
+        """ Load `.csv` """
+        if label_name is None:
+            assert mode is not None, f"Provide `mode` for UKB dataset"
+            label_name = {"train": "ukb_trainval_age_exist240221.csv",
+                          "valid": "ukb_trainval_age_exist240221.csv",
+                          "test": "ukb_test_age_exist240221.csv"}[mode]
+        labels = super().load_labels(root=root, label_name=label_name, mode=mode)
+        return labels
+
+    def remove_duplicates(self, labels: pd.DataFrame) -> pd.DataFrame:
+        """ This method removes duplicate patients
+        who have undergone multiple scans """
+        _labels = labels.fname.apply(lambda s: s.split("_")[0])
+        _dups_bool = _labels.duplicated(keep=False)
+        labels = labels[~_dups_bool]
+        return labels
+
+    def _exclude_data(self,
+                      lst: pd.DataFrame,
+                      root: Path,
+                      exclusion_fname: str = "exclusion.csv") -> List[Path]:
+        try:
+            exc = pd.read_csv(root / exclusion_fname, header=None)
+            exclusion = set(exc.values.flatten().tolist())
+            lst = [f for f in lst if f not in exclusion]
+        except:
+            logger.info("No exclusion file found. %s", root / exclusion_fname)
+            pass
+        return lst
 
 
 class UKBClassification(UKBDataset):
@@ -206,11 +294,6 @@ class UKBClassification(UKBDataset):
                  verbose: bool = False):
         self.thresholds = {"young": young_threshold, "old": old_threshold}
         self.verbose = verbose
-        # TODO: Many variables are accessed by `self.`. Make sure they can be introduced
-        if label_name is None:
-            label_name = {"train": "ukb_trainval_age.csv",
-                          "valid": "ukb_trainval_age.csv",
-                          "test": "vbm.csv"}[mode]
         super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
                          exclusion_fname=exclusion_fname, seed=seed)
 

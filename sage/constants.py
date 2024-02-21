@@ -16,4 +16,9 @@ BIOBANK_AFFINE = np.array([[ -1.,  0.,  0.,   90.],
 
 # Reshape target size
 SPATIAL_SIZE = (160, 192, 160)
-BIOBANK_PATH = Path.home() / "brain-age-prediction" / "biobank"
+
+DATA_BASE = Path.home() / "data" / "hdd01" / "1pha"
+BIOBANK_PATH = DATA_BASE / "h5"
+
+EXT_BASE = DATA_BASE / "brain"
+PPMI_DIR = EXT_BASE / "PPMI"
