@@ -1,0 +1,6 @@
+_target_: sage.data.mask.UKB_MaskDataset
+root: 
+label_name:
+mode: train
+valid_ratio: 0.1
+seed: ${misc.seed}
