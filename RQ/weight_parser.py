@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 
 import hydra
 import numpy as np
+import pandas as pd
 
 import constants as C
 import utils
@@ -149,8 +150,9 @@ class Weights:
         self.xai_dict = xai_dict
         return xai_dict
 
-    def load_xai_dict_indiv(self) -> Dict[str, List[float]]:
+    def load_xai_dict_indiv(self) -> pd.DataFrame:
         xai_dict_indiv = utils.load_json(path=self.xai_path / "xai_dict_indiv.json")
+        xai_dict_indiv = pd.DataFrame(xai_dict_indiv)
         self.xai_dict_indiv = xai_dict_indiv
         return xai_dict_indiv
 
@@ -158,6 +160,22 @@ class Weights:
         self.attrs = np.load(self.xai_path / "attrs.npy")
         self.top_attr = np.load(self.xai_path / "top_attr.npy")
         return dict(attrs=self.attrs, top_attr=self.top_attr)
+    
+    def normalize_df(self, df: pd.DataFrame = None):
+        """Treat each column as a single vector and normalize row-wise,
+        so that norm of df.iloc[i, :] goes to 1.
+        This is to generate a normalized vector for each row (=test subject, 3,029 rows),
+        and calculate patient2patient similarity and get a matrix."""
+        if df is None:
+            df = self.load_xai_dict_indiv()
+        cond = ~df.isna().all() # Remove RoI with all nan values
+        df = df.loc[:, cond]
+        arr = df.values
+        nr, nc = arr.shape
+        norm = np.linalg.norm(x=arr, axis=1).repeat(nc).reshape(nr, nc)
+        arr = arr / norm
+        arr = np.nan_to_num(x=arr, nan=0, posinf=0, neginf=0)
+        return arr
 
 
 class WeightAvg:

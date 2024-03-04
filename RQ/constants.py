@@ -1,4 +1,10 @@
 from pathlib import Path
+from nilearn.datasets import load_mni152_brain_mask
+
+
+mni_template = load_mni152_brain_mask()
+MNI_SHAPE = mni_template.get_fdata().shape
+MNI_AFFINE = mni_template.affine
 
 
 BASE = Path.home() / "codespace/brain-age-prediction"
@@ -27,5 +33,5 @@ WEIGHTS_LIST = ["convnext-base-42",
                 "resnet34-44"]
 
 MODELS = ["resnet10", "resnet18", "resnet34", "convnext-tiny", "convnext-base"]
-XAI_METHODS = ["gradxinput", "gcam_avg", "gbp", "deconv",
+XAI_METHODS = ["gradxinput", "gcam_avg", "gbp", #"deconv",
                "ggcam", "ggcam_avg", "deeplift", "ig"]

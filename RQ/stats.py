@@ -11,7 +11,7 @@ import utils as u
 logger = u.get_logger(name=__file__)
 
 
-def spearmanr_permutation(weight_avgs: List[weight_parser.WeightAvg], naming: str = "seed") -> Tuple[pd.DataFrame, pd.DataFrame]:
+def spearmanr_combination(weight_avgs: List[weight_parser.WeightAvg], naming: str = "seed") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """ Calculates spearmanr across all possible combinations"""
     corrs, pvals = [], []
     names = chain(*[[(f"{wa.model_name}_{seed}", wa) for seed in wa.seeds] for wa in weight_avgs])
