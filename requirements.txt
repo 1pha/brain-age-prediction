@@ -20,3 +20,4 @@ flake8
 pytest
 fire
 lion_pytorch
+python-dotenv
