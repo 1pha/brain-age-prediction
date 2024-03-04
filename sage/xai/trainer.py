@@ -39,6 +39,8 @@ class XPLModule(PLModule):
                  xai_method: str = "gbp",
                  baseline: bool = False,
                  atlas: str = "dkt",
+                 xai_init_kwarg: dict = None,
+                 xai_call_kwarg: dict = None,
                  ############################
                  test_loader: torch.utils.data.DataLoader = None,
                  predict_loader: torch.utils.data.DataLoader = None,
@@ -68,20 +70,15 @@ class XPLModule(PLModule):
                          save_dir)
         self.init_transforms(augmentation=augmentation)
 
-        # Dataloader sanity check
-        # if self.predict_dataloader:
-        #     assert self.predict_dataloader.batch_size == 1, "Predict dataloader should have batch_size=1 for XPL"
-        
-
         self.smaller_mask = utils.margin_mni_mask(return_pt=True)
         self.target_layer_index = target_layer_index
         self.top_k_percentile = top_k_percentile
         self.xai_method = xai_method
         self.baseline = baseline
         
-        self.configure_xai(model=self.model,
-                           xai_method=xai_method,
-                           target_layer_index=target_layer_index)
+        self.configure_xai(model=self.model, xai_method=xai_method,
+                           target_layer_index=target_layer_index,
+                           xai_init_kwarg=xai_init_kwarg, xai_call_kwarg=xai_call_kwarg)
         
         self.atlas = A.get_atlas(atlas_name=atlas)
 
@@ -93,7 +90,9 @@ class XPLModule(PLModule):
     def _configure_xai(self,
                        model: nn.Module | Callable,
                        xai_method: str = "gbp",
-                       target_layer_index: int = -1):
+                       target_layer_index: int = -1,
+                       xai_init_kwarg: dict = None,
+                       xai_call_kwarg: dict = None):
         forward_func = model._forward
         if xai_method == "gcam":
             xai = ca.LayerGradCam(forward_func=forward_func,
@@ -118,28 +117,42 @@ class XPLModule(PLModule):
             xai = ca.IntegratedGradients(forward_func=forward_func)
         elif xai_method == "lrp":
             xai = ca.LRP(model=model.backbone)
+        elif xai_method.startswith("smooth"):
+            if xai_method == "smooth_gbp":
+                attr_mtd = ca.GuidedBackprop(model=model.backbone)
+            elif xai_method == "smooth_gi":
+                attr_mtd = ca.InputXGradient(forward_func=model.backbone)
+            xai = ca.NoiseTunnel(attribution_method=attr_mtd)
+            if xai_call_kwarg is None:
+                xai_call_kwarg = dict(nt_type="smoothgrad", nt_samples=10)
         else:
             breakpoint()
+        self.xai_call_kwarg = dict() if xai_call_kwarg is None else xai_call_kwarg
         logger.info("Start XAI Inference of %s", xai_method.upper())
         return xai
 
     def configure_xai(self,
                       model: nn.Module,
                       xai_method: str = "gbp",
-                      target_layer_index: int = 1) -> None:
+                      target_layer_index: int = 1,
+                      xai_init_kwarg: dict = None,
+                      xai_call_kwarg: dict = None) -> None:
         name = model.NAME.lower()
         if name in ["resnet10", "resnet18", "resnet34", "convnext-tiny", "convnext-base"]:
-            # self.model = model.backbone
             self.xai = self._configure_xai(model=self.model, xai_method=xai_method,
-                                           target_layer_index=target_layer_index)
+                                           target_layer_index=target_layer_index,
+                                           xai_init_kwarg=xai_init_kwarg,
+                                           xai_call_kwarg=xai_call_kwarg)
 
         elif name == "swin_vit":
             if xai_method != "gcam":
                 self.xai = self._configure_xai(model=self.model, xai_method=xai_method,
-                                               target_layer_index=target_layer_index)
+                                               target_layer_index=target_layer_index,
+                                               xai_init_kwarg=xai_init_kwarg,
+                                               xai_call_kwarg=xai_call_kwarg)
             else:
                 breakpoint()
-                
+
     def upsample(self,
                  tensor: torch.Tensor,
                  target_shape: tuple = None,
@@ -192,10 +205,10 @@ class XPLModule(PLModule):
     def attribute(self, brain: torch.Tensor) -> torch.Tensor:
         # For integrated gradients with baseline (average brain) given.
         # brain: (B, C, H, W, D)
+        if hasattr(self, "xai_call_kwarg"):
+            attr_kwargs = self.xai_call_kwarg
         if self.xai_method == "ig" and self.baseline:
-            attr_kwargs = dict(baselines=self.baseline.to(self.device))
-        else:
-            attr_kwargs = dict()
+            attr_kwargs = attr_kwargs["baselines"] = self.baseline.to(self.device)
 
         if self.xai_method in ["gcam_avg", "ggcam_avg"]:
             attrs = []
