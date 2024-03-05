@@ -251,15 +251,16 @@ class PLModule(pl.LightningModule):
         
         output: dict = self.valid_metric(result["pred"], result["target"])
         self.log_result(output, unit="step", prog_bar=False)
-        
         self.validation_step_outputs.append(result)
 
     def on_validation_epoch_end(self):
         output: dict = self.valid_metric.compute()
         self.log_result(output, unit="epoch", prog_bar=True)
-        if output["pred"].ndim == 2:
+
+        result = utils._sort_outputs(outputs=self.validation_step_outputs)
+        if result["pred"].ndim == 2:
             """ Assuming prediction with (B, C) shape is a classification task"""
-            self.log_confusion_matrix(result=output)
+            self.log_confusion_matrix(result=result)
         self.validation_step_outputs.clear()
 
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):

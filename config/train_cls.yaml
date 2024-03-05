@@ -92,3 +92,8 @@ callbacks:
     logging_interval: step
     log_momentum: False
   
+  richsummary:
+    _target_: pytorch_lightning.callbacks.RichModelSummary
+
+  richpbar:
+    _target_: pytorch_lightning.callbacks.RichProgressBar
