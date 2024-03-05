@@ -73,6 +73,7 @@ class PLModule(pl.LightningModule):
         self.log_lr = manual_lr
         self.training_step_outputs = []
         self.validation_step_outputs = []
+        self.prediction_step_outputs = []
 
         self.init_transforms(augmentation=augmentation)
         self.save_dir = Path(save_dir)
@@ -265,7 +266,14 @@ class PLModule(pl.LightningModule):
 
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")
+        self.prediction_step_outputs.append(result)
         return result
+
+    def on_predict_end(self):
+        result = utils._sort_outputs(outputs=self.validation_step_outputs)
+        if result["pred"].ndim == 2:
+            """ Assuming prediction with (B, C) shape is a classification task"""
+            self.log_confusion_matrix(result=result)
 
     def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")

@@ -9,7 +9,7 @@ defaults:
   - model: convnext_cls
   - dataset: ppmi
   - scheduler: cosine_anneal_warmup
-  - optim: lion
+  - optim: adamw
 
 dataloader:
   _target_: torch.utils.data.DataLoader
@@ -30,6 +30,7 @@ module:
     spatial_size: [ 160 , 192 , 160 ]
   load_from_checkpoint: # for lightning
   load_model_ckpt: # For model checkpoint only
+  log_train_metrics: True
   separate_lr:
   save_dir: ${callbacks.checkpoint.dirpath}
 

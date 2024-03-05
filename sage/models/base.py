@@ -10,25 +10,13 @@ logger = get_logger(name=__file__)
 
 
 class ModelBase(nn.Module):
-    def __init__(self,
-                 backbone: nn.Module,
-                 criterion: nn.Module,
-                 name: str,
-                 task: str = "reg"):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__()
         logger.info("Start Initiating model %s", name.upper())
         # self.backbone = torch.compile(backbone)
         self.backbone = backbone
         self.criterion = criterion
         self.NAME = name
-        self.TASK = task
-
-    def forward(self, brain: torch.Tensor, age: torch.Tensor):
-        pred = self.backbone(brain).squeeze()
-        loss = self.criterion(pred, age.long())
-        return dict(loss=loss,
-                    pred=pred.detach().cpu(),
-                    target=age.detach().cpu().long())
 
     def _forward(self, brain: torch.Tensor):
         return self.backbone(brain)
@@ -45,7 +33,7 @@ class ModelBase(nn.Module):
             return s
         ckpt = {parse_ckpt(k): v for k, v in ckpt.items()}
         self.load_state_dict(ckpt)
-        
+
     def conv_layers(self):
         if hasattr(self.backbone, "conv_layers"):
             return self.backbone.conv_layers()
@@ -57,57 +45,38 @@ class ClsBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         pred = self.backbone(brain).squeeze()
         loss = self.criterion(pred, age.long())
-        return dict(loss=loss,
-                    pred=pred.detach().cpu(),
-                    target=age.detach().cpu().long())
+        return dict(loss=loss, pred=pred.detach().cpu(), target=age.detach().cpu().long())
 
 
 class RegBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         pred = self.backbone(brain).squeeze()
         loss = self.criterion(pred, age.float())
-        return dict(loss=loss,
-                    pred=pred.detach().cpu(),
-                    target=age.detach().cpu())
+        return dict(loss=loss, pred=pred.detach().cpu(), target=age.detach().cpu())
 
 
 class ResNet(RegBase):
-    def __init__(self,
-                 backbone: nn.Module,
-                 criterion: nn.Module,
-                 name: str):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
 class ConvNext(RegBase):
-    def __init__(self,
-                 backbone: nn.Module,
-                 criterion: nn.Module,
-                 name: str):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
 class ResNetCls(RegBase):
-    def __init__(self,
-                 backbone: nn.Module,
-                 criterion: nn.Module,
-                 name: str):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
 class ConvNextCls(RegBase):
-    def __init__(self,
-                 backbone: nn.Module,
-                 criterion: nn.Module,
-                 name: str):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
 class SFCNModel(ModelBase):
-    def __init__(self,
-                 backbone: nn.Module,
-                 criterion: nn.Module,
-                 name: str):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
         # TODO: bin_range interval and backbones' output_dim should be matched,
         # but they are separately hard-coded!
