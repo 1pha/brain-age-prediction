@@ -8,7 +8,7 @@ defaults:
   - _self_
   - model: convnext_cls
   - dataset: ppmi
-  - scheduler: cosine_anneal_warmup
+  - scheduler: exp_decay
   - optim: adamw
 
 dataloader:

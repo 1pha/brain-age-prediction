@@ -41,18 +41,18 @@ class ModelBase(nn.Module):
             return find_conv_modules(self.backbone)
 
 
-class ClsBase(ModelBase):
-    def forward(self, brain: torch.Tensor, age: torch.Tensor):
-        pred = self.backbone(brain).squeeze()
-        loss = self.criterion(pred, age.long())
-        return dict(loss=loss, pred=pred.detach().cpu(), target=age.detach().cpu().long())
-
-
 class RegBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         pred = self.backbone(brain).squeeze()
         loss = self.criterion(pred, age.float())
         return dict(loss=loss, pred=pred.detach().cpu(), target=age.detach().cpu())
+
+
+class ClsBase(ModelBase):
+    def forward(self, brain: torch.Tensor, age: torch.Tensor):
+        pred = self.backbone(brain).squeeze()
+        loss = self.criterion(pred, age.long())
+        return dict(loss=loss, pred=pred.detach().cpu(), target=age.detach().cpu().long())
 
 
 class ResNet(RegBase):
@@ -65,12 +65,12 @@ class ConvNext(RegBase):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
-class ResNetCls(RegBase):
+class ResNetCls(ClsBase):
     def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
-class ConvNextCls(RegBase):
+class ConvNextCls(ClsBase):
     def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
