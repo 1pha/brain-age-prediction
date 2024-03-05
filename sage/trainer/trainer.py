@@ -190,7 +190,7 @@ class PLModule(pl.LightningModule):
             """
             aug = getattr(self, f"{'train' if mode == 'train' else 'valid'}_transforms")
             batch["brain"] = aug(batch["brain"]).as_tensor()
-            batch["age"] = batch["age"].float()
+            batch["age"] = batch["age"]
             result: dict = self.model(**batch)
             return result
         except RuntimeError as e:
