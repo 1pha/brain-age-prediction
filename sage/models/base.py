@@ -25,11 +25,11 @@ class ModelBase(nn.Module):
 
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         pred = self.backbone(brain).squeeze()
-        loss = self.criterion(pred, age)
+        loss = self.criterion(pred, age.long())
         return dict(loss=loss,
                     pred=pred.detach().cpu(),
-                    target=age.detach().cpu())
-        
+                    target=age.detach().cpu().long())
+
     def _forward(self, brain: torch.Tensor):
         return self.backbone(brain)
 

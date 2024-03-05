@@ -2,6 +2,7 @@ _target_: sage.models.base.ConvNext
 backbone:
   _target_: sage.models.model_zoo.convnext.build_convnext
   model_name: convnext-base
+  num_classes: 4
 criterion:
-  _target_: torch.nn.BCEWithLogitsLoss
+  _target_: torch.nn.CrossEntropyLoss
 name: ConvNeXt-base

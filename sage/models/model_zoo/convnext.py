@@ -248,22 +248,22 @@ convnext_list = [
 ]
 
 
-def build_convnext(model_name: str = "convnext-base"):
+def build_convnext(model_name: str = "convnext-base", num_classes: int = 1):
 
     if model_name == "convnext-tiny":  # 3.3M
-        model = ConvNeXt(depths=[1, 1, 3, 1],
+        model = ConvNeXt(depths=[1, 1, 3, 1], num_classes=num_classes,
                          dims=[48, 96, 192, 384])
 
     elif (model_name == "convnext-small-dim") or (model_name == "convnext-small"):  # 12.5M
-        model = ConvNeXt(depths=[1, 1, 3, 1],
+        model = ConvNeXt(depths=[1, 1, 3, 1], num_classes=num_classes,
                          dims=[96, 192, 384, 768])
 
     elif model_name == "convnext-small-depth":  # 8.4M
-        model = ConvNeXt(depths=[3, 3, 9, 3],
+        model = ConvNeXt(depths=[3, 3, 9, 3], num_classes=num_classes,
                          dims=[48, 96, 192, 384])
 
     elif model_name == "convnext-base":
-        model = ConvNeXt(depths=[3, 3, 9, 3],
+        model = ConvNeXt(depths=[3, 3, 9, 3], num_classes=num_classes,
                          dims=[96, 192, 384, 768])
 
     return model
