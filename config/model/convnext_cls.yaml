@@ -1,4 +1,4 @@
-_target_: sage.models.base.ConvNext
+_target_: sage.models.base.ConvNextCls
 backbone:
   _target_: sage.models.model_zoo.convnext.build_convnext
   model_name: convnext-base
