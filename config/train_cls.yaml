@@ -6,60 +6,52 @@ hydra:
 
 defaults:
   - _self_
-  - model: resnet_cls
-  - dataset: biobank_cls
-  - scheduler: onecycle
+  - model: convnext_cls
+  - dataset: ppmi
+  - scheduler: cosine_anneal_warmup
+  - optim: lion
 
 dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 64
-  num_workers: 4
+  batch_size: 4
+  num_workers: 2
   pin_memory: True
   dataset: ${dataset}
-
-optim:
-  _target_: torch.optim.AdamW
-  lr: 1e-4
-  weight_decay: 1e-6
-  eps: 1e-8
 
 misc:
   seed: 42
   debug: False
-  modes: [ train, valid, test ]
+  modes: [ train, valid ]
 
 module:
   _target_: sage.trainer.PLModule
   _recursive_: False
   augmentation:
-    _target_: sage.data.augment
-    spatial_size: [ 96, 96, 96 ]
-  mask: False
-  mask_threshold: 0.1
+    spatial_size: [ 160 , 192 , 160 ]
   load_from_checkpoint: # for lightning
   load_model_ckpt: # For model checkpoint only
   separate_lr:
+  save_dir: ${callbacks.checkpoint.dirpath}
 
 metrics:
   acc:
     _target_: torchmetrics.Accuracy
-    task: binary
+    task: multiclass
+    num_classes: ${model.backbone.num_classes}
   f1:
     _target_: torchmetrics.F1Score
-    task: binary
+    task: multiclass
+    num_classes: ${model.backbone.num_classes}
   auroc:
     _target_: torchmetrics.AUROC
-    task: binary
+    task: multiclass
+    num_classes: ${model.backbone.num_classes}
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
   project: brain-age
   entity: 1pha
-  name: C ${model.name} | mask=${module.mask}
-  tags:
-    - model=${model.name}
-    - mask=${module.mask}
-    - CLS
+  name: C ${model.name}
 
 # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
 trainer:
@@ -69,7 +61,7 @@ trainer:
   accelerator: gpu
   gradient_clip_val: 1
   log_every_n_steps: 50
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 4
   # DEBUGGING FLAGS. TODO: Split
   # limit_train_batches: 0.001
   # limit_val_batches: 0.01
@@ -79,8 +71,8 @@ callbacks:
   checkpoint:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
-    filename: "{step}-valid_f1-{epoch/valid_BinaryF1Score:.3f}"
-    monitor: epoch/valid_BinaryF1Score
+    filename: "{step}-valid_f1-{epoch/valid_MulticlassF1Score:.3f}"
+    monitor: epoch/valid_MulticlassF1Score
     mode: max
     save_top_k: 1
     save_last: True
@@ -90,7 +82,7 @@ callbacks:
   # https://pytorch-lightning.readthedocs.io/en/stable/common/early_stopping.html
   early_stop:
     _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
-    monitor: epoch/valid_BinaryF1Score
+    monitor: epoch/valid_MulticlassF1Score
     mode: max
     patience: 10
 

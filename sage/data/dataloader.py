@@ -32,7 +32,7 @@ def open_scan(fname: str) -> Tuple[np.array, dict]:
         arr = open_npy(fname)
     elif suffix == ".h5":
         arr, meta = open_h5(fname=fname)
-    elif suffix in {".nii", ".nii.gz"}:
+    elif suffix in {".nii", ".nii.gz"} or str(fname).endswith(".nii.gz"):
         arr = nib.load(filename=fname)
         arr = arr.get_fdata()
     return arr, meta
@@ -70,7 +70,7 @@ def open_h5_nifti(fname: str) -> nib.nifti1.Nifti1Image:
     nii = nib.nifti1.Nifti1Image(dataobj=arr, affine=affine)
     return nii
 
-    
+
 class DatasetBase(Dataset):
     """ This Dataset class takes `.csv` labels with following scheme
     cols: pid (primary_key) | label | abspath
@@ -92,6 +92,8 @@ class DatasetBase(Dataset):
                  pk_col: str,
                  pid_col: str,
                  label_col: str,
+                 mod_col: str = None,
+                 modality: List[str] = None,
                  exclusion_fname: str = "exclusion.csv",
                  augmentation: str = "monai",
                  seed: int = 42,):
@@ -103,10 +105,12 @@ class DatasetBase(Dataset):
         root = Path(root)
         labels: pd.DataFrame = self.load_labels(root=root, label_name=label_name, mode=mode)
         labels: pd.DataFrame = self.remove_duplicates(labels=labels)
+        if mod_col and modality:
+            labels: pd.DataFrame = self.filter_data(labels=labels, col=mod_col, leave=modality)
         self.mode = mode
 
         if mode != "test":
-            labels: pd.DataFrame = self._split_data(labels=labels, valid_ratio=valid_ratio,
+            labels: pd.DataFrame = self.split_data(labels=labels, valid_ratio=valid_ratio,
                                                     pid_col=pid_col, mode=mode, seed=seed)
         
         self.sanity_check(labels=labels, path_col=path_col)
@@ -127,13 +131,18 @@ class DatasetBase(Dataset):
                       root: Path,
                       exclusion_fname: str = "exclusion.csv") -> List[Path]:
         return lst
+    
+    def filter_data(self, labels: pd.DataFrame, col: str, leave: List[str]) -> pd.DataFrame:
+        cond = labels[col].isin(set(leave))
+        labels = labels[cond]
+        return labels
 
-    def _split_data(self,
-                    labels: pd.DataFrame,
-                    valid_ratio: float = 0.1,
-                    pid_col: str = "",
-                    mode: str = "train",
-                    seed: int = 42) -> pd.DataFrame:
+    def split_data(self,
+                   labels: pd.DataFrame,
+                   valid_ratio: float = 0.1,
+                   pid_col: str = "",
+                   mode: str = "train",
+                   seed: int = 42) -> pd.DataFrame:
         # Data split, used fixated seed
         if pid_col:
             pid = labels[pid_col].unique().tolist()
@@ -320,15 +329,15 @@ class UKBClassification(UKBDataset):
         logger.info("#%s scans were excluded since they were not found as h5 files in biobank", len(passed))
         return files
 
-    def _split_data(self,
-                    files: list,
-                    valid_ratio: float = 0.1,
-                    mode: str = "train",
-                    seed: int = 42) -> pd.DataFrame:
+    def split_data(self,
+                   files: list,
+                   valid_ratio: float = 0.1,
+                   mode: str = "train",
+                   seed: int = 42) -> pd.DataFrame:
         """ Override function.
         Filters out data with age. """
         files = self._age_filter(files=files)
-        files = super()._split_data(files=files, valid_ratio=valid_ratio, mode=mode, seed=seed)
+        files = super().split_data(files=files, valid_ratio=valid_ratio, mode=mode, seed=seed)
         return files
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:

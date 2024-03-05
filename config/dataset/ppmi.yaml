@@ -1,6 +1,4 @@
-_target_: sage.data.mask.UKB_MaskDataset
-root: 
-label_name:
+_target_: sage.data.ppmi.PPMIClassification
 mode: train
 valid_ratio: 0.1
 seed: ${misc.seed}
