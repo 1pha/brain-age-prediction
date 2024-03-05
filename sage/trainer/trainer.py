@@ -12,6 +12,7 @@ from torch import nn
 from torchmetrics import MetricCollection
 import wandb
 import monai.transforms as mt
+from monai.data.meta_tensor import MetaTensor
 
 import sage
 import sage.xai.nilearn_plots as nilp_
@@ -179,6 +180,15 @@ class PLModule(pl.LightningModule):
     def configure_optimizers(self) -> torch.optim.Optimizer | dict:
         return self.opt_config
 
+    def get_tensor(self, tensor: torch.Tensor | MetaTensor) -> torch.Tensor:
+        """ monai.transforms return a internal tensor class called "Metatensor"
+        This datatype may throw an error for some functions from time to time. (e.g torch.compile)
+        Use this method to resolve the issue. """
+        if isinstance(tensor, MetaTensor):
+            # MetaTensor is not suitable for torch.compile
+            tensor = tensor.as_tensor()
+        return tensor
+
     def forward(self, batch, mode: str = "train"):
         try:
             """ model should return dict of
@@ -199,6 +209,12 @@ class PLModule(pl.LightningModule):
             logger.exception(e)
             breakpoint()
             raise e
+        
+    def log_confusion_matrix(self, result: dict):
+        probs = result["pred"].cpu().detach()
+        labels = result["target"].cpu().numpy()
+        cf = wandb.plot.confusion_matrix(probs=probs, y_true=labels)
+        self.logger.experiment.log({"confusion_matrix": cf})
 
     def log_result(self, output: dict, unit: str = "step", prog_bar: bool = False):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
@@ -241,8 +257,11 @@ class PLModule(pl.LightningModule):
     def on_validation_epoch_end(self):
         output: dict = self.valid_metric.compute()
         self.log_result(output, unit="epoch", prog_bar=True)
+        if output["pred"].ndim == 2:
+            """ Assuming prediction with (B, C) shape is a classification task"""
+            self.log_confusion_matrix(result=output)
         self.validation_step_outputs.clear()
-    
+
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")
         return result
