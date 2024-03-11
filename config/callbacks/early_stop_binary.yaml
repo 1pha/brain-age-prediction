@@ -1,0 +1,4 @@
+  _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
+  monitor: epoch/valid_BinaryF1Score
+  mode: max
+  patience: 10
