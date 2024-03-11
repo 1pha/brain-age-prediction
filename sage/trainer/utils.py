@@ -136,6 +136,7 @@ def _reg_inference(preds, target, root_dir, run_name) -> float:
     fig.suptitle(run_name)
     fig.tight_layout()
     fig.savefig(root_dir / f"{run_name}-kde.png")
+    plt.close()
     return mse
     
 
@@ -196,6 +197,7 @@ def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
         fig.suptitle(run_name, size=titlesize)
         fig.tight_layout()
         fig.savefig(root_dir / f"{run_name}-cf.png")
+        plt.close()
 
 
 def _cls_inference(preds, target, root_dir, run_name) -> float:
@@ -214,6 +216,7 @@ def _cls_inference(preds, target, root_dir, run_name) -> float:
     p = sns.heatmap(cf, annot=True, fmt="d")
     p.set_title(run_name)
     plt.savefig(root_dir / f"{run_name}-cf.png")
+    plt.close()
     return acc
 
 
