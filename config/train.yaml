@@ -19,9 +19,5 @@ defaults:
   - callbacks/early_stop: reg
   - callbacks/lr_monitor: default
   - callbacks/richsummary: default
+  - callbacks/manual_ckpt: anchor
   - misc: default
-
-callbacks:
-  manual_ckpt:
-    _target_: sage.trainer.callbacks.AnchorCheckpoint
-    multiplier: 1

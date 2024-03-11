@@ -1,0 +1,2 @@
+  _target_: sage.trainer.callbacks.AnchorCheckpoint
+  multiplier: 1
