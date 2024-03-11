@@ -55,19 +55,16 @@ def tune(batch_size: int = 64,
 
 
 def _sort_outputs(outputs):
-    try:
-        result = dict()
-        keys: list = outputs[0].keys()
-        for key in keys:
-            data = outputs[0][key]
-            if data.ndim == 0:
-                # Scalar value result
-                result[key] = torch.stack([o[key] for o in outputs if key in o])
-            elif data.ndim in [1, 2]:
-                # Batched 
-                result[key] = torch.concat([o[key] for o in outputs if key in o])
-    except:
-        breakpoint()
+    result = dict()
+    keys: list = outputs[0].keys()
+    for key in keys:
+        data = outputs[0][key]
+        if data.ndim == 0:
+            # Scalar value result
+            result[key] = torch.stack([o[key] for o in outputs if key in o])
+        elif data.ndim in [1, 2]:
+            # Batched 
+            result[key] = torch.concat([o[key] for o in outputs if key in o])
     return result
 
 
@@ -99,18 +96,21 @@ def finalize_inference(prediction: list,
     # 2. Log Predictions
     run_name = save_name[:-4] + "_" + timestamp()
     preds, target = prediction["pred"], prediction["target"]
+    infer_kwargs = dict(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
     if name.startswith("C"):
         logger.info("Classification data given:")
-        _cls_inference(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
+        metric = _cls_inference(**infer_kwargs)
     elif name[0] in set(["R", "M"]):
         logger.info("Regression data given:")
-        _reg_inference(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
-        _get_norm_cf_reg(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
+        metric = _reg_inference(**infer_kwargs)
+        _get_norm_cf_reg(**infer_kwargs)
     else:
         logger.info("Failed to inference. Check the run name for the task.")
+        metric = None
+    return metric
 
 
-def _reg_inference(preds, target, root_dir, run_name) -> None:
+def _reg_inference(preds, target, root_dir, run_name) -> float:
     mse = tmf.mean_squared_error(preds=preds, target=target)
     mae = tmf.mean_absolute_error(preds=preds, target=target)
     r2 = tmf.r2_score(preds=preds, target=target)
@@ -136,6 +136,7 @@ def _reg_inference(preds, target, root_dir, run_name) -> None:
     fig.suptitle(run_name)
     fig.tight_layout()
     fig.savefig(root_dir / f"{run_name}-kde.png")
+    return mse
     
 
 def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
@@ -197,7 +198,7 @@ def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
         fig.savefig(root_dir / f"{run_name}-cf.png")
 
 
-def _cls_inference(preds, target, root_dir, run_name) -> None:
+def _cls_inference(preds, target, root_dir, run_name) -> float:
     metrics_input = dict(preds=preds,
                          target=target.int(),
                          task="binary")
@@ -213,6 +214,7 @@ def _cls_inference(preds, target, root_dir, run_name) -> None:
     p = sns.heatmap(cf, annot=True, fmt="d")
     p.set_title(run_name)
     plt.savefig(root_dir / f"{run_name}-cf.png")
+    return acc
 
 
 def brain2augment(brain: torch.Tensor) -> torch.Tensor:

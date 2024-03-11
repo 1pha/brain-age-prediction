@@ -1,7 +1,6 @@
-import os
 import random
 import subprocess
-from typing import Any
+from typing import Any, List, Dict
 from pathlib import Path
 
 import hydra
@@ -39,6 +38,7 @@ class PLModule(pl.LightningModule):
                  load_model_ckpt: str = None,
                  load_from_checkpoint: str = None, # unused params but requires for instantiation
                  separate_lr: dict = None,
+                 task: str = None,
                  save_dir: str = None):
         super().__init__()
         self.model = model
@@ -77,6 +77,7 @@ class PLModule(pl.LightningModule):
 
         self.init_transforms(augmentation=augmentation)
         self.save_dir = Path(save_dir)
+        self.task = task
         
     def setup(self, stage):
         self.log_brain(return_path=False)
@@ -88,7 +89,7 @@ class PLModule(pl.LightningModule):
             mt.ScaleIntensity(channel_wise=True),
             mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
             mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
-            mt.RandAxisFlip(prob=0.5),
+            # mt.RandAxisFlip(prob=0.5),
             mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
             mt.Lambda(func=utils.augment2brain),
         ])
@@ -211,6 +212,22 @@ class PLModule(pl.LightningModule):
             breakpoint()
             raise e
         
+    def move_device(self,
+                    result: Dict[str, torch.Tensor],
+                    exclude_keys: List[str] = ["loss"]) -> Dict[str, torch.Tensor]:
+        """ ModelBase returns a dictionary with model output,
+        including prediction, logits, ground truth.
+        However, these values shuold be shifted from cuda to cpu, due to VRAM consuming issue.
+        This was moved back to cpu in ModelBase,
+        but most torchmetrics functions require logits and ground truth to be on cuda
+        (more precisely, to be on the same device with torchmetrics)
+        Therefore, we keep other keys in cuda and move back to cpu after metric calculation.
+        """
+        for key in result:
+            if key not in exclude_keys:
+                result[key] = result[key].to("cpu")
+        return result
+    
     def log_confusion_matrix(self, result: dict):
         probs = result["pred"].cpu().detach()
         labels = result["target"].cpu().numpy()
@@ -227,12 +244,12 @@ class PLModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         result: dict = self.forward(batch, mode="train")
         self.log(name="train_loss", value=result["loss"], prog_bar=True)
-        
+
         if self.log_train_metrics:
             output: dict = self.train_metric(result["pred"], result["target"])
             self.log_result(output=output, unit="step", prog_bar=False)
-            self.training_step_outputs.append(result)
-        
+            self.training_step_outputs.append(self.move_device(result=result))
+
         if self.log_lr:
             # Since `ModelCheckpoint` cannot track learning rate automatically,
             # We log learning rate explicitly and monitor this
@@ -249,10 +266,9 @@ class PLModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         result: dict = self.forward(batch, mode="valid")
         self.log(name="valid_loss", value=result["loss"], prog_bar=True)
-        
         output: dict = self.valid_metric(result["pred"], result["target"])
         self.log_result(output, unit="step", prog_bar=False)
-        self.validation_step_outputs.append(result)
+        self.validation_step_outputs.append(self.move_device(result=result))
 
     def on_validation_epoch_end(self):
         output: dict = self.valid_metric.compute()
@@ -270,7 +286,7 @@ class PLModule(pl.LightningModule):
         return result
 
     def on_predict_end(self):
-        result = utils._sort_outputs(outputs=self.validation_step_outputs)
+        result = utils._sort_outputs(outputs=self.prediction_step_outputs)
         if result["pred"].ndim == 2:
             """ Assuming prediction with (B, C) shape is a classification task"""
             self.log_confusion_matrix(result=result)
@@ -349,8 +365,9 @@ def train(config: omegaconf.DictConfig) -> None:
         pass
     else:
         # Hard-code config uploading
+        resolve = not "sweep" in config.hydra
         wandb.config.update(
-            omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+            omegaconf.OmegaConf.to_container(config, resolve=resolve, throw_on_missing=resolve)
         )
 
     # Callbacks
@@ -361,13 +378,23 @@ def train(config: omegaconf.DictConfig) -> None:
                 train_dataloaders=dataloaders["train"],
                 val_dataloaders=dataloaders["valid"],
                 ckpt_path=config.misc.get("ckpt_path", None))
+    
     if dataloaders["test"]:
         logger.info("Test dataset given. Start inference on %s", len(dataloaders["test"].dataset))
         prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["test"])
-        utils.finalize_inference(prediction=prediction, name=config.logger.name,
-                                 root_dir=Path(config.callbacks.checkpoint.dirpath))
+        metric = utils.finalize_inference(prediction=prediction, name=config.logger.name,
+                                          root_dir=Path(config.callbacks.checkpoint.dirpath))
+    elif dataloaders["valid"]:
+        logger.info("Test dataset not found. Start inference on validation dataset %s",
+                    len(dataloaders["valid"].dataset))
+        prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["valid"])
+        metric = utils.finalize_inference(prediction=prediction, name=config.logger.name,
+                                          root_dir=Path(config.callbacks.checkpoint.dirpath))
+        
     if config_update:
-        wandb.config.update(omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True))
+        wandb.config.update(omegaconf.OmegaConf.to_container(config, resolve=True,
+                                                             throw_on_missing=True))
+    return metric
 
 
 def inference(config: omegaconf.DictConfig,
