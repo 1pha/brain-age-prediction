@@ -1,0 +1,7 @@
+_target_: pytorch_lightning.loggers.WandbLogger
+project: brain-age
+entity: 1pha
+name: M ${dataset.mask_idx} | ${misc.seed}
+tags:
+  - model=${model.name}
+  - MASK

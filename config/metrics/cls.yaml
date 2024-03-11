@@ -1,0 +1,14 @@
+acc:
+  _target_: torchmetrics.Accuracy
+  task: multiclass
+  num_classes: ${model.backbone.num_classes}
+  average: weighted
+f1:
+  _target_: torchmetrics.F1Score
+  task: multiclass
+  num_classes: ${model.backbone.num_classes}
+  average: macro
+auroc:
+  _target_: torchmetrics.AUROC
+  task: multiclass
+  num_classes: ${model.backbone.num_classes}

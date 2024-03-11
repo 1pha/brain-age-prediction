@@ -1,0 +1,9 @@
+_target_: sage.trainer.PLModule
+_recursive_: False
+augmentation:
+  spatial_size: [ 160 , 192 , 160 ]
+load_from_checkpoint: # for lightning
+load_model_ckpt: # For model checkpoint only
+log_train_metrics: True
+separate_lr:
+save_dir: ${callbacks.checkpoint.dirpath}

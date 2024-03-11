@@ -1,0 +1,11 @@
+acc:
+  _target_: torchmetrics.Accuracy
+  task: binary
+  average: weighted
+f1:
+  _target_: torchmetrics.F1Score
+  task: binary
+  average: macro
+auroc:
+  _target_: torchmetrics.AUROC
+  task: binary

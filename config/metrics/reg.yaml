@@ -1,0 +1,9 @@
+mae:
+  _target_: torchmetrics.MeanAbsoluteError
+rmse:
+  _target_: torchmetrics.MeanSquaredError
+  squared: False
+corr:
+  _target_: torchmetrics.PearsonCorrCoef
+r2:
+  _target_: torchmetrics.R2Score
