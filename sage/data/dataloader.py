@@ -92,6 +92,7 @@ class DatasetBase(Dataset):
                  pk_col: str,
                  pid_col: str,
                  label_col: str,
+                 strat_col: str = None,
                  mod_col: str = None,
                  modality: List[str] = None,
                  exclusion_fname: str = "exclusion.csv",
@@ -111,8 +112,12 @@ class DatasetBase(Dataset):
 
         if mode != "test":
             labels: pd.DataFrame = self.split_data(labels=labels, valid_ratio=valid_ratio,
-                                                    pid_col=pid_col, mode=mode, seed=seed)
-        
+                                                   strat_col=strat_col, pid_col=pid_col,
+                                                   mode=mode, seed=seed)
+        if exclusion_fname:
+            labels: pd.DataFrame = self._exclude_data(labels=labels, pk_col=pk_col, root=root,
+                                                      exclusion_fname=exclusion_fname)
+
         self.sanity_check(labels=labels, path_col=path_col)
         self.labels = labels
         self.init_transforms(augmentation=augmentation)
@@ -126,11 +131,10 @@ class DatasetBase(Dataset):
     def remove_duplicates(self, labels: pd.DataFrame) -> pd.DataFrame:
         return labels
 
-    def _exclude_data(self,
-                      lst: pd.DataFrame,
-                      root: Path,
+    def _exclude_data(self, labels: pd.DataFrame, pk_col: str, root: Path,
                       exclusion_fname: str = "exclusion.csv") -> List[Path]:
-        return lst
+        """ Needs overrides for future usage. """
+        return labels
     
     def filter_data(self, labels: pd.DataFrame, col: str, leave: List[str]) -> pd.DataFrame:
         cond = labels[col].isin(set(leave))
@@ -141,12 +145,15 @@ class DatasetBase(Dataset):
                    labels: pd.DataFrame,
                    valid_ratio: float = 0.1,
                    pid_col: str = "",
+                   strat_col: str = None,
                    mode: str = "train",
                    seed: int = 42) -> pd.DataFrame:
         # Data split, used fixated seed
         if pid_col:
-            pid = labels[pid_col].unique().tolist()
-            trn_pid, val_pid = train_test_split(pid, test_size=valid_ratio, random_state=seed)
+            _labels = labels.drop_duplicates(subset=pid_col)
+            pid = _labels[pid_col]
+            y = _labels[strat_col] if strat_col else None
+            trn_pid, val_pid = train_test_split(pid, test_size=valid_ratio, random_state=seed, stratify=y)
             trn = labels[labels[pid_col].isin(trn_pid)]
             val = labels[labels[pid_col].isin(val_pid)]
         else:    

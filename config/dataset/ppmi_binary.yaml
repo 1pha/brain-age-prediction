@@ -1,0 +1,4 @@
+_target_: sage.data.ppmi.PPMIBinary
+mode: train
+valid_ratio: 0.1
+seed: ${misc.seed}

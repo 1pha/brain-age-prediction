@@ -25,6 +25,7 @@ class PPMIBase(DatasetBase):
                  pk_col: str = "Image Data ID",
                  pid_col: str = "Subject",
                  label_col: str = "Group",
+                 strat_col: str = "Group",
                  mod_col: str = "Description",
                  modality: List[str] = ["t1"],
                  exclusion_fname: str = "exclusion.csv",
@@ -33,8 +34,8 @@ class PPMIBase(DatasetBase):
         modality = [self.MOD_MAPPER[m] for m in modality]
         super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
                          path_col=path_col, pk_col=pk_col, pid_col=pid_col, label_col=label_col,
-                         mod_col=mod_col, modality=modality, exclusion_fname=exclusion_fname,
-                         augmentation=augmentation, seed=seed)
+                         strat_col=strat_col, mod_col=mod_col, modality=modality,
+                         exclusion_fname=exclusion_fname, augmentation=augmentation, seed=seed)
 
     def _load_data(self, idx: int) -> Tuple[torch.Tensor]:
         """ Make sure to properly return PPMI """
@@ -52,11 +53,15 @@ class PPMIClassification(PPMIBase):
                  pk_col: str = "Image Data ID",
                  pid_col: str = "Subject",
                  label_col: str = "Group",
+                 strat_col: str = "Group",
+                 mod_col: str = "Description",
+                 modality: List[str] = ["t1"],
                  exclusion_fname: str = "exclusion.csv",
                  augmentation: str = "monai",
                  seed: int = 42,):
         super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
                          path_col=path_col, pk_col=pk_col, pid_col=pid_col, label_col=label_col,
+                         strat_col=strat_col, mod_col=mod_col, modality=modality,
                          exclusion_fname=exclusion_fname, augmentation=augmentation, seed=seed)
 
     def _load_data(self, idx: int) -> Tuple[torch.Tensor]:
@@ -73,6 +78,29 @@ class PPMIClassification(PPMIBase):
         return arr, label
 
 
+class PPMIBinary(PPMIClassification):
+    NAME = "PPMI-Binary"
+    def __init__(self,
+                 root: Path | str = C.PPMI_DIR,
+                 label_name: str = "ppmi_binary_label.csv",
+                 mode: str = "train",
+                 valid_ratio: float = .1,
+                 path_col: str = "abs_path",
+                 pk_col: str = "Image Data ID",
+                 pid_col: str = "Subject",
+                 label_col: str = "Group",
+                 strat_col: str = "Group",
+                 mod_col: str = "Description",
+                 modality: List[str] = ["t1"],
+                 exclusion_fname: str = "exclusion.csv",
+                 augmentation: str = "monai",
+                 seed: int = 42,):
+        super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
+                         path_col=path_col, pk_col=pk_col, pid_col=pid_col, label_col=label_col,
+                         strat_col=strat_col, mod_col=mod_col, modality=modality,
+                         exclusion_fname=exclusion_fname, augmentation=augmentation, seed=seed)
+
+
 class PPMIAgeRegression(PPMIBase):
     NAME = "PPMI_AGE"
     def __init__(self,
@@ -84,11 +112,15 @@ class PPMIAgeRegression(PPMIBase):
                  pk_col: str = "Image Data ID",
                  pid_col: str = "Subject",
                  label_col: str = "Age",
+                 strat_col: str = None,
+                 mod_col: str = "Description",
+                 modality: List[str] = ["t1"],
                  exclusion_fname: str = "exclusion.csv",
                  augmentation: str = "monai",
                  seed: int = 42,):
         super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
                          path_col=path_col, pk_col=pk_col, pid_col=pid_col, label_col=label_col,
+                         strat_col=strat_col, mod_col=mod_col, modality=modality,
                          exclusion_fname=exclusion_fname, augmentation=augmentation, seed=seed)
 
     def _load_data(self, idx: int) -> Tuple[torch.Tensor]:
