@@ -45,8 +45,7 @@ def override_config(hydra_config: omegaconf.DictConfig,
         if nkeys == 1:
             # If no . found in key
             # This implies override from defaults
-            _subcfg = load_sweep_yaml(config_path=f"{config_path}/{key}",
-                                      config_name=f"{value}.yaml")
+            _subcfg = load_yaml(config_path=f"{config_path}/{key}", config_name=f"{value}.yaml")
             hydra_config[key] = _subcfg
         else:
             _c = hydra_config[key_list[0]]
@@ -56,8 +55,10 @@ def override_config(hydra_config: omegaconf.DictConfig,
                 else:
                     _c[_k] = value
     if "sweep" in hydra_config.hydra:
+        # Configure directory for sweep. sweep_main_dir/subdir
         hydra_config.hydra.sweep.subdir = "_".join([f"{k}={v}" for k, v in update_dict.items()])
-        hydra_config.callbacks.checkpoint.dirpath = hydra_config.hydra.sweep.subdir
+        dirpath = f"{hydra_config.hydra.sweep.dir}/{hydra_config.hydra.sweep.subdir}"
+        hydra_config.callbacks.checkpoint.dirpath = dirpath
     return hydra_config
 
 
@@ -65,16 +66,12 @@ def load_default_hydra_config(config_path: str = "config",
                               config_name: str = "train.yaml",
                               version_base="1.1",
                               overrides: List[str] = []) -> omegaconf.DictConfig:
-    """ In order to apply wandb.sweep into lightning,
-    we need to remove wandb.callback arguments that was used to log the original experiment.
-    """
     with hydra.initialize(config_path=config_path, version_base=version_base):
-        config = hydra.compose(config_name=config_name,
-                               overrides=overrides, return_hydra_config=True)
+        config = hydra.compose(config_name=config_name, overrides=overrides, return_hydra_config=True)
     return config
 
 
-def load_sweep_yaml(config_path: str = "config/sweep", config_name: str = "sweep.yaml") -> dict:
+def load_yaml(config_path: str = "config/sweep", config_name: str = "sweep.yaml") -> dict:
     with open(os.path.join(config_path, config_name), mode="r") as f:
         sweep_cfg = yaml.load(stream=f, Loader=yaml.FullLoader)
     return sweep_cfg
@@ -82,7 +79,7 @@ def load_sweep_yaml(config_path: str = "config/sweep", config_name: str = "sweep
 
 def main(config: omegaconf.DictConfig, config_path: str = "config") -> float:
     wandb.init(project="brain-age")
-    print(wandb.config)
+    logger.info("Sweep Config: %s", wandb.config)
     updated_config = override_config(hydra_config=config,
                                      update_dict=wandb.config,
                                      config_path=config_path)
@@ -103,7 +100,7 @@ if __name__=="__main__":
     func: Callable = partial(main, config=config, config_path=args.config_path)
 
     # Load wandb.sweep configuration and instantiation
-    sweep_cfg = load_sweep_yaml(config_path=os.path.join(args.config_path, "sweep"),
-                                config_name=args.sweep_cfg_name)
+    sweep_cfg = load_yaml(config_path=os.path.join(args.config_path, "sweep"),
+                          config_name=args.sweep_cfg_name)
     sweep_id = wandb.sweep(sweep=sweep_cfg, project=args.wandb_project, entity=args.wandb_entity)
     wandb.agent(sweep_id=sweep_id, function=func)

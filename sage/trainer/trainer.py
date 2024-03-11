@@ -78,10 +78,10 @@ class PLModule(pl.LightningModule):
         self.init_transforms(augmentation=augmentation)
         self.save_dir = Path(save_dir)
         self.task = task
-        
+
     def setup(self, stage):
         self.log_brain(return_path=False)
-        
+
     def init_transforms(self, augmentation: omegaconf.DictConfig):
         self.train_transforms = mt.Compose([
             mt.Lambda(func=utils.brain2augment),
@@ -89,7 +89,7 @@ class PLModule(pl.LightningModule):
             mt.ScaleIntensity(channel_wise=True),
             mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
             mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
-            # mt.RandAxisFlip(prob=0.5),
+            mt.RandAxisFlip(prob=0.5),
             mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
             mt.Lambda(func=utils.augment2brain),
         ])
@@ -227,12 +227,20 @@ class PLModule(pl.LightningModule):
             if key not in exclude_keys:
                 result[key] = result[key].to("cpu")
         return result
-    
+
     def log_confusion_matrix(self, result: dict):
-        probs = result["pred"].cpu().detach()
+        probs = result["pred"]
+        if probs.ndim == 1:
+            # Binary classification
+            probs = torch.nn.functional.sigmoid(probs)
+            probs = torch.stack([1-probs, probs]).T.cpu().numpy()
+        else:
+            probs = probs.cpu().detach()
         labels = result["target"].cpu().numpy()
         cf = wandb.plot.confusion_matrix(probs=probs, y_true=labels)
-        self.logger.experiment.log({"confusion_matrix": cf})
+        roc = wandb.plot.roc_curve(y_true=labels, y_probas=probs)
+        pr = wandb.plot.pr_curve(y_true=labels, y_probas=probs)
+        self.logger.experiment.log({"confusion_matrix": cf, "roc_curve": roc, "pr_curve": pr})
 
     def log_result(self, output: dict, unit: str = "step", prog_bar: bool = False):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
@@ -262,6 +270,7 @@ class PLModule(pl.LightningModule):
             output: dict = self.train_metric.compute()
             self.log_result(output, unit="epoch")
             self.training_step_outputs.clear()
+            self.train_metric.reset()
 
     def validation_step(self, batch, batch_idx):
         result: dict = self.forward(batch, mode="valid")
@@ -275,10 +284,10 @@ class PLModule(pl.LightningModule):
         self.log_result(output, unit="epoch", prog_bar=True)
 
         result = utils._sort_outputs(outputs=self.validation_step_outputs)
-        if result["pred"].ndim == 2:
-            """ Assuming prediction with (B, C) shape is a classification task"""
+        if utils.check_classification(result=result):
             self.log_confusion_matrix(result=result)
         self.validation_step_outputs.clear()
+        self.valid_metric.reset()
 
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")
@@ -287,8 +296,7 @@ class PLModule(pl.LightningModule):
 
     def on_predict_end(self):
         result = utils._sort_outputs(outputs=self.prediction_step_outputs)
-        if result["pred"].ndim == 2:
-            """ Assuming prediction with (B, C) shape is a classification task"""
+        if utils.check_classification(result=result):
             self.log_confusion_matrix(result=result)
 
     def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):

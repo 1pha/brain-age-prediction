@@ -265,3 +265,14 @@ def augment2brain(brain: torch.Tensor) -> torch.Tensor:
         C = brain.shape[1]
         assert C == 1, f"Brain should have single-channel: #channels = {C}"
     return brain
+
+
+def check_classification(result: dict) -> bool:
+    pred, target = result["pred"], result["target"]
+    if pred.ndim == 2:
+        return True
+    elif (pred.ndim == 1) & (target.unique().size(0) == 2):
+        # Binary case
+        return True
+    else:
+        return False
