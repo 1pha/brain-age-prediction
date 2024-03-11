@@ -45,14 +45,14 @@ class RegBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         pred = self.backbone(brain).squeeze()
         loss = self.criterion(pred, age.float())
-        return dict(loss=loss, pred=pred.detach().cpu(), target=age.detach().cpu())
+        return dict(loss=loss, pred=pred.detach(), target=age.detach())
 
 
 class ClsBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
         pred = self.backbone(brain).squeeze()
         loss = self.criterion(pred, age.long())
-        return dict(loss=loss, pred=pred.detach().cpu(), target=age.detach().cpu().long())
+        return dict(loss=loss, pred=pred.detach(), target=age.detach().long())
 
 
 class ResNet(RegBase):

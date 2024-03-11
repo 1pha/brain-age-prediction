@@ -2,7 +2,8 @@ _target_: sage.models.base.ResNetCls
 backbone:
   _target_: sage.models.model_zoo.resnet.build_resnet
   model_depth: 10
-  num_classes: 1
+  num_classes: 4
 criterion:
-  _target_: torch.nn.BCEWithLogitsLoss
+  _target_: torch.nn.CrossEntropyLoss
+  label_smoothing: 0.0
 name: resnet10t
