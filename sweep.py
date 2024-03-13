@@ -1,5 +1,6 @@
 import os
 import ast
+from copy import deepcopy
 import argparse
 from functools import partial
 from typing import List, Callable
@@ -21,7 +22,7 @@ def parse_args():
     parser.add_argument("--config_path", default="config", type=str, help="")
     parser.add_argument("--config_name", default="train.yaml", type=str, help="")
     parser.add_argument("--overrides", default="", type=str, help="")
-    parser.add_argument("--version_base", default="1.1", type=str, help="")
+    parser.add_argument("--version_base", default="1.3", type=str, help="")
 
     parser.add_argument("--sweep_cfg_name", default="sweep.yaml", type=str, help="")
     parser.add_argument("--wandb_project", default="brain-age", type=str, help="")
@@ -29,6 +30,23 @@ def parse_args():
 
     args = parser.parse_args()
     return args
+
+
+def load_hydra_config(config_path: str = "config",
+                      config_name: str = "train.yaml",
+                      version_base="1.3",
+                      overrides: List[str] = [],
+                      return_hydra_config: bool = False) -> omegaconf.DictConfig:
+    with hydra.initialize(config_path=config_path, version_base=version_base):
+        config = hydra.compose(config_name=config_name, overrides=overrides,
+                               return_hydra_config=return_hydra_config)
+    return config
+
+
+def load_yaml(config_path: str = "config/sweep", config_name: str = "sweep.yaml") -> dict:
+    with open(os.path.join(config_path, config_name), mode="r") as f:
+        sweep_cfg = yaml.load(stream=f, Loader=yaml.FullLoader)
+    return sweep_cfg
 
 
 def override_config(hydra_config: omegaconf.DictConfig,
@@ -45,7 +63,8 @@ def override_config(hydra_config: omegaconf.DictConfig,
         if nkeys == 1:
             # If no . found in key
             # This implies override from defaults
-            _subcfg = load_yaml(config_path=f"{config_path}/{key}", config_name=f"{value}.yaml")
+            _subcfg = load_hydra_config(config_path=f"{config_path}/{key}",
+                                        config_name=f"{value}.yaml")
             hydra_config[key] = _subcfg
         else:
             _c = hydra_config[key_list[0]]
@@ -54,36 +73,30 @@ def override_config(hydra_config: omegaconf.DictConfig,
                     _c = _c[_k]
                 else:
                     _c[_k] = value
-    if "sweep" in hydra_config.hydra:
+       
+    var_sweep = " ".join([f"{k[:3]}={v}" for k, v in update_dict.items()])
+    ds_name = sage.utils.get_func_name(hydra_config.dataset) if hydra_config.get("dataset") else ""
+    if "sweep" in hydra_config.get("hydra", []):
         # Configure directory for sweep. sweep_main_dir/subdir
-        hydra_config.hydra.sweep.subdir = "_".join([f"{k}={v}" for k, v in update_dict.items()])
-        dirpath = f"{hydra_config.hydra.sweep.dir}/{hydra_config.hydra.sweep.subdir}"
+        hydra_config.hydra.sweep.dir = f"{hydra_config.hydra.run.dir}-{ds_name}"
+        hydra_config.hydra.sweep.subdir = var_sweep
+        dirpath = f"{hydra_config.hydra.sweep.dir}/{var_sweep}"
         hydra_config.callbacks.checkpoint.dirpath = dirpath
+        hydra_config.logger.name = f"{ds_name} {var_sweep}"
+
     return hydra_config
-
-
-def load_default_hydra_config(config_path: str = "config",
-                              config_name: str = "train.yaml",
-                              version_base="1.1",
-                              overrides: List[str] = []) -> omegaconf.DictConfig:
-    with hydra.initialize(config_path=config_path, version_base=version_base):
-        config = hydra.compose(config_name=config_name, overrides=overrides, return_hydra_config=True)
-    return config
-
-
-def load_yaml(config_path: str = "config/sweep", config_name: str = "sweep.yaml") -> dict:
-    with open(os.path.join(config_path, config_name), mode="r") as f:
-        sweep_cfg = yaml.load(stream=f, Loader=yaml.FullLoader)
-    return sweep_cfg
 
 
 def main(config: omegaconf.DictConfig, config_path: str = "config") -> float:
     wandb.init(project="brain-age")
-    logger.info("Sweep Config: %s", wandb.config)
-    updated_config = override_config(hydra_config=config,
+    _config = deepcopy(config)
+    updated_config = override_config(hydra_config=_config,
                                      update_dict=wandb.config,
                                      config_path=config_path)
+    wandb.run.name = updated_config.logger.name
+
     logger.info("Start Training")
+    logger.info("Sweep Config: %s", wandb.config)
     metric = sage.trainer.train(updated_config)
     return metric
 
@@ -93,10 +106,11 @@ if __name__=="__main__":
 
     # Load hydra default configuration
     overrides = ast.literal_eval(args.overrides)
-    config = load_default_hydra_config(config_path=args.config_path,
-                                       config_name=args.config_name,
-                                       overrides=overrides,
-                                       version_base=args.version_base)
+    config = load_hydra_config(config_path=args.config_path,
+                               config_name=args.config_name,
+                               overrides=overrides,
+                               version_base=args.version_base,
+                               return_hydra_config=True)
     func: Callable = partial(main, config=config, config_path=args.config_path)
 
     # Load wandb.sweep configuration and instantiation

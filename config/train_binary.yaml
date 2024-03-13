@@ -4,12 +4,12 @@ hydra:
   run:
     dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${logger.name}
   sweep:
-    dir: ${hydra.run.dir}
+    dir: ${hydra:run.dir}
 
 defaults:
   - _self_
-  - model: convnext_cls
-  - dataset: ppmi
+  - model: resnet_binary
+  - dataset: ppmi_binary
   - scheduler: exp_decay
   - optim: adamw
   - trainer: default

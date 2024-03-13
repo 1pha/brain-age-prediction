@@ -1,5 +1,5 @@
 _target_: pytorch_lightning.callbacks.ModelCheckpoint
-dirpath: ${hydra.run.dir}
+dirpath: ${hydra:run.dir}
 filename: "{step}-valid_f1-{epoch/valid_MulticlassF1Score:.3f}"
 monitor: epoch/valid_MulticlassF1Score
 mode: max

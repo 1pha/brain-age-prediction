@@ -25,14 +25,14 @@ class ModelBase(nn.Module):
     def num_params(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def load_from_checkpoint(self, ckpt: str):
+    def load_from_checkpoint(self, ckpt: str, strict: bool = True):
         ckpt = torch.load(ckpt)["state_dict"]
         def parse_ckpt(s: str):
             # This is to remove "model." prefix from pytorch_lightning
             s = ".".join(s.split(".")[1:])
             return s
         ckpt = {parse_ckpt(k): v for k, v in ckpt.items()}
-        self.load_state_dict(ckpt)
+        self.load_state_dict(ckpt, strict=strict)
 
     def conv_layers(self):
         if hasattr(self.backbone, "conv_layers"):

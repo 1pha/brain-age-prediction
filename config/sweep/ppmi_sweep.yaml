@@ -1,9 +1,11 @@
-method: random
+method: bayes
 metric:
   goal: maximize
-  name: metric
+  name: test_acc
 parameters:
-  model:
-    values: [ resnet_binary , convnext_binary ]
+  optim:
+    values: [ adamw , lion ]
+  scheduler:
+    values: [ exp_decay , cosine_anneal_warmup ]
   optim.lr:
-    values: [ 5e-3 , 1e-3 , 5e-4 , 1e-4 , 5e-5 ]
+    values: [ 5e-3 , 1e-3 , 1e-4 , 5e-5 ]

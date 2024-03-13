@@ -36,6 +36,7 @@ class PLModule(pl.LightningModule):
                  augmentation: omegaconf.DictConfig = None,
                  scheduler: omegaconf.DictConfig = None,
                  load_model_ckpt: str = None,
+                 load_model_strict: bool = True,
                  load_from_checkpoint: str = None, # unused params but requires for instantiation
                  separate_lr: dict = None,
                  task: str = None,
@@ -67,7 +68,7 @@ class PLModule(pl.LightningModule):
 
         if load_model_ckpt:
             logger.info("Load checkpoint from %s", load_model_ckpt)
-            self.model.load_from_checkpoint(load_model_ckpt)
+            self.model.load_from_checkpoint(ckpt=load_model_ckpt, strict=load_model_strict)
 
         self.log_train_metrics = log_train_metrics
         self.log_lr = manual_lr
@@ -132,7 +133,7 @@ class PLModule(pl.LightningModule):
                 if submodel is None:
                     logger.warn("separate_lr was given but submodel was not found: %s", _submodel)
                     opt_config = self._configure_optimizer(optimizer=optimizer,
-                                                      scheduler=scheduler)
+                                                           scheduler=scheduler)
                     break
                 _opt_groups.append(
                     {"params": submodel.parameters(), "lr": _lr}
@@ -174,8 +175,8 @@ class PLModule(pl.LightningModule):
                 if num_training_steps:
                     struct.update({"num_training_steps": num_training_steps})
                 sch = hydra.utils.instantiate(scheduler, scheduler=struct)
-            except Exception as e:
-                logger.exception(e)
+            except TypeError as e:
+                breakpoint()
                 raise
         return sch
 
@@ -242,6 +243,26 @@ class PLModule(pl.LightningModule):
         pr = wandb.plot.pr_curve(y_true=labels, y_probas=probs)
         self.logger.experiment.log({"confusion_matrix": cf, "roc_curve": roc, "pr_curve": pr})
 
+    def log_table(self, batch: Dict[str, torch.Tensor], result: Dict[str, torch.Tensor]):
+        """ Preparing table logging to wandb. """
+        if not hasattr(self, "table_columns"):
+            self.table_columns = ["PID", "Image", "Target", "Prediction", "Entropy"] + \
+                                 [f"Logit {c}" for c in range(result["cls_pred"].size(1))]
+        if not hasattr(self, "table_data"):
+            self.table_data = []
+
+        img_path, img = batch["image_path"], batch["image"]
+        for i, ind in enumerate(batch["indicator"]):
+            x, path = img[:ind], img_path[:ind]
+            pred = result["cls_pred"][i]
+            prediction = int(pred.argmax())
+            entropy = -float((pred * pred.log()).sum())
+            pred, target = pred.tolist(), int(result["cls_target"][i])
+            self.table_data.append(
+                ["\n".join(path), wandb.Image(x), target, prediction, entropy] + pred
+            )
+            img, img_path = img[ind:], img_path[ind:]
+
     def log_result(self, output: dict, unit: str = "step", prog_bar: bool = False):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
         self.log_dict(dictionary=output, 
@@ -298,6 +319,9 @@ class PLModule(pl.LightningModule):
         result = utils._sort_outputs(outputs=self.prediction_step_outputs)
         if utils.check_classification(result=result):
             self.log_confusion_matrix(result=result)
+            self.logger.log_table(key="Test Prediction", columns=["Target", "Prediction"],
+                                  data=[(t, p) for t, p in zip(result["target"].tolist(),
+                                                               result["pred"].tolist())])
 
     def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")
@@ -360,48 +384,56 @@ def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
     return config
 
 
-def train(config: omegaconf.DictConfig) -> None:
+def train(config: omegaconf.DictConfig) -> Dict[str, float]:
     config: omegaconf.DictConfig = tune(config)
-    _logger = hydra.utils.instantiate(config.logger)
+    _logger: pl._logger = hydra.utils.instantiate(config.logger)
     module, dataloaders = setup_trainer(config)
 
     # Logger Setup
     _logger.watch(module)
-    config_update: bool = "version" in config.logger or config.trainer.devices > 1
+    config_update: bool = "version" in config.logger or (config.trainer.devices > 1)
     if config_update:
         # Skip config update when using resume checkpoint
+        # or when using multiple devices 
         pass
     else:
         # Hard-code config uploading
-        resolve = not "sweep" in config.hydra
-        wandb.config.update(
-            omegaconf.OmegaConf.to_container(config, resolve=resolve, throw_on_missing=resolve)
-        )
+        resolve = not "sweep" in config.get("hydra", [])
+        _cfg = omegaconf.OmegaConf.to_container(config, resolve=resolve, throw_on_missing=resolve)
+        wandb.config.update(_cfg)
 
     # Callbacks
-    callbacks: dict = hydra.utils.instantiate(config.callbacks)
+    callbacks: Dict[str, pl.Callback] = hydra.utils.instantiate(config.callbacks)
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=_logger,
                                                   callbacks=list(callbacks.values()))
     trainer.fit(model=module,
                 train_dataloaders=dataloaders["train"],
                 val_dataloaders=dataloaders["valid"],
                 ckpt_path=config.misc.get("ckpt_path", None))
-    
+
     if dataloaders["test"]:
         logger.info("Test dataset given. Start inference on %s", len(dataloaders["test"].dataset))
-        prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["test"])
-        metric = utils.finalize_inference(prediction=prediction, name=config.logger.name,
-                                          root_dir=Path(config.callbacks.checkpoint.dirpath))
+        dl = dataloaders["test"]
     elif dataloaders["valid"]:
         logger.info("Test dataset not found. Start inference on validation dataset %s",
                     len(dataloaders["valid"].dataset))
-        prediction = trainer.predict(ckpt_path="best", dataloaders=dataloaders["valid"])
-        metric = utils.finalize_inference(prediction=prediction, name=config.logger.name,
-                                          root_dir=Path(config.callbacks.checkpoint.dirpath))
-        
+        dl = dataloaders["valid"]
+    else:
+        logger.info("No valid or test dataset found. Skip inference")
+        dl = None
+
+    # Make Prediction & Log Metrics to wandb logger
+    if dl is not None:
+        prediction = trainer.predict(ckpt_path="best", dataloaders=dl)
+        metric: Dict[str, float] = utils.finalize_inference(prediction=prediction,
+                                                            name=config.logger.name,
+                                                            root_dir=Path(config.callbacks.checkpoint.dirpath))
+        trainer.logger.log_metrics(metric)
+
     if config_update:
-        wandb.config.update(omegaconf.OmegaConf.to_container(config, resolve=True,
-                                                             throw_on_missing=True))
+        # Update configuration if needed
+        _cfg = omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+        wandb.config.update(_cfg)
     return metric
 
 

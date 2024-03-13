@@ -4,6 +4,7 @@ import math
 from datetime import datetime
 from pathlib import Path
 import pickle
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -54,7 +55,7 @@ def tune(batch_size: int = 64,
     return ratio
 
 
-def _sort_outputs(outputs):
+def _sort_outputs(outputs: Dict[str, list]):
     result = dict()
     keys: list = outputs[0].keys()
     for key in keys:
@@ -94,7 +95,7 @@ def finalize_inference(prediction: list,
         pickle.dump(prediction, f)
 
     # 2. Log Predictions
-    run_name = save_name[:-4] + "_" + timestamp()
+    run_name: str = save_name[:-4] + "_" + timestamp()
     preds, target = prediction["pred"], prediction["target"]
     infer_kwargs = dict(preds=preds, target=target, root_dir=root_dir, run_name=run_name)
     result = dict(pred=preds, target=target)
@@ -108,7 +109,11 @@ def finalize_inference(prediction: list,
     return metric
 
 
-def _reg_inference(preds, target, root_dir, run_name) -> float:
+def _reg_inference(preds: List[torch.Tensor],
+                   target: List[torch.Tensor],
+                   root_dir: Path,
+                   run_name: str,
+                   prefix: str = "test") -> Dict[str, float]:
     mse = tmf.mean_squared_error(preds=preds, target=target)
     mae = tmf.mean_absolute_error(preds=preds, target=target)
     r2 = tmf.r2_score(preds=preds, target=target)
@@ -135,10 +140,15 @@ def _reg_inference(preds, target, root_dir, run_name) -> float:
     fig.tight_layout()
     fig.savefig(root_dir / f"{run_name}-kde.png")
     plt.close()
-    return mse
     
+    metric = {f"{prefix}_{m}": v for m, v in zip(["mse", "mae", "r2"], [mse, mae, r2])}
+    return metric
 
-def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
+
+def _get_norm_cf_reg(preds: List[torch.Tensor],
+                     target: List[torch.Tensor],
+                     root_dir: Path,
+                     run_name: str) -> None:
     """Calculate normalized confusion matrix for regression result.
     Calculating number of bins is done autmoatically.
     1. Number of bins: between 5 and 10
@@ -198,7 +208,11 @@ def _get_norm_cf_reg(preds, target, root_dir, run_name) -> None:
         plt.close()
 
 
-def _cls_inference(preds, target, root_dir, run_name) -> float:
+def _cls_inference(preds: List[torch.Tensor],
+                   target: List[torch.Tensor],
+                   root_dir: Path,
+                   run_name: str,
+                   prefix: str = "test") -> Dict[str, float]:
     metrics_input = dict(preds=preds,
                          target=target.int(),
                          task="binary")
@@ -215,7 +229,9 @@ def _cls_inference(preds, target, root_dir, run_name) -> float:
     p.set_title(run_name)
     plt.savefig(root_dir / f"{run_name}-cf.png")
     plt.close()
-    return acc
+
+    metric = {f"{prefix}_{m}": v for m, v in zip(["acc", "f1", "auroc"], [acc, f1, auroc])}
+    return metric
 
 
 def brain2augment(brain: torch.Tensor) -> torch.Tensor:

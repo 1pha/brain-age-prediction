@@ -79,6 +79,15 @@ def parse_hydra(config: omegaconf, **kwargs):
     return inst
 
 
+def get_func_name(config: omegaconf.DictConfig) -> str:
+    if "_target_" in config:
+        target = config._target_
+        name = target.split(".")[-1]
+    else:
+        name = ""
+    return name
+
+
 def load_hydra(config_name: str,
                config_path: str = "config",
                overrides: FrozenSet[str] = None):
