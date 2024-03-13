@@ -82,7 +82,7 @@ def override_config(hydra_config: omegaconf.DictConfig,
         hydra_config.hydra.sweep.subdir = var_sweep
         dirpath = f"{hydra_config.hydra.sweep.dir}/{var_sweep}"
         hydra_config.callbacks.checkpoint.dirpath = dirpath
-        hydra_config.logger.name = f"{ds_name} {var_sweep}"
+        hydra_config.logger.name = f"{var_sweep}"
 
     return hydra_config
 
