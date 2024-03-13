@@ -1,11 +1,21 @@
+name: "PPMI Sweep"
+description: "HPO for PPMI-Binary classification task"
 method: bayes
 metric:
   goal: maximize
   name: test_acc
 parameters:
+  model:
+    values: [ resnet_binary , convnext_binary ]
   optim:
     values: [ adamw , lion ]
   scheduler:
     values: [ exp_decay , cosine_anneal_warmup ]
   optim.lr:
     values: [ 5e-3 , 1e-3 , 1e-4 , 5e-5 ]
+early_terminate:
+  type: hyperband
+  s: 2
+  eta: 3
+  max_iter: 27
+run_cap: 50
