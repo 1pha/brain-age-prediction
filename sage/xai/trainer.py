@@ -124,7 +124,7 @@ class XPLModule(PLModule):
                 attr_mtd = ca.InputXGradient(forward_func=model.backbone)
             xai = ca.NoiseTunnel(attribution_method=attr_mtd)
             if xai_call_kwarg is None:
-                xai_call_kwarg = dict(nt_type="smoothgrad", nt_samples=15)
+                xai_call_kwarg = dict(nt_type="smoothgrad", nt_samples=10)
         else:
             breakpoint()
         self.xai_call_kwarg = dict() if xai_call_kwarg is None else xai_call_kwarg

@@ -283,19 +283,6 @@ class UKBDataset(DatasetBase):
         labels = labels[~_dups_bool]
         return labels
 
-    def _exclude_data(self,
-                      lst: pd.DataFrame,
-                      root: Path,
-                      exclusion_fname: str = "exclusion.csv") -> List[Path]:
-        try:
-            exc = pd.read_csv(root / exclusion_fname, header=None)
-            exclusion = set(exc.values.flatten().tolist())
-            lst = [f for f in lst if f not in exclusion]
-        except:
-            logger.info("No exclusion file found. %s", root / exclusion_fname)
-            pass
-        return lst
-
 
 class UKBClassification(UKBDataset):
     def __init__(self,
