@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Tuple, List
 
 import torch
-import pandas as pd
 
 from sage.data.dataloader import DatasetBase, open_scan
 import sage.constants as C

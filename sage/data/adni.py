@@ -41,7 +41,6 @@ class ADNIBase(DatasetBase):
         """ Make sure to properly return PPMI """
         raise NotImplementedError
 
-    @overrides
     def _exclude_data(self, labels: pd.DataFrame, pk_col: str, root: Path,
                       exclusion_fname: str = "donotuse-adni.txt") -> pd.DataFrame:
         """ TODO: Remove exclude from label """

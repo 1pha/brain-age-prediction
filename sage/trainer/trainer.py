@@ -212,7 +212,7 @@ class PLModule(pl.LightningModule):
             logger.exception(e)
             breakpoint()
             raise e
-        
+
     def move_device(self,
                     result: Dict[str, torch.Tensor],
                     exclude_keys: List[str] = ["loss"]) -> Dict[str, torch.Tensor]:
@@ -242,26 +242,6 @@ class PLModule(pl.LightningModule):
         roc = wandb.plot.roc_curve(y_true=labels, y_probas=probs)
         pr = wandb.plot.pr_curve(y_true=labels, y_probas=probs)
         self.logger.experiment.log({"confusion_matrix": cf, "roc_curve": roc, "pr_curve": pr})
-
-    def log_table(self, batch: Dict[str, torch.Tensor], result: Dict[str, torch.Tensor]):
-        """ Preparing table logging to wandb. """
-        if not hasattr(self, "table_columns"):
-            self.table_columns = ["PID", "Image", "Target", "Prediction", "Entropy"] + \
-                                 [f"Logit {c}" for c in range(result["cls_pred"].size(1))]
-        if not hasattr(self, "table_data"):
-            self.table_data = []
-
-        img_path, img = batch["image_path"], batch["image"]
-        for i, ind in enumerate(batch["indicator"]):
-            x, path = img[:ind], img_path[:ind]
-            pred = result["cls_pred"][i]
-            prediction = int(pred.argmax())
-            entropy = -float((pred * pred.log()).sum())
-            pred, target = pred.tolist(), int(result["cls_target"][i])
-            self.table_data.append(
-                ["\n".join(path), wandb.Image(x), target, prediction, entropy] + pred
-            )
-            img, img_path = img[ind:], img_path[ind:]
 
     def log_result(self, output: dict, unit: str = "step", prog_bar: bool = False):
         output = {f"{unit}/{k}": float(v) for k, v in output.items()}
@@ -321,7 +301,7 @@ class PLModule(pl.LightningModule):
             self.log_confusion_matrix(result=result)
             self.logger.log_table(key="Test Prediction", columns=["Target", "Prediction"],
                                   data=[(t, p) for t, p in zip(result["target"].tolist(),
-                                                               result["pred"].tolist())])
+                                                               nn.functional.sigmoid(result["pred"]).tolist())])
 
     def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
         result: dict = self.forward(batch, mode="test")
@@ -429,6 +409,8 @@ def train(config: omegaconf.DictConfig) -> Dict[str, float]:
                                                             name=config.logger.name,
                                                             root_dir=Path(config.callbacks.checkpoint.dirpath))
         trainer.logger.log_metrics(metric)
+    else:
+        metric = None
 
     if config_update:
         # Update configuration if needed

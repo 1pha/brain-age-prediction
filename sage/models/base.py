@@ -43,14 +43,15 @@ class ModelBase(nn.Module):
 
 class RegBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
-        pred = self.backbone(brain).squeeze()
+        # Specify squeeze dimension to prevent batch_size=1 being squeezed to a singel scalar.
+        pred = self.backbone(brain).squeeze(dim=1)
         loss = self.criterion(pred, age.float())
         return dict(loss=loss, pred=pred.detach(), target=age.detach())
 
 
 class ClsBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
-        pred = self.backbone(brain).squeeze()
+        pred = self.backbone(brain).squeeze(dim=1)
         loss = self.criterion(pred, age.long())
         return dict(loss=loss, pred=pred.detach(), target=age.detach().long())
 

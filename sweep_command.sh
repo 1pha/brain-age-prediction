@@ -1,9 +1,39 @@
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES=1
 
-python sweep.py --sweep_cfg_name=ppmi_sweep.yaml\
-                --wandb_project=ppmi\
-                --config_name=train_binary.yaml\
-                --sweep_prefix='Scratch'
-                # --overrides="['module.load_model_ckpt=meta_brain/weights/default/resnet10-42/156864-valid_mae3.465.ckpt',\
-                #               '+module.load_model_strict=False']"
+read -p "Enter devices: " device
+export CUDA_VISIBLE_DEVICES=$device
+
+read -p "Enter devices: ppmi|adni " ds
+dataset=$ds
+
+sweep_ppmi() {
+    echo "Sweep on PPMI"
+    python sweep.py --sweep_cfg_name=ppmi_sweep.yaml\
+                    --wandb_project=ppmi\
+                    --config_name=train_binary.yaml\
+                    --sweep_prefix='Scratch'\
+                    --overrides="['dataset=ppmi_binary', \
+                                  '+dataset.modality=[t2]', \
+                                  'dataloader.batch_size=4', \
+                                  'dataloader.num_workers=2', \
+                                  'trainer.accumulate_grad_batches=8']"
+}
+
+sweep_adni() {
+    echo "Sweep on ADNI"
+    python sweep.py --sweep_cfg_name=adni_sweep.yaml\
+                    --wandb_project=adni\
+                    --config_name=train_binary.yaml\
+                    --sweep_prefix='Scratch'\
+                    --overrides="['dataset=adni']"
+}
+
+# Check the input argument and call the appropriate function
+if [ $dataset = "ppmi" ]; then
+    sweep_ppmi
+elif [ $dataset = "adni" ]; then
+    sweep_adni
+else
+    echo "Invalid argument. Usage: $0 [ppmi|adni]. Got $dataset instead"
+    exit 1
+fi
