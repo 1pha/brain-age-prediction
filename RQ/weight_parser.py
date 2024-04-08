@@ -161,7 +161,7 @@ class Weights:
         self.top_attr = np.load(self.xai_path / "top_attr.npy")
         return dict(attrs=self.attrs, top_attr=self.top_attr)
     
-    def normalize_df(self, df: pd.DataFrame = None):
+    def normalize_df(self, df: pd.DataFrame = None, eps: float = 1e-8) -> np.ndarray:
         """Treat each column as a single vector and normalize row-wise,
         so that norm of df.iloc[i, :] goes to 1.
         This is to generate a normalized vector for each row (=test subject, 3,029 rows),
@@ -173,7 +173,7 @@ class Weights:
         arr = df.values
         nr, nc = arr.shape
         norm = np.linalg.norm(x=arr, axis=1).repeat(nc).reshape(nr, nc)
-        arr = arr / norm
+        arr = arr / (norm + eps)
         arr = np.nan_to_num(x=arr, nan=0, posinf=0, neginf=0)
         return arr
 

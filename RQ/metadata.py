@@ -1,8 +1,12 @@
 import json
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
+from collections import defaultdict
+
+import numpy as np
 
 import constants as C
+import weight_parser as wp
 
 
 def load_vbm(base_dir: Path = C.VBM_DIR) -> Dict[str, Dict[str, float]]:
@@ -32,3 +36,19 @@ def load_metadata(vbm_dir: Path = C.VBM_DIR,
             "VBM Old-to-Young": vbm_dicts["old2young"],
             "Fastsurfer Voxel": fs_dicts["fastsurfer_volume_dict"],
             "Fastsurfer Intensity": fs_dicts["fastsurfer_intensity_dict"]}
+
+
+def load_interps() -> Dict[str, Dict[str, List[np.ndarray]]]:
+    interps = defaultdict(dict)
+    for xai_method in C.XAI_METHODS:
+        for model_name in C.MODELS:
+            if xai_method == "ig" and model_name == "convnext-base":
+                continue
+            seeds = [42, 43, 44] if model_name != "convnext-base" else [42, 43]
+            lst = [wp.Weights(model_name=model_name, seed=seed, xai_method=xai_method, verbose=False).normalize_df()\
+                   for seed in seeds]
+            interps[xai_method][model_name] = lst
+    return interps
+
+
+def load_robustness(base_dir: Path = C.
