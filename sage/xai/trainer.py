@@ -52,22 +52,21 @@ class XPLModule(PLModule):
                  load_from_checkpoint: str = None,
                  separate_lr: dict = None,
                  save_dir: Path = None):
-
-        super().__init__(model,
-                         train_loader,
-                         valid_loader,
-                         optimizer,
-                         metrics,
-                         test_loader,
-                         predict_loader,
-                         log_train_metrics,
-                         manual_lr,
-                         augmentation,
-                         scheduler,
-                         load_model_ckpt,
-                         load_from_checkpoint,
-                         separate_lr,
-                         save_dir)
+        super().__init__(model=model,
+                         train_loader=train_loader,
+                         valid_loader=valid_loader,
+                         optimizer=optimizer,
+                         metrics=metrics,
+                         test_loader=test_loader,
+                         predict_loader=predict_loader,
+                         log_train_metrics=log_train_metrics,
+                         manual_lr=manual_lr,
+                         augmentation=augmentation,
+                         scheduler=scheduler,
+                         load_model_ckpt=load_model_ckpt,
+                         load_from_checkpoint=load_from_checkpoint,
+                         separate_lr=separate_lr,
+                         save_dir=save_dir)
         self.init_transforms(augmentation=augmentation)
 
         self.smaller_mask = utils.margin_mni_mask(return_pt=True)
@@ -209,6 +208,9 @@ class XPLModule(PLModule):
             attr_kwargs = self.xai_call_kwarg
         if self.xai_method == "ig" and self.baseline:
             attr_kwargs = attr_kwargs["baselines"] = self.baseline.to(self.device)
+            
+        if hasattr(brain, "as_tensor"):
+            brain = brain.as_tensor()
 
         if self.xai_method in ["gcam_avg", "ggcam_avg"]:
             attrs = []
@@ -329,6 +331,7 @@ class XPLModule(PLModule):
 
         # Save Total Projection Result
         xai_dict, agg_saliency = ao.calculate_overlaps(arr=self.top_attr, atlas=self.atlas,
-                                                       root_dir=root_dir, title=root_dir.stem)
+                                                       use_torch=True, root_dir=root_dir,
+                                                       title=root_dir.stem)
         with (root_dir / "xai_dict.json").open(mode="w") as f:
             json.dump(obj=xai_dict, fp=f, indent="\t")
