@@ -126,6 +126,9 @@ class DatasetBase(Dataset):
     def load_labels(self, root: Path, label_name: str = None, mode: str = None) -> pd.DataFrame:
         """ Load `.csv` """
         labels = pd.read_csv(root / label_name)
+        if mode is not None and "split" in labels.columns:
+            mode = "train" if mode != "test" else "test"
+            labels = labels[labels.split == mode]
         return labels
 
     def remove_duplicates(self, labels: pd.DataFrame) -> pd.DataFrame:
@@ -156,7 +159,7 @@ class DatasetBase(Dataset):
             trn_pid, val_pid = train_test_split(pid, test_size=valid_ratio, random_state=seed, stratify=y)
             trn = labels[labels[pid_col].isin(trn_pid)]
             val = labels[labels[pid_col].isin(val_pid)]
-        else:    
+        else:
             trn, val = train_test_split(labels, test_size=valid_ratio, random_state=seed)
         labels = {"train": trn, "valid": val}.get(mode, None)
         if labels is None:

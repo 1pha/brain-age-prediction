@@ -5,8 +5,6 @@ metric:
   goal: maximize
   name: test_acc
 parameters:
-  model:
-    values: [ resnet_binary , convnext_binary ]
   optim:
     values: [ adamw , lion ]
   scheduler:

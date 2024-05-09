@@ -15,20 +15,19 @@ logger = get_logger(name=__name__)
 
 class ADNIBase(DatasetBase):
     NAME = "ADNI"
-    MAPPER2INT = {"ADNI 2": 0, "ADNI 3": 1}
     def __init__(self,
                  root: Path | str = C.ADNI_DIR,
-                 label_name: str = "adni_label.csv",
+                 label_name: str = "adni_labels_240509.csv",
                  mode: str = "train",
                  valid_ratio: float = .1,
-                 path_col: str = "abs_path",
-                 pk_col: str = "Subject ID",
-                 pid_col: str = "Subject ID",
-                 label_col: str = "Phase",
-                 strat_col: str = "Phase",
+                 path_col: str = "filepath",
+                 pk_col: str = "Subject",
+                 pid_col: str = "Subject",
+                 label_col: str = "Group",
+                 strat_col: str = "Group",
                  mod_col: str = None,
                  modality: List[str] = None,
-                 exclusion_fname: str = "donotuse-adni.txt",
+                 exclusion_fname: str = "",
                  augmentation: str = "monai",
                  seed: int = 42,):
         logger.warn("Please note that ADNI dataset label file should not have the exclusion file.")
@@ -58,20 +57,20 @@ class ADNIBase(DatasetBase):
 
 class ADNIClassification(ADNIBase):
     NAME = "ADNI-CLS"
-    MAPPER2INT = {"ADNI 2": 0, "ADNI 3": 1}
+    MAPPER2INT = {"CN": 0, "MCI": 1, "AD": 2}
     def __init__(self,
                  root: Path | str = C.ADNI_DIR,
-                 label_name: str = "adni_label.csv",
+                 label_name: str = "adni_labels_240509.csv",
                  mode: str = "train",
                  valid_ratio: float = .1,
-                 path_col: str = "abs_path",
-                 pk_col: str = "Subject ID",
-                 pid_col: str = "Subject ID",
-                 label_col: str = "Phase",
-                 strat_col: str = "Phase",
-                 mod_col: str = None,
-                 modality: List[str] = None,
-                 exclusion_fname: str = "donotuse-adni.txt",
+                 path_col: str = "filepath",
+                 pk_col: str = "Subject",
+                 pid_col: str = "Subject",
+                 label_col: str = "Group",
+                 strat_col: str = "Group",
+                 mod_col: str = "Group",
+                 modality: List[str] = ["CN", "MCI", "AD"],
+                 exclusion_fname: str = "",
                  augmentation: str = "monai",
                  seed: int = 42,):
         super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
@@ -91,3 +90,27 @@ class ADNIClassification(ADNIBase):
             raise
         label = torch.tensor(label, dtype=torch.long)
         return arr, label
+
+
+class ADNIFullClassification(ADNIClassification):
+    NAME = "ADNI-ALL-CLS"
+    MAPPER2INT = {"CN": 0, "SMC": 1, "EMCI": 2, "MCI": 3, "LMCI": 4, "AD": 5}
+    def __init__(self,
+                 root: Path | str = C.ADNI_DIR,
+                 label_name: str = "adni_labels_240509.csv",
+                 mode: str = "train",
+                 valid_ratio: float = .1,
+                 path_col: str = "filepath",
+                 pk_col: str = "Subject",
+                 pid_col: str = "Subject",
+                 label_col: str = "Group",
+                 strat_col: str = "Group",
+                 mod_col: str = None,
+                 modality: List[str] = None,
+                 exclusion_fname: str = "",
+                 augmentation: str = "monai",
+                 seed: int = 42,):
+        super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
+                         path_col=path_col, pk_col=pk_col, pid_col=pid_col, label_col=label_col,
+                         strat_col=strat_col, mod_col=mod_col, modality=modality,
+                         exclusion_fname=exclusion_fname, augmentation=augmentation, seed=seed)

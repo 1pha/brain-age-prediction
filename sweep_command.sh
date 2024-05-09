@@ -23,9 +23,9 @@ sweep_adni() {
     echo "Sweep on ADNI"
     python sweep.py --sweep_cfg_name=adni_sweep.yaml\
                     --wandb_project=adni\
-                    --config_name=train_binary.yaml\
+                    --config_name=train_cls.yaml\
                     --sweep_prefix='Scratch'\
-                    --overrides="['dataset=adni']"
+                    --overrides="['dataloader.batch_size=8']"
 }
 
 # Check the input argument and call the appropriate function

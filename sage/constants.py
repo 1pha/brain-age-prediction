@@ -24,4 +24,4 @@ BIOBANK_PATH = DATA_BASE / "h5"
 
 EXT_BASE = DATA_BASE / "brain"
 PPMI_DIR = EXT_BASE / "PPMI"
-ADNI_DIR = EXT_BASE / "ADNI"
+ADNI_DIR = Path("adni") / "ADNI_3_reg"

@@ -9,7 +9,7 @@ hydra:
 defaults:
   - _self_
   - model: convnext_cls
-  - dataset: ppmi
+  - dataset: adni
   - scheduler: exp_decay
   - optim: adamw
   - trainer: default
