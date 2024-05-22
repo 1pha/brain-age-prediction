@@ -140,7 +140,7 @@ def project_to_atlas(atlas: Bunch,
 
     pbar = tqdm(iterable=xai_dict, desc="Spread values to Brain ROI ...", leave=verbose)
     for label in pbar:
-        val = xai_dict[label]        
+        val = xai_dict[label]
         idx = atlas.labels.index(label)
         idx = atlas.indices[idx]
         agg_saliency[np.where(atlas.array == int(idx))] = val

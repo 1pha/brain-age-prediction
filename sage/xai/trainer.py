@@ -12,6 +12,7 @@ import omegaconf
 
 import sage
 from sage.trainer import PLModule
+from .lrp.innvestigator import InnvestigateModel
 from . import nilearn_plots as nilp_
 from . import atlas_overlap as ao
 from . import atlas as A
@@ -115,7 +116,14 @@ class XPLModule(PLModule):
         elif xai_method == "ig":
             xai = ca.IntegratedGradients(forward_func=forward_func)
         elif xai_method == "lrp":
-            xai = ca.LRP(model=model.backbone)
+            # XXX: Device setup is not done in lightning module instantiation
+            device = torch.device(f"cuda:{torch.cuda.current_device()}")
+            lrp_default_kwarg = dict(lrp_exponent=2, method="b-rule", beta=.5, device=device)
+            if xai_init_kwarg is None:
+                xai_init_kwarg = lrp_default_kwarg
+            elif isinstance(xai_init_kwarg, dict):
+                xai_init_kwarg.update(**lrp_default_kwarg)
+            xai = InnvestigateModel(model.backbone, **xai_init_kwarg)
         elif xai_method.startswith("smooth"):
             if xai_method == "smooth_gbp":
                 attr_mtd = ca.GuidedBackprop(model=model.backbone)
@@ -276,7 +284,7 @@ class XPLModule(PLModule):
         except Exception as e:
             # For CUDA Device-side asserted error
             logger.warn("Given batch %s", batch)
-            logger.exception(e)
+            logger.exception(e) 
             breakpoint()
 
     def on_predict_start(self) -> None:

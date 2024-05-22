@@ -213,9 +213,11 @@ def _cls_inference(preds: List[torch.Tensor],
                    root_dir: Path,
                    run_name: str,
                    prefix: str = "test") -> Dict[str, float]:
-    metrics_input = dict(preds=preds,
-                         target=target.int(),
-                         task="binary")
+    if preds.ndim > 1 and preds.size(1) > 2:
+        task = "multiclass"
+    else:
+        task = "binary"
+    metrics_input = dict(preds=preds, target=target.int(), task=task)
     acc = tmf.accuracy(**metrics_input)
     f1 = tmf.f1_score(**metrics_input)
     auroc = tmf.auroc(**metrics_input)
