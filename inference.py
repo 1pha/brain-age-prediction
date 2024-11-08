@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 from pathlib import Path
 
@@ -17,6 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--path", type=str, help="Leaf node directory name. e.g. resnet10t-mask")
+    parser.add_argument("--ckpt_step", default=None, type=int, help="Finds checkpoint step.")
     parser.add_argument("--root", default="meta_brain/weights/default/", type=str, help="Root directory where weights resides")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size during inference")
@@ -33,8 +35,23 @@ def parse_args():
 def main(args):
     root = Path(args.root) / args.path
     # Starting with numbers is the checkpoint recorded by best monitoring checkpoint via save_top_k=1
-    weight = sorted(root.glob("*.ckpt"))[0]
-    
+    ckpts = sorted(root.glob("*.ckpt"))
+    if args.ckpt_step is None:
+        weight = ckpts[0]
+    else:
+        ckpts_step = [ckpt.stem for ckpt in ckpts]
+        ckpt_idx = [idx for idx, ckpt in enumerate(ckpts_step)
+                    if (ckpt.startswith("step") and int(ckpt.split("-")[0][4:]) == args.ckpt_step)]
+        if len(ckpt_idx):
+            # Yes there is a finding ckpt_step
+            weight = ckpts[ckpt_idx[0]]
+        else:
+            # No step of checkpoint looking for.
+            logger.info("No step of checkpoint you are looking for %s", args.ckpt_step)
+            logger.info("Weight list: %s", ckpts)
+            # 안되는건 그냥 나중에 step이름 쑤셔넣는거로 대체
+            sys.exit()
+
     overrides = ["misc.modes=[train,valid,test]",
                  f"module.load_model_ckpt={weight}",
                  f"dataloader.batch_size={args.batch_size}"]
@@ -65,7 +82,7 @@ def main(args):
 
     logger.info("Start Inference")
     os.makedirs(root, exist_ok=True)
-    sage.trainer.inference(config, root_dir=root)
+    sage.trainer.inference(config, root_dir=root, ckpt_step=args.ckpt_step)
 
 
 if __name__=="__main__":

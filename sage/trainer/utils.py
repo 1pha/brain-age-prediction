@@ -213,25 +213,27 @@ def _cls_inference(preds: List[torch.Tensor],
                    root_dir: Path,
                    run_name: str,
                    prefix: str = "test") -> Dict[str, float]:
-    if preds.ndim > 1 and preds.size(1) > 2:
-        task = "multiclass"
-    else:
-        task = "binary"
-    metrics_input = dict(preds=preds, target=target.int(), task=task)
+    metrics_input = dict(preds=preds,
+                         target=target.int(),
+                         task="multiclass" if preds.ndim > 1 else "binary")
+    if metrics_input["task"] == "multiclass":
+        metrics_input["num_classes"] = preds.size(1)
     acc = tmf.accuracy(**metrics_input)
-    f1 = tmf.f1_score(**metrics_input)
+    f1 = tmf.f1_score(average="macro", **metrics_input)
     auroc = tmf.auroc(**metrics_input)
-    logger.info("Results as follow:")
-    logger.info("ACC  : %.3f", acc)
-    logger.info("F1   : %.3f", f1)
-    logger.info("AUROC: %.4f", auroc)
-    
+
     cf = tmf.confusion_matrix(**metrics_input)
     p = sns.heatmap(cf, annot=True, fmt="d")
     p.set_title(run_name)
     plt.savefig(root_dir / f"{run_name}-cf.png")
     plt.close()
 
+    logger.info("Results as follow:")
+    logger.info("ACC  : %.3f", acc)
+    logger.info("F1   : %.3f", f1)
+    logger.info("AUROC: %.4f", auroc)
+    logger.info("Confurion matrix\n%s", cf)
+    
     metric = {f"{prefix}_{m}": v for m, v in zip(["acc", "f1", "auroc"], [acc, f1, auroc])}
     return metric
 

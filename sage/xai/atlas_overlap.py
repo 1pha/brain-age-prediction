@@ -147,7 +147,8 @@ def project_to_atlas(atlas: Bunch,
 
     save = root_dir / "proj_glass.png" if root_dir is not None else None
     nilp_.plot_glass_brain(arr=agg_saliency,
-                           target_affine=atlas.nii.affine, title=title, cmap=nilp.cm.bwr,
+                           target_affine=atlas.nii.affine, title=title, cmap="Reds",
+                           threshold=0,
                            vmin=vmin, vmax=vmax, colorbar=True, plot_abs=use_abs, save=save)
 
     save = root_dir / "proj_mosaic.png" if root_dir is not None else None

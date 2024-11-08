@@ -17,14 +17,14 @@ class ADNIBase(DatasetBase):
     NAME = "ADNI"
     def __init__(self,
                  root: Path | str = C.ADNI_DIR,
-                 label_name: str = "adni_labels_240509.csv",
+                 label_name: str = "adni_screen_labels_Sept11_test15_2024.csv",
                  mode: str = "train",
                  valid_ratio: float = .1,
                  path_col: str = "filepath",
                  pk_col: str = "Subject",
                  pid_col: str = "Subject",
-                 label_col: str = "Group",
-                 strat_col: str = "Group",
+                 label_col: str = "DX_bl",
+                 strat_col: str = "DX_bl",
                  mod_col: str = None,
                  modality: List[str] = None,
                  exclusion_fname: str = "",
@@ -60,15 +60,15 @@ class ADNIClassification(ADNIBase):
     MAPPER2INT = {"CN": 0, "MCI": 1, "AD": 2}
     def __init__(self,
                  root: Path | str = C.ADNI_DIR,
-                 label_name: str = "adni_labels_240509.csv",
+                 label_name: str = "adni_screen_labels_Sept11_test15_2024.csv",
                  mode: str = "train",
                  valid_ratio: float = .1,
                  path_col: str = "filepath",
                  pk_col: str = "Subject",
                  pid_col: str = "Subject",
-                 label_col: str = "Group",
-                 strat_col: str = "Group",
-                 mod_col: str = "Group",
+                 label_col: str = "DX_bl",
+                 strat_col: str = "DX_bl",
+                 mod_col: str = "DX_bl",
                  modality: List[str] = ["CN", "MCI", "AD"],
                  exclusion_fname: str = "",
                  augmentation: str = "monai",
@@ -92,19 +92,43 @@ class ADNIClassification(ADNIBase):
         return arr, label
 
 
-class ADNIFullClassification(ADNIClassification):
-    NAME = "ADNI-ALL-CLS"
-    MAPPER2INT = {"CN": 0, "SMC": 1, "EMCI": 2, "MCI": 3, "LMCI": 4, "AD": 5}
+class ADNIBinary(ADNIClassification):
+    NAME = "ADNI-Binary"
+    MAPPER2INT = {"CN": 0, "AD": 1}
     def __init__(self,
                  root: Path | str = C.ADNI_DIR,
-                 label_name: str = "adni_labels_240509.csv",
+                 label_name: str = "adni_screen_labels_Sept11_test15_2024.csv",
                  mode: str = "train",
                  valid_ratio: float = .1,
                  path_col: str = "filepath",
                  pk_col: str = "Subject",
                  pid_col: str = "Subject",
-                 label_col: str = "Group",
-                 strat_col: str = "Group",
+                 label_col: str = "DX_bl",
+                 strat_col: str = "DX_bl",
+                 mod_col: str = "DX_bl",
+                 modality: List[str] = ["CN", "AD"],
+                 exclusion_fname: str = "",
+                 augmentation: str = "monai",
+                 seed: int = 42,):
+        super().__init__(root=root, label_name=label_name, mode=mode, valid_ratio=valid_ratio,
+                         path_col=path_col, pk_col=pk_col, pid_col=pid_col, label_col=label_col,
+                         strat_col=strat_col, mod_col=mod_col, modality=modality,
+                         exclusion_fname=exclusion_fname, augmentation=augmentation, seed=seed)
+
+
+class ADNIFullClassification(ADNIClassification):
+    NAME = "ADNI-ALL-CLS"
+    MAPPER2INT = {"CN": 0, "SMC": 1, "EMCI": 2, "MCI": 3, "LMCI": 4, "AD": 5}
+    def __init__(self,
+                 root: Path | str = C.ADNI_DIR,
+                 label_name: str = "adni_screen_labels_Sept11_test15_2024.csv",
+                 mode: str = "train",
+                 valid_ratio: float = .1,
+                 path_col: str = "filepath",
+                 pk_col: str = "Subject",
+                 pid_col: str = "Subject",
+                 label_col: str = "DX_bl",
+                 strat_col: str = "DX_bl",
                  mod_col: str = None,
                  modality: List[str] = None,
                  exclusion_fname: str = "",

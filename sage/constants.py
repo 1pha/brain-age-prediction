@@ -19,9 +19,11 @@ BIOBANK_AFFINE = np.array([[ -1.,  0.,  0.,   90.],
 # Reshape target size
 SPATIAL_SIZE = (160, 192, 160)
 
-DATA_BASE = Path(config.get("DATA_BASE", Path.home() / "data" / "hdd01" / "1pha"))
-BIOBANK_PATH = DATA_BASE / "h5"
+DATA_BASE1 = Path(config.get("DATA_BASE", Path.home() / "data" / "hdd01" / "1pha"))
+BIOBANK_PATH = DATA_BASE1 / "h5"
+ADNI_DIR = DATA_BASE1 / "brain" / "ADNI_08_12_2024" / "3_reg"
 
-EXT_BASE = DATA_BASE / "brain"
-PPMI_DIR = EXT_BASE / "PPMI"
-ADNI_DIR = Path("adni") / "ADNI_3_reg"
+DATA_BASE3 = Path.home() / "data" / "hdd03" / "1pha"
+PPMI_DIR = DATA_BASE3 / "ppmi" / "PPMI_4_reg"
+# PPMI_DIR = Path("~/workspace/brain-age-prediction/ppmi/PPMI_4_reg")
+ADNI_DIR = Path("adni")

@@ -43,8 +43,13 @@ class ModelBase(nn.Module):
 
 class RegBase(ModelBase):
     def forward(self, brain: torch.Tensor, age: torch.Tensor):
-        # Specify squeeze dimension to prevent batch_size=1 being squeezed to a singel scalar.
-        pred = self.backbone(brain).squeeze(dim=1)
+        # Specify squeeze dimension to prevent batch_size=1 being squeezed to a single scalar.
+        pred = self.backbone(brain)
+        try:
+            pred = pred.squeeze(dim=1)
+        except IndexError:
+            # XXX: 언젠가 고쳐..제발...
+            pass
         loss = self.criterion(pred, age.float())
         return dict(loss=loss, pred=pred.detach(), target=age.detach())
 
@@ -66,12 +71,22 @@ class ConvNext(RegBase):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
+class Densenet(RegBase):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
+        super().__init__(backbone=backbone, criterion=criterion, name=name)
+
+
 class ResNetCls(ClsBase):
     def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 
 
 class ConvNextCls(ClsBase):
+    def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
+        super().__init__(backbone=backbone, criterion=criterion, name=name)
+
+
+class DensenetCls(ClsBase):
     def __init__(self, backbone: nn.Module, criterion: nn.Module, name: str):
         super().__init__(backbone=backbone, criterion=criterion, name=name)
 

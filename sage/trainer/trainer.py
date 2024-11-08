@@ -88,8 +88,8 @@ class PLModule(pl.LightningModule):
             mt.Lambda(func=utils.brain2augment),
             mt.Resize(spatial_size=augmentation.get("spatial_size", C.SPATIAL_SIZE)),
             mt.ScaleIntensity(channel_wise=True),
-            mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
-            mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
+            # mt.RandAdjustContrast(prob=0.1, gamma=(0.5, 2.0)),
+            # mt.RandCoarseDropout(holes=20, spatial_size=8, prob=0.4, fill_value=0.),
             mt.RandAxisFlip(prob=0.5),
             mt.RandZoom(prob=0.4, min_zoom=0.9, max_zoom=1.4, mode="trilinear"),  
             mt.Lambda(func=utils.augment2brain),
@@ -415,37 +415,62 @@ def train(config: omegaconf.DictConfig) -> Dict[str, float]:
     if config_update:
         # Update configuration if needed
         _cfg = omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
-        wandb.config.update(_cfg)
+        try:
+            wandb.config.update(_cfg)
+        except Exception as e:
+            print(e)
+            pass
     return metric
 
 
 def inference(config: omegaconf.DictConfig,
-              root_dir: Path = None) -> None:
+              root_dir: Path = None, ckpt_step: int = None) -> None:
     if root_dir is None:
         root_dir = Path(config.callbacks.checkpoint.dirpath)
-        
+
+    # Resumed trains contain checkpoints in configuration
+    # override to current checkpoint
+    if "load_from_checkpoint" in config.module:
+        config.module.load_from_checkpoint = None
+    
+    with omegaconf.open_dict(config):
+        is_cls = config.model._target_.endswith("cls") or config.model.name.endswith("binary")
+        config.module.is_cls = is_cls
+        is_cls =  False # debug
     module, dataloaders = setup_trainer(config)
     module.setup(stage=None)
     brain = module.log_brain(return_path=True, augment=False)
 
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
-    logger.info("Start prediction")
-    prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
 
-    task = config.module._target_
-    if task == "sage.trainer.PLModule":
+    logger.info("Start prediction")
+    infer_task = config.module._target_
+    if infer_task == "sage.trainer.PLModule":
         # Infer Metrics
+        prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
         utils.finalize_inference(prediction=prediction,
                                  name=config.logger.name,
                                  root_dir=root_dir)
 
-    elif task == "sage.xai.trainer.XPLModule":
-        # Infer Saliency maps
+    elif infer_task == "sage.xai.trainer.XPLModule":
         postfix = module.xai_method + f"k{module.top_k_percentile:.2f}"
-
-        bsz = config.dataloader.batch_size
-        if bsz > 1:
+        if (bsz := config.dataloader.batch_size) > 1:
             postfix = f"{postfix}-bsz{bsz}"
         root_dir = root_dir / postfix
+        if ckpt_step is not None:
+            root_dir = root_dir / f"step{ckpt_step}"
         subprocess.run(["mv", brain, f"{root_dir}/sample.png"])
-        module.save_result(root_dir=root_dir)
+
+        # Infer Saliency maps
+        if is_cls:
+            # Split datasets by class
+            for label in dataloaders["test"].dataset.MAPPER2INT:
+                # Substituting internal csv for certain classes.
+                _ds = deepcopy(dataloaders["test"].dataset)
+                _ds.labels = _ds.labels[_ds.labels[_ds.label_col] == label]
+                dl = hydra.utils.instantiate(config.dataloader, dataset=_ds)
+                prediction = trainer.predict(model=module, dataloaders=dl)
+                module.save_result(root_dir=root_dir / label)
+        else:
+            prediction = trainer.predict(model=module, dataloaders=dataloaders["test"])
+            module.save_result(root_dir=root_dir)

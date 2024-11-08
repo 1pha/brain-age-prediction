@@ -115,6 +115,7 @@ class XPLModule(PLModule):
             xai = ca.Deconvolution(model=model.backbone)
         elif xai_method == "ig":
             xai = ca.IntegratedGradients(forward_func=forward_func)
+
         elif xai_method == "lrp":
             # XXX: Device setup is not done in lightning module instantiation
             device = torch.device(f"cuda:{torch.cuda.current_device()}")
@@ -124,6 +125,7 @@ class XPLModule(PLModule):
             elif isinstance(xai_init_kwarg, dict):
                 xai_init_kwarg.update(**lrp_default_kwarg)
             xai = InnvestigateModel(model.backbone, **xai_init_kwarg)
+
         elif xai_method.startswith("smooth"):
             if xai_method == "smooth_gbp":
                 attr_mtd = ca.GuidedBackprop(model=model.backbone)
@@ -132,6 +134,7 @@ class XPLModule(PLModule):
             xai = ca.NoiseTunnel(attribution_method=attr_mtd)
             if xai_call_kwarg is None:
                 xai_call_kwarg = dict(nt_type="smoothgrad", nt_samples=10)
+
         else:
             breakpoint()
         self.xai_call_kwarg = dict() if xai_call_kwarg is None else xai_call_kwarg
@@ -145,7 +148,7 @@ class XPLModule(PLModule):
                       xai_init_kwarg: dict = None,
                       xai_call_kwarg: dict = None) -> None:
         name = model.NAME.lower()
-        if name in ["resnet10", "resnet18", "resnet34", "convnext-tiny", "convnext-base"]:
+        if name in ["resnet10", "resnet18", "resnet34", "convnext-tiny", "convnext-small", "convnext-base"]:
             self.xai = self._configure_xai(model=self.model, xai_method=xai_method,
                                            target_layer_index=target_layer_index,
                                            xai_init_kwarg=xai_init_kwarg,
@@ -277,9 +280,8 @@ class XPLModule(PLModule):
 
             # Get projection list
             xai_dict = self.calculate_overlaps(attr=attr, atlas=self.atlas, device=brain.device)
-            return {"attr": attr,
-                    "top_attr": top_attr,
-                    "xai_dict": xai_dict}
+            top_xai_dict = self.calculate_overlaps(attr=top_attr, atlas=self.atlas, device=brain.device)
+            return dict(attr=attr, top_attr=top_attr, xai_dict=xai_dict, top_xai_dict=top_xai_dict)
 
         except Exception as e:
             # For CUDA Device-side asserted error
@@ -294,6 +296,7 @@ class XPLModule(PLModule):
         # dict: {roi1: [X1, X2, ... Xn],
         #        roi2: [X2, X2, ... Xn], ...}
         self.xai_dict = defaultdict(list)
+        self.top_xai_dict = defaultdict(list)
 
     def predict_step(self,
                      batch: dict,
@@ -309,6 +312,13 @@ class XPLModule(PLModule):
                 self.xai_dict[k].append(val)
             elif isinstance(val, list):
                 self.xai_dict[k].extend(val)
+
+        for k in result["top_xai_dict"]:
+            val = result["top_xai_dict"][k]
+            if isinstance(val, float):
+                self.top_xai_dict[k].append(val)
+            elif isinstance(val, list):
+                self.top_xai_dict[k].extend(val)
         # This is a hack to make lightning work
         return torch.zeros(size=(1,), requires_grad=True)
 
@@ -336,6 +346,8 @@ class XPLModule(PLModule):
         # Save Individual Projection Result
         with (root_dir / "xai_dict_indiv.json").open(mode="w") as f:
             json.dump(obj=self.xai_dict, fp=f, indent="\t")
+        with (root_dir / "top_xai_dict_indiv.json").open(mode="w") as f:
+            json.dump(obj=self.top_xai_dict, fp=f, indent="\t")
 
         # Save Total Projection Result
         xai_dict, agg_saliency = ao.calculate_overlaps(arr=self.top_attr, atlas=self.atlas,
