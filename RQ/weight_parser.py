@@ -1,16 +1,30 @@
 import os
 import logging
+import functools
 from pathlib import Path
 from typing import Dict, List, Tuple
+import warnings
 
 import hydra
 import numpy as np
 import pandas as pd
+from sympy import E
 
 import constants as C
 import utils
 
 logger = utils.get_logger(name=__file__)
+
+
+def error_handling_decorator(method):
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except Exception as e:
+            print(e)
+            self.flag = False
+    return wrapper
 
 
 class Weights:
@@ -31,6 +45,7 @@ class Weights:
                  seed: int = 42,
                  base_dir: Path = C.WEIGHT_DIR,
                  xai_method: str = "",
+                 strict: bool = True,
                  verbose: bool = True,
                  debug: bool = False):
         self.verbose = verbose
@@ -40,8 +55,12 @@ class Weights:
         logger.setLevel(logging.INFO if verbose else logging.CRITICAL)
         logger.info("Set base_path as %s", self.base_path)
         logger.info("Loading Basic Information")
+        self.model_name = model_name
+        self.seed = seed
+        self.xai_method = xai_method
         self.debug = debug
-        
+
+        self.flag = True # will turn to False if following has errors.
         self.prediction = self.load_prediction()
         self.config = self.load_config()
         self.ckpt_dict = self.load_checkpoint()
@@ -50,10 +69,16 @@ class Weights:
         if xai_method:
             # One can explicitly set xai method after instantiation via `obj.load_xai` as well.
             self.load_xai(xai_method=xai_method)
+        
+        if self.flag == False:
+            logger.info("One of loading failed")
+            if strict:
+                raise
             
     def __str__(self) -> str:
         return " / ".join([f"{k}: {v}" for k, v in self.test_performance.items()])
 
+    @error_handling_decorator
     def load_prediction(self, name: str = None) -> dict:
         if name is not None:
             # Load if there is a designate prediction file
@@ -69,6 +94,7 @@ class Weights:
                 logger.warn("There is no prediction pickle file in %s.", self.base_path)
                 logger.warn("Check the following: %s", list(self.base_path.glob("*")))
 
+    @error_handling_decorator
     def load_config(self,
                     config_fname: str = "config.yaml",
                     config_path: str = ".hydra",
@@ -79,6 +105,7 @@ class Weights:
             config = hydra.compose(config_name=config_fname)
         return config
 
+    @error_handling_decorator
     def load_checkpoint(self, step: int = None) -> Dict[str, List[tuple] | Path]:
         ckpts = list(self.base_path.glob("*.ckpt"))
         ckpt_dict = dict(steps=[])
@@ -102,6 +129,7 @@ class Weights:
                 ckpt_dict["best_valid_mae"] = [(int(step), mae)]
         return ckpt_dict
     
+    @error_handling_decorator
     def load_test_performance(self, log_fname: str = "train.log") -> Dict[str, float]:
         with open(self.base_path / log_fname, mode="r") as f:
             logs = f.readlines()
@@ -127,6 +155,7 @@ class Weights:
     def clear_path(self):
         self.xai_method = None
 
+    @error_handling_decorator
     def load_xai(self, xai_method: str, topk: float = 0.99) -> None:
         self.clear_path()
         self.set_path(xai_method=xai_method, topk=topk)
@@ -136,6 +165,7 @@ class Weights:
         self.load_xai_dict()
         self.load_xai_dict_indiv()
         self.load_attributes()
+        self.xai_method = xai_method
 
     def load_imgs(self) -> Dict[str, Path]:
         imgs = self.xai_path.rglob("*.png")
@@ -147,35 +177,101 @@ class Weights:
 
     def load_xai_dict(self) -> Dict[str, float]:
         xai_dict = utils.load_json(path=self.xai_path / "xai_dict.json")
-        self.xai_dict = xai_dict
+        self.xai_dict = {k: xai_dict[k] for k in C.ROI_COLUMNS} # Assuring order of RoIs indictionary
         return xai_dict
 
-    def load_xai_dict_indiv(self) -> pd.DataFrame:
+    def load_xai_dict_indiv(self, mask: np.ndarray = None, return_np: bool = False) -> pd.DataFrame:
         xai_dict_indiv = utils.load_json(path=self.xai_path / "xai_dict_indiv.json")
         xai_dict_indiv = pd.DataFrame(xai_dict_indiv)
+        xai_dict_indiv = xai_dict_indiv[C.ROI_COLUMNS] # Assuring order of RoIs indictionary
+        if mask is not None:
+            xai_dict_indiv = xai_dict_indiv[mask]
         self.xai_dict_indiv = xai_dict_indiv
-        return xai_dict_indiv
+        if return_np:
+            cond = ~xai_dict_indiv.isna().all() # Remove RoI with all nan values
+            xai_dict_indiv = xai_dict_indiv.loc[:, cond] if mask is None else xai_dict_indiv.loc[mask, cond]
+            arr = xai_dict_indiv.values
+            return arr
+        else:
+            return xai_dict_indiv
 
     def load_attributes(self) -> Dict[str, np.ndarray]:
         self.attrs = np.load(self.xai_path / "attrs.npy")
         self.top_attr = np.load(self.xai_path / "top_attr.npy")
         return dict(attrs=self.attrs, top_attr=self.top_attr)
     
-    def normalize_df(self, df: pd.DataFrame = None, eps: float = 1e-8) -> np.ndarray:
+    def normalize_df(self, df: pd.DataFrame = None, mask: np.ndarray = None, eps: float = 1e-8) -> np.ndarray:
         """Treat each column as a single vector and normalize row-wise,
         so that norm of df.iloc[i, :] goes to 1.
         This is to generate a normalized vector for each row (=test subject, 3,029 rows),
         and calculate patient2patient similarity and get a matrix."""
         if df is None:
-            df = self.load_xai_dict_indiv()
+            df = self.load_xai_dict_indiv(return_np=False)
         cond = ~df.isna().all() # Remove RoI with all nan values
-        df = df.loc[:, cond]
+        df = df.loc[:, cond] if mask is None else df.loc[mask, cond]
         arr = df.values
         nr, nc = arr.shape
         norm = np.linalg.norm(x=arr, axis=1).repeat(nc).reshape(nr, nc)
-        arr = arr / (norm + eps)
+        with warnings.catch_warnings(record=True) as w:
+            arr = arr / (norm + eps)
+            if w:
+                for warn in w:
+                    print(f"Runtime Divide {warn.message}: {self.model_name}-{self.seed} | {self.xai_method}")
         arr = np.nan_to_num(x=arr, nan=0, posinf=0, neginf=0)
         return arr
+    
+    
+class WeightsCls(Weights):
+    """For ADNI"""
+    def __init__(self,
+                 model_name: str = "resnet10t-binary",
+                 seed: int = 42,
+                 base_dir: Path = C._WEIGHTS / "adni",
+                 xai_method: str = "",
+                 strict: bool = True,
+                 verbose: bool = True,
+                 debug: bool = False):
+        super().__init__(model_name=model_name, seed=seed, base_dir=base_dir,
+                         xai_method=xai_method, strict=strict, verbose=verbose, debug=debug)
+
+    @error_handling_decorator
+    def load_checkpoint(self, step: int = None) -> Dict[str, List[tuple] | Path]:
+        ckpts = list(self.base_path.glob("*.ckpt"))
+        ckpt_dict = dict(steps=[])
+        for _ckpt in ckpts:
+            ckpt = str(_ckpt.stem)
+            if ckpt.startswith("step"):
+                # Checkpoints saved during training
+                step = int(ckpt.lstrip("step").split("-")[0])
+                train_mae = float(ckpt.split("-")[-1].lstrip("train_mae"))
+                ckpt_dict["steps"].append((step, train_mae))
+
+            elif ckpt == "last":
+                # Last Checkpoint
+                ckpt_dict["last"] = _ckpt
+
+            elif ckpt[0].isdigit():
+                # Best Checkpoint
+                ckpt_dict["best"] = _ckpt
+                step, _, f1 = ckpt.split("-")
+                f1 = float(f1)
+                ckpt_dict["best_valid_mae"] = [(int(step), f1)]
+        return ckpt_dict
+
+    @error_handling_decorator
+    def load_test_performance(self, log_fname: str = "train.log") -> Dict[str, float]:
+        with open(self.base_path / log_fname, mode="r") as f:
+            logs = f.readlines()
+        
+        perfs = dict(acc="ACC  :", f1="F1   :", auroc="AUROC:")
+        # Filterout lines with performances
+        logs = [line for line in logs if any(p in line for p in perfs.values())]
+        for log in logs:
+            for metric, char in perfs.items():
+                if isinstance(char, str) and char in log:
+                    val = float(log.split(char)[-1])
+                    perfs[metric] = val
+        return perfs
 
 
 class WeightAvg:
@@ -184,6 +280,8 @@ class WeightAvg:
                  model_name: str,
                  xai_method: str = "",
                  seeds: List[int] = [42, 43, 44],
+                 base_dir: Path = C.WEIGHT_DIR,
+                 reg: bool = True,
                  verbose: bool = False):
         """ Fetch multiple Weights of a fixated model_name & xai_method.
         e.g. For resnet10, collect xai_attributes from all seeds """
@@ -198,7 +296,12 @@ class WeightAvg:
         self._init_seed = seeds[0]
         self.seed_dict = dict()
         for seed in seeds:
-            w = Weights(model_name=model_name, xai_method=xai_method, seed=seed, verbose=verbose)
+            if reg:
+                w = Weights(model_name=model_name, xai_method=xai_method,
+                            seed=seed, base_dir=base_dir, verbose=verbose)
+            else:
+                w = WeightsCls(model_name=model_name, xai_method=xai_method,
+                               seed=seed, base_dir=base_dir, verbose=verbose)
             self.seed_dict[seed] = w
         self.aggregate(agg_xai=bool(xai_method))
 

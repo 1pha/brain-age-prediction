@@ -144,3 +144,43 @@ def preprocess_saliency(arr: np.ndarray,
     dp, _ = plot_overlay(arr=arr, use_mni=use_mni, display_mode=display_mode,
                          title=title, title_size=title_size)
     return arr, dp
+
+
+def to_square(df: pd.DataFrame, xai_key: str = None, method: str = None) -> pd.DataFrame:
+    """Convert dataframe into square form for heatmap plots"""
+    if not (xai_key is None and method is None):
+        subdf = df[(df[C.XCOL] == xai_key) & (df["Similarity Method"].str.contains(method))]
+    else:
+        subdf = df.copy()
+    subdf = subdf[["Similarity", "Source", "Target"]]
+
+    ids = np.unique(subdf[['Source', 'Target']])
+    matrix = pd.DataFrame(data=np.nan, index=ids, columns=ids)
+    for _, row in subdf.iterrows():
+        matrix.at[row['Source'], row['Target']] = row['Similarity']
+        matrix.at[row['Target'], row['Source']] = row['Similarity']  # if the matrix is symmetric
+    return matrix
+
+
+def heatmap(rob: pd.DataFrame, method: str, auto_cbar: bool = True, save: str = "") -> None:
+    assert method in {"spearmanr", "cossim"}, f"Method: {method}"
+    fig, ax = plt.subplots(nrows=2, ncols=4, figsize=(30, 12))
+    vmin = None if auto_cbar else -1
+    vmax = None if auto_cbar else 1
+    for idx, xai in enumerate(C.XAI_METHODS):
+        r, c = idx % 2, idx // 2
+        _ax = ax[r, c]
+
+        mat = to_square(df=rob, xai_key=xai, method=method)
+        mask = np.triu(np.ones_like(mat, dtype=bool))
+        
+        cmap = sns.color_palette("coolwarm", as_cmap=True)
+        cmap.set_bad(color="none")
+        sns.heatmap(mat, mask=mask, cmap=cmap, ax=_ax, vmin=vmin, vmax=vmax, square=True, linewidth=0.,)
+        _ax.set_title(C.XAI_METHODS_MAPPER.get(xai, xai), size="x-large")
+        _ax.grid(False)
+    fig.tight_layout()
+    if save:
+        fig.savefig(save, dpi=150, bbox_inches="tight")
+    else:
+        fig.suptitle(f"Similarity method: {method}, Average of patient-wise Robustness", size=35)
