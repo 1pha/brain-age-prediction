@@ -15,7 +15,8 @@ from itertools import combinations
 import pandas as pd
 import numpy as np
 from numpy import linalg
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, pearsonr
+from scipy.spatial.distance import pdist, squareform
 
 import constants as C
 
@@ -147,6 +148,91 @@ def _spear_mm(mat1: np.ndarray, mat2: np.ndarray,
     return np.nanmean(simvec) if return_avg else simvec
 
 
+def _cka_mm(mat1: np.ndarray, mat2: np.ndarray, sigma: float = 1.0,
+            num_patients: int = C.NUM_TEST, return_avg: bool = False) -> float | np.ndarray:
+    # Sanity check
+    assert mat1.ndim == 2, f"Entry matrix1 is not a matrix. Check ndim: {mat1.ndim}"
+    assert num_patients in mat1.shape, f"Entry matrix1 does not have num_patients shape ({num_patients}). Check shape: {mat1.shape}"
+    assert mat2.ndim == 2, f"Entry matrix2 is not a matrix. Check ndim: {mat2.ndim}"
+    assert num_patients in mat2.shape, f"Entry matrix2 does not have num_patients shape ({num_patients}). Check shape: {mat2.shape}"
+
+    if mat1.shape[0] != num_patients:
+        # mat1: (# Test scans, # RoIs)
+        mat1 = mat1.T
+    if mat2.shape[0] != num_patients:
+        # mat2: (# RoIs, # Test Scans)
+        mat2 = mat2.T
+    
+    # 마스크 적용하여 NaN 제거
+    # Calculate RBF kernel matrices
+    if sigma is None:
+        # Median heuristic for kernel width
+        X_norm = np.sqrt(np.sum(X**2, axis=1))
+        distances = squareform(pdist(X_norm.reshape(-1, 1)))
+        sigma = np.median(distances[distances > 0])
+        
+    # Apply RBF kernel
+    gamma = 1 / (2 * sigma**2)
+    K = mat1 @ mat1.T
+    L = mat2 @ mat2.T
+    
+    # Center kernel matrices
+    n = K.shape[0]
+    H = np.eye(n) - 1/n * np.ones((n, n))
+    K_centered = H @ K @ H
+    L_centered = H @ L @ H
+    
+    # Calculate HSIC
+    hsic = np.sum(K_centered * L_centered)
+    
+    # Calculate normalization
+    normalization = np.sqrt(np.sum(K_centered * K_centered) * np.sum(L_centered * L_centered))
+    
+    if normalization < 1e-10:
+        return 0.0
+    
+    return hsic / normalization
+
+
+def compute_RDM(X):
+    """
+    Compute Representational Dissimilarity Matrix.
+    
+    Args:
+        X: Matrix of shape (num_samples, num_features)
+        
+    Returns:
+        RDM of shape (num_samples, num_samples)
+    """
+    return squareform(pdist(X, metric='correlation'))
+
+
+def _rsa_mm(mat1: np.ndarray, mat2: np.ndarray, method: str = "spearmanr",
+            num_patients: int = C.NUM_TEST, return_avg: bool = False) -> float | np.ndarray:
+    # Sanity check
+    assert mat1.ndim == 2, f"Entry matrix1 is not a matrix. Check ndim: {mat1.ndim}"
+    assert num_patients in mat1.shape, f"Entry matrix1 does not have num_patients shape ({num_patients}). Check shape: {mat1.shape}"
+    assert mat2.ndim == 2, f"Entry matrix2 is not a matrix. Check ndim: {mat2.ndim}"
+    assert num_patients in mat2.shape, f"Entry matrix2 does not have num_patients shape ({num_patients}). Check shape: {mat2.shape}"
+    
+    # Compute RDMs
+    rdm_X = compute_RDM(mat1)
+    rdm_Y = compute_RDM(mat2)
+    
+    # Extract upper triangular part (excluding diagonal)
+    triu_indices = np.triu_indices_from(rdm_X, k=1)
+    rdm_X_vec = rdm_X[triu_indices]
+    rdm_Y_vec = rdm_Y[triu_indices]
+    
+    # Compute correlation
+    if method == 'spearman':
+        corr, p = spearmanr(rdm_X_vec, rdm_Y_vec)
+    else:  # pearson
+        corr, p = pearsonr(rdm_X_vec, rdm_Y_vec)
+    
+    return corr, p
+
+
 def simcalc(interp1: np.ndarray, interp2: np.ndarray,
             method: str = "spearmanr", return_avg: bool = False) -> np.ndarray | float:
     """ Similarity calculation betwen matrix/vector """
@@ -158,7 +244,8 @@ def simcalc(interp1: np.ndarray, interp2: np.ndarray,
     interp1, interp2 = d2n(interp1), d2n(interp2)
     dt1, dt2 = interp1.ndim, interp2.ndim
     
-    func_name = {"spearmanr": "spear", "cossim": "cossim"}[method]
+    func_name = {"spearmanr": "spear", "cossim": "cossim",
+                 "cka": "cka", "rsa": "rsa"}[method]
     if (dt1, dt2) == (1, 1):
         _simcalc = lambda i1, i2: eval(f"_{func_name}_vv")(vec1=i1, vec2=i2)
     elif (dt1, dt2) == (2, 1):
@@ -307,8 +394,39 @@ def inter_robustness(interps: Dict[str, Dict[str, List[np.ndarray]]],
     return df
 
 
+def inter_robustness_xai(interps: Dict[str, Dict[str, List[np.ndarray]]],
+                         method: str = "spearmanr") -> pd.DataFrame:
+    """For input, refer to metadata.py/load_interps()
+    Robustness with fixed model-seed, compare across saliency methods
+    
+    This will in turn generate the following:
+        Model      | Similarity | Similarity Method | Source   | Target
+    1   resnet10-0 | 0.87       | `method`          | DeepLIFT | IG
+    ...
+    """
+    rd = [] # Robustness Dictionary
+    print(f"Start calculating Inter-robustness (XAI): {method}")
+    
+    xai_list = list(interps.keys())
+    assert xai_list, f"Empty xai list. Check interpretability matrix `interps`"
+    model_list = list(interps[xai_list[0]].keys())
+    # No assertion code that forces all models saliency methods exist in different xai
+    NUM_SEEDS = range(10)
+    for model in model_list:
+        for seed in NUM_SEEDS:
+            xai_array = [interps[xai][model][seed] for xai in xai_list]
+            sim, index_pair = _group_simcalc(group=xai_array, method=method, return_avg=True)
+            for _sim, (idx1, idx2) in zip(sim, index_pair):
+                data = [f"{model}-{seed}", _sim, method, xai_list[idx1], xai_list[idx2]]
+                rd.append(data)
+    df = pd.DataFrame(rd, columns=["Model", C.YCOL, "Similarity Method", "Source", "Target"])
+    return df
+
+
 def group_alignment(interps: Dict[str, Dict[str, List[np.ndarray]]],
                     vector: np.ndarray, method: str, mask: np.ndarray = None) -> pd.DataFrame:
+    """Calculates alignment between conventional methods and saliency vector
+    """
     ad = dict()
     models = []
     for xai in interps:
@@ -346,6 +464,7 @@ def calculate_all_alignment(
         Assume p-values are given.
         """
         if isinstance(vector, dict):
+            # VBM stats
             key = list(vector.keys())[0]
             val = vector[key]
             if isinstance(val, float):
@@ -353,13 +472,13 @@ def calculate_all_alignment(
             elif isinstance(val, tuple | list):
                 # Fastsurfer values contain {RoI: (slope, pval)}
                 # Return p-value
-                vector = np.array([vector[key][0] for key in C.ROI_COLUMNS])
+                # P-value: needs reverse
+                vector = - np.array([vector[key][0] for key in C.ROI_COLUMNS])
         elif isinstance(vector, np.ndarray):
             pass
         else:
             vector = None
-        # P-value: needs reverse
-        return -vector
+        return vector
 
     ad = dict()
     for meta_key in metadata:
@@ -373,16 +492,21 @@ def calculate_all_alignment(
         # Finding Threshold
         if meta_key in ["VBM Young-to-old", "VBM Old-to-Young"]:
             # UKB VBM Threshold given
+            # Threshold based on t-statistics from vbm result.
+            # 인줄 알았으나 p-val이 들어있네.. 그거미만으로 가야..?
             threshold = C.UKB_FEW_THD
-            mask = vector < threshold
+            mask = vector > threshold
+            breakpoint()
         elif meta_key == "VBM ADNI":
             # ADNI VBM Threshold given
+            # Threshold based on t-statistics from vbm result.
             threshold = C.ADNI_FEW_THD
-            mask = vector < threshold
+            mask = vector > threshold
         elif meta_key.startswith("Fastsurfer"):
             # Fastsurfer tests given
+            # Threshold based on p-value
             threshold = 0.05
-            mask = np.array([metadata[key][1] < threshold for key in C.ROI_COLUMNS])
+            mask = np.array([metadata[meta_key][key][1] < threshold for key in C.ROI_COLUMNS])
         else:
             if use_threshold:
                 print(f"No availble threhsolding for given {meta_key}")

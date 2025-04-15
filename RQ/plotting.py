@@ -162,7 +162,8 @@ def to_square(df: pd.DataFrame, xai_key: str = None, method: str = None) -> pd.D
     return matrix
 
 
-def heatmap(rob: pd.DataFrame, method: str, auto_cbar: bool = True, save: str = "") -> None:
+def heatmap(rob: pd.DataFrame, method: str, auto_cbar: bool = True,
+            cmap: str = "coolwarm", save: str = "") -> None:
     assert method in {"spearmanr", "cossim"}, f"Method: {method}"
     fig, ax = plt.subplots(nrows=2, ncols=4, figsize=(30, 12))
     vmin = None if auto_cbar else -1
@@ -174,7 +175,7 @@ def heatmap(rob: pd.DataFrame, method: str, auto_cbar: bool = True, save: str = 
         mat = to_square(df=rob, xai_key=xai, method=method)
         mask = np.triu(np.ones_like(mat, dtype=bool))
         
-        cmap = sns.color_palette("coolwarm", as_cmap=True)
+        cmap = sns.color_palette(cmap, as_cmap=True)
         cmap.set_bad(color="none")
         sns.heatmap(mat, mask=mask, cmap=cmap, ax=_ax, vmin=vmin, vmax=vmax, square=True, linewidth=0.,)
         _ax.set_title(C.XAI_METHODS_MAPPER.get(xai, xai), size="x-large")

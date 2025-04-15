@@ -108,6 +108,8 @@ def fit(interps, gt, fitter: str = "lgbm", reg: bool = True,
 
     results = [] # List of dicts
     for xai_key in xai_methods:
+        if xai_key != "smooth_grad":
+            continue
         for model_key in model_list:
             print(f"\nXAI: {xai_key}\nMODEL: {model_key}\nMAE: ")
             result = train_ml(interps=interps, gt=gt, xai_key=xai_key, model_key=model_key,

@@ -1,10 +1,18 @@
 from pathlib import Path
+
+import seaborn as sns
+import numpy as np
 from nilearn.datasets import load_mni152_brain_mask
 
 
 mni_template = load_mni152_brain_mask()
 MNI_SHAPE = mni_template.get_fdata().shape
 MNI_AFFINE = mni_template.affine
+
+BIOBANK_AFFINE = np.array([[ -1.,  0.,  0.,   90.],
+                           [  0.,  1.,  0., -126.],
+                           [  0.,  0.,  1.,  -72.],
+                           [  0.,  0.,  0.,    1.]], dtype=np.float32)
 
 
 BASE = Path.home() / "codespace/brain-age-prediction"
@@ -16,11 +24,13 @@ META_DIR = BASE / "meta_brain"
 
 _WEIGHTS = BASE / "meta_brain" / "weights"
 WEIGHT_DIR = _WEIGHTS / "default"
+ADNI_WEIGHT_DIR = _WEIGHTS / "adni"
 
 ANALYSIS_DIR = META_DIR / "analysis"
 FS_DIR = ANALYSIS_DIR / "fastsurfer"
 VBM_DIR = ANALYSIS_DIR / "vbm"
 OCC_DIR = ANALYSIS_DIR / "occlusion"
+
 
 MODEL_KEY = {"resnet10": "ResNet10",
              "resnet18": "ResNet18",
@@ -30,8 +40,17 @@ MODEL_KEY = {"resnet10": "ResNet10",
              "convnext-base": "ConvNeXt-Base",
              "densenet121": "Densenet121",
              "densenet169": "Densenet169",
-             "densenet264d": "Densenet264d",
-             }
+             "densenet264d": "Densenet264d"}
+
+MODEL_ARCH_KEY = {"resnet10": "ResNet",
+                  "resnet18": "ResNet",
+                  "resnet34": "ResNet",
+                  "convnext-tiny": "ConvNeXt",
+                  "convnext-small": "ConvNeXt",
+                  "convnext-base": "ConvNeXt",
+                  "densenet121": "Densenet",
+                  "densenet169": "Densenet",
+                  "densenet264d": "Densenet"}
 
 MODELS = ["resnet10", "resnet18", "resnet34",
           "convnext-tiny", "convnext-small", "convnext-base",
@@ -48,18 +67,23 @@ MODELS_SIZE = {
     "densenet264d": "90.4M",
 }
 
-XAI_METHODS = ["gradxinput", "gcam_avg", "gbp", "smooth_gbp",
-               "ggcam", "ggcam_avg", "deeplift", "ig"]
-XAI_METHODS_MAPPER = {
+# Remove ggcam (naive, no average) for integration
+XAI_METHODS = ["gradxinput", "gcam_avg", "gbp", "smooth_gbp", "smooth_grad",
+               "ggcam_avg", "deeplift", "ig"]
+_XAI_METHODS_MAPPER = {
     "gradxinput": "GradXInput",
     "gcam_avg": "GradCAM",
     "gbp": "GuidedBackprop.",
     "smooth_gbp": "SmoothGBP",
-    "ggcam": "Guided-GCAM",
-    "ggcam_avg": "GGCAM Avg.",
+    "smooth_grad": "SmoothGrad",
+    "ggcam": "Guided-GCAM Last",
+    "ggcam_avg": "Guided-GCAM",
     "deeplift": "DeepLIFT",
     "ig": "Integ. Gradients",
 }
+XAI_METHODS_MAPPER = {k: _XAI_METHODS_MAPPER[k] for k in XAI_METHODS}
+nc = len(XAI_METHODS)
+ukb_cmap, adni_cmap = sns.color_palette("rocket_r", n_colors=nc), sns.color_palette("crest", n_colors=nc)
 
 SEEDS = range(42, 52)
 NUM_TEST = 3029
@@ -71,6 +95,25 @@ PERF_AVG = dict(mae=2.55094, r2=0.822, mse=10.3914)
 PERF_AVG_ADNI = dict(acc=0.8437, f1=0.7759, auroc=0.91331)
 
 UKB_FEW_THD = 4.950344
+"""
+from scipy.stats import t
+
+# 자유도
+df = 197
+
+# 유의수준 (0.05)
+alpha = 0.05
+
+# 양측 검정 threshold t 값
+t_threshold_two_tailed = t.ppf(1 - alpha/2, df)
+
+# 단측 검정 threshold t 값
+t_threshold_one_tailed = t.ppf(1 - alpha, df)
+
+print("양측 검정 t-threshold:", t_threshold_two_tailed)
+print("단측 검정 t-threshold:", t_threshold_one_tailed)
+"""
+UKB_FEW_THD_TWO = 5.20
 ADNI_FWE_THD = 5.071649
 
 ROI_COLUMNS = [
