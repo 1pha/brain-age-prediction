@@ -8,7 +8,7 @@ hydra:
 
 defaults:
   - _self_
-  - model: convnext_cls
+  - model: resnet_cls
   - dataset: adni
   - scheduler: exp_decay
   - optim: adamw

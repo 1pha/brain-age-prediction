@@ -1,4 +1,4 @@
 _target_: pytorch_lightning.loggers.WandbLogger
 project: brain-age
 entity: 1pha
-name: ${model.name}
+name: ${model.name} ${misc.seed}

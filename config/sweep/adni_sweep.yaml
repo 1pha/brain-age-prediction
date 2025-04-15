@@ -3,7 +3,7 @@ description: "HPO for ADNI classification task"
 method: bayes
 metric:
   goal: maximize
-  name: test_acc
+  name: test_f1
 parameters:
   optim:
     values: [ adamw , lion ]
@@ -11,6 +11,8 @@ parameters:
     values: [ exp_decay , cosine_anneal_warmup ]
   optim.lr:
     values: [ 5e-3 , 1e-3 , 1e-4 , 5e-5 ]
+  model.backbone.model_depth:
+    values: [ 10 , 18 , 34 ]
 early_terminate:
   type: hyperband
   s: 2

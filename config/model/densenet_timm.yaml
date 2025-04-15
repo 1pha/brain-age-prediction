@@ -1,0 +1,9 @@
+_target_: sage.models.base.Densenet
+backbone:
+  _target_: timm_3d.create_model
+  num_classes: 1
+  in_chans: 1
+  model_name: densenet121
+criterion:
+  _target_: torch.nn.MSELoss
+name: ${model.backbone.model_name}

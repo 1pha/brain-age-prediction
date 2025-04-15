@@ -1,0 +1,7 @@
+_target_: sage.models.base.Densenet
+backbone:
+  _target_: sage.models.model_zoo.densenet.build_densenet
+  model_depth: 121 # 169, 201, 264
+criterion:
+  _target_: torch.nn.MSELoss
+name: Densenet

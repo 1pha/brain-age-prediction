@@ -5,4 +5,4 @@ backbone:
   num_classes: 1
 criterion:
   _target_: torch.nn.BCEWithLogitsLoss
-name: ConvNeXt-base
+name: ${model.backbone.model_name}-binary

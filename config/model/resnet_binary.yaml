@@ -5,4 +5,4 @@ backbone:
   num_classes: 1
 criterion:
   _target_: torch.nn.BCEWithLogitsLoss
-name: resnet10t
+name: resnet${model.backbone.model_depth}t-binary
