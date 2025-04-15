@@ -1,15 +1,25 @@
 age-README/
 assets/
+adni
+adni_fastsurfer
+meta_brain
+adni_new
+adni*
+adni_training/*
+brain
 biobank
 lightning_logs/
 outputs/
 raw_rfMRI
+retrain/*
+nl
+ppmi
 *.pkl
 *.tar
 _*
 tmp_vbm/
 nbia/
-brain/
+RQ/media_assets
 
 *.ini
 *.nii
@@ -30,6 +40,7 @@ resized_attmap/
 DeepNotion/
 result/
 wandb/
+occlusion-result/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
