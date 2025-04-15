@@ -2,6 +2,7 @@ import random
 import subprocess
 from typing import Any, List, Dict
 from pathlib import Path
+from copy import deepcopy
 
 import hydra
 import omegaconf
@@ -366,7 +367,7 @@ def tune(config: omegaconf.DictConfig) -> omegaconf.DictConfig:
 
 def train(config: omegaconf.DictConfig) -> Dict[str, float]:
     config: omegaconf.DictConfig = tune(config)
-    _logger: pl._logger = hydra.utils.instantiate(config.logger)
+    _logger = hydra.utils.instantiate(config.logger)
     module, dataloaders = setup_trainer(config)
 
     # Logger Setup
